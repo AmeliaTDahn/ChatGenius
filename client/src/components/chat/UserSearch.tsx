@@ -11,6 +11,7 @@ type User = {
   id: number;
   username: string;
   avatarUrl?: string;
+  isFriend?: boolean;
 };
 
 export function UserSearch() {
@@ -90,14 +91,24 @@ export function UserSearch() {
                   </Avatar>
                   <span className="font-medium">{user.username}</span>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendFriendRequest.mutate(user.id)}
-                  disabled={sendFriendRequest.isPending}
-                >
-                  Add Friend
-                </Button>
+                {user.isFriend ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={true}
+                  >
+                    Added
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => sendFriendRequest.mutate(user.id)}
+                    disabled={sendFriendRequest.isPending}
+                  >
+                    Add Friend
+                  </Button>
+                )}
               </div>
             ))}
           </div>

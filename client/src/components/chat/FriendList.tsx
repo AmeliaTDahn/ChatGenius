@@ -3,6 +3,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { MessageCircle } from "lucide-react";
 
 type Friend = {
   id: number;
@@ -47,6 +48,34 @@ export function FriendList() {
     }
   });
 
+  const startDirectMessage = useMutation({
+    mutationFn: async (friendId: number) => {
+      const res = await fetch('/api/direct-messages/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendId }),
+        credentials: 'include'
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
+      toast({
+        title: "Direct message channel created",
+        description: "You can now start chatting with your friend.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading friends...</div>;
   }
@@ -75,14 +104,24 @@ export function FriendList() {
                 <p className="font-medium">{friend.username}</p>
               </div>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => removeFriend.mutate(friend.id)}
-              disabled={removeFriend.isPending}
-            >
-              Remove
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => startDirectMessage.mutate(friend.id)}
+                disabled={startDirectMessage.isPending}
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => removeFriend.mutate(friend.id)}
+                disabled={removeFriend.isPending}
+              >
+                Remove
+              </Button>
+            </div>
           </div>
         ))}
       </div>
