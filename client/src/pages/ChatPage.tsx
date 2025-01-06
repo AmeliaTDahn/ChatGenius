@@ -6,6 +6,7 @@ import { ChannelList } from "@/components/chat/ChannelList";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { UserSearch } from "@/components/chat/UserSearch";
+import { FriendRequests } from "@/components/chat/FriendRequests";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,7 @@ export default function ChatPage() {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const { sendMessage } = useWebSocket(user);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isRequestsOpen, setIsRequestsOpen] = useState(false);
 
   if (!user) return null;
 
@@ -39,6 +41,7 @@ export default function ChatPage() {
           user={user} 
           onLogout={logout} 
           onAddFriend={() => setIsSearchOpen(true)}
+          onViewRequests={() => setIsRequestsOpen(true)}
         />
         <ChannelList
           selectedChannel={selectedChannel}
@@ -72,6 +75,15 @@ export default function ChatPage() {
             <DialogTitle>Add Friend</DialogTitle>
           </DialogHeader>
           <UserSearch />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRequestsOpen} onOpenChange={setIsRequestsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Friend Requests</DialogTitle>
+          </DialogHeader>
+          <FriendRequests />
         </DialogContent>
       </Dialog>
     </div>

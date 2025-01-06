@@ -1,6 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, UserPlus } from "lucide-react";
+import { LogOut, UserPlus, Bell } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -8,9 +8,10 @@ type UserHeaderProps = {
   user: User;
   onLogout: () => Promise<void>;
   onAddFriend: () => void;
+  onViewRequests: () => void;
 };
 
-export function UserHeader({ user, onLogout, onAddFriend }: UserHeaderProps) {
+export function UserHeader({ user, onLogout, onAddFriend, onViewRequests }: UserHeaderProps) {
   const { toast } = useToast();
 
   // Safe fallback for username display
@@ -50,6 +51,14 @@ export function UserHeader({ user, onLogout, onAddFriend }: UserHeaderProps) {
         </div>
       </div>
       <div className="flex gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={onViewRequests}
+          title="Friend Requests"
+        >
+          <Bell className="h-4 w-4" />
+        </Button>
         <Button 
           variant="ghost" 
           size="icon"
