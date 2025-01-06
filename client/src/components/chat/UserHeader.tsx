@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 
 type UserHeaderProps = {
   user: User;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
 };
 
 export function UserHeader({ user, onLogout }: UserHeaderProps) {
@@ -31,6 +31,14 @@ export function UserHeader({ user, onLogout }: UserHeaderProps) {
   // Safe fallback for username display
   const displayName = user?.username || 'User';
   const fallbackInitial = displayName.charAt(0).toUpperCase();
+
+  const handleLogout = async () => {
+    try {
+      await onLogout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   return (
     <div className="flex items-center justify-between p-4 border-b bg-sidebar">
@@ -84,7 +92,7 @@ export function UserHeader({ user, onLogout }: UserHeaderProps) {
           </SheetContent>
         </Sheet>
         <ThemeToggle />
-        <Button variant="ghost" size="icon" onClick={onLogout}>
+        <Button variant="ghost" size="icon" onClick={handleLogout}>
           <LogOut className="h-4 w-4" />
         </Button>
       </div>

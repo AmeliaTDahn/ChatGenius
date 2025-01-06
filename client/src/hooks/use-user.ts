@@ -6,47 +6,6 @@ type LoginData = {
   password: string;
 };
 
-type RequestResult = {
-  ok: true;
-  user: User;
-} | {
-  ok: false;
-  message: string;
-};
-
-async function handleRequest(
-  url: string,
-  method: string,
-  body?: LoginData
-): Promise<RequestResult> {
-  try {
-    const response = await fetch(url, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      if (response.status >= 500) {
-        return { ok: false, message: response.statusText };
-      }
-
-      const message = await response.text();
-      return { ok: false, message };
-    }
-
-    if (method === 'POST' && url === '/api/logout') {
-      return { ok: true, user: null as any };
-    }
-
-    const data = await response.json();
-    return { ok: true, user: data };
-  } catch (e: any) {
-    return { ok: false, message: e.toString() };
-  }
-}
-
 async function fetchUser(): Promise<User | null> {
   const response = await fetch('/api/user', {
     credentials: 'include'
@@ -72,30 +31,42 @@ export function useUser() {
     retry: false
   });
 
-  const loginMutation = useMutation<RequestResult, Error, LoginData>({
-    mutationFn: (userData) => handleRequest('/api/login', 'POST', userData),
-    onSuccess: (result) => {
-      if (result.ok) {
-        queryClient.setQueryData(['user'], result.user);
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginData) => {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['user'], data.user);
     },
   });
 
-  const logoutMutation = useMutation<RequestResult, Error>({
-    mutationFn: () => handleRequest('/api/logout', 'POST'),
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.setQueryData(['user'], null);
-      // Force reload to clear all state
       window.location.href = '/';
-    },
-  });
-
-  const registerMutation = useMutation<RequestResult, Error, LoginData>({
-    mutationFn: (userData) => handleRequest('/api/register', 'POST', userData),
-    onSuccess: (result) => {
-      if (result.ok) {
-        queryClient.setQueryData(['user'], result.user);
-      }
     },
   });
 
@@ -105,6 +76,5 @@ export function useUser() {
     error,
     login: loginMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
-    register: registerMutation.mutateAsync,
   };
 }
