@@ -15,16 +15,13 @@ function App() {
     );
   }
 
+  // If not logged in, show auth page
   if (!user) {
     return <AuthPage />;
   }
 
-  return (
-    <Switch>
-      <Route path="/" component={ChatPage} />
-      <Route component={ChatPage} />
-    </Switch>
-  );
+  // If logged in, show chat page
+  return <ChatPage />;
 }
 
 export default App;
