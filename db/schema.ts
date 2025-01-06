@@ -16,11 +16,38 @@ export const userProfiles = pgTable("user_profiles", {
   userId: integer("user_id").references(() => users.id).notNull(),
   displayName: text("display_name").notNull(),
   bio: text("bio"),
+  city: text("city"),
   timezone: text("timezone").notNull(),
-  interests: text("interests"),
+  age: integer("age"),
+  avatarUrl: text("avatar_url"),
   isProfileComplete: boolean("is_profile_complete").default(false).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Define base types first
+export type User = typeof users.$inferSelect;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type InsertUserProfile = typeof userProfiles.$inferInsert;
+
+// Then extend User type to include optional profile
+export type UserWithProfile = User & {
+  profile?: UserProfile;
+};
+
+// Relations
+export const userRelations = relations(users, ({ one }) => ({
+  profile: one(userProfiles, {
+    fields: [users.id],
+    references: [userProfiles.userId],
+  }),
+}));
+
+// Export schemas for validation
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
+export const insertUserProfileSchema = createInsertSchema(userProfiles);
+export const selectUserProfileSchema = createSelectSchema(userProfiles);
 
 export const channels = pgTable("channels", {
   id: serial("id").primaryKey(),
@@ -31,11 +58,8 @@ export const channels = pgTable("channels", {
 });
 
 // Base types
-export type User = typeof users.$inferSelect & {
-  profile?: UserProfile;
-};
-export type UserProfile = typeof userProfiles.$inferSelect;
 export type Channel = typeof channels.$inferSelect;
+
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -95,19 +119,6 @@ export const channelInvites = pgTable("channel_invites", {
 });
 
 // Relations
-export const userRelations = relations(users, ({ many, one }) => ({
-  profile: one(userProfiles, {
-    fields: [users.id],
-    references: [userProfiles.userId],
-  }),
-  messages: many(messages),
-  channelMembers: many(channelMembers),
-  sentFriendRequests: many(friendRequests, { relationName: "sender" }),
-  receivedFriendRequests: many(friendRequests, { relationName: "receiver" }),
-  sentChannelInvites: many(channelInvites, { relationName: "sender" }),
-  receivedChannelInvites: many(channelInvites, { relationName: "receiver" }),
-}));
-
 export const channelRelations = relations(channels, ({ many }) => ({
   messages: many(messages),
   channelMembers: many(channelMembers),
@@ -180,8 +191,6 @@ export const channelInviteRelations = relations(channelInvites, ({ one }) => ({
 }));
 
 // Export schemas for validation
-export const insertUserSchema = createInsertSchema(users);
-export const selectUserSchema = createSelectSchema(users);
 
 export const insertChannelSchema = createInsertSchema(channels);
 export const selectChannelSchema = createSelectSchema(channels);
@@ -197,6 +206,3 @@ export const selectFriendRequestSchema = createSelectSchema(friendRequests);
 
 export const insertChannelInviteSchema = createInsertSchema(channelInvites);
 export const selectChannelInviteSchema = createSelectSchema(channelInvites);
-
-export const insertUserProfileSchema = createInsertSchema(userProfiles);
-export const selectUserProfileSchema = createSelectSchema(userProfiles);

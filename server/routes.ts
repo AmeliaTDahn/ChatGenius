@@ -1,10 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
-import { setupWebSocket } from "./websocket";
 import { db } from "@db";
-import { channels, messages, channelMembers, messageReactions, users, friendRequests, channelInvites, userProfiles } from "@db/schema";
-import { eq, desc, ilike, and, or } from "drizzle-orm";
+import { users, userProfiles, type UserWithProfile } from "@db/schema";
+import { eq } from "drizzle-orm";
+import { setupAuth } from "./auth";
 
 declare module 'express-session' {
   interface SessionData {
@@ -14,39 +13,84 @@ declare module 'express-session' {
   }
 }
 
+declare global {
+  namespace Express {
+    interface User extends UserWithProfile {}
+  }
+}
+
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
   const server = createServer(app);
-  setupWebSocket(server);
 
   // Profile Setup
   app.post("/api/user/profile", async (req, res) => {
-    if (!req.isAuthenticated() || !req.user?.id) {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
-    const { displayName, bio, timezone, interests } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).send("Invalid user");
+    }
+
+    const { displayName, bio, city, timezone, age, avatarUrl } = req.body;
     if (!displayName || !timezone) {
       return res.status(400).send("Display name and timezone are required");
     }
 
     try {
+      // First, check if a profile already exists
+      const [existingProfile] = await db
+        .select()
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId))
+        .limit(1);
+
+      if (existingProfile) {
+        // Update existing profile
+        const [profile] = await db
+          .update(userProfiles)
+          .set({
+            displayName,
+            bio,
+            city,
+            timezone,
+            age: Number(age),
+            avatarUrl,
+            isProfileComplete: true,
+          })
+          .where(eq(userProfiles.userId, userId))
+          .returning();
+
+        return res.json(profile);
+      }
+
+      // Create new profile
       const [profile] = await db
         .insert(userProfiles)
         .values({
-          userId: req.user.id,
+          userId,
           displayName,
           bio,
+          city,
           timezone,
-          interests,
+          age: Number(age),
+          avatarUrl,
           isProfileComplete: true,
         })
         .returning();
 
+      // Update user's avatar URL
+      await db
+        .update(users)
+        .set({ avatarUrl })
+        .where(eq(users.id, userId));
+
       res.json(profile);
     } catch (error) {
-      console.error("Error creating user profile:", error);
-      res.status(500).send("Error creating user profile");
+      console.error("Error creating/updating user profile:", error);
+      res.status(500).send("Error creating/updating user profile");
     }
   });
 
