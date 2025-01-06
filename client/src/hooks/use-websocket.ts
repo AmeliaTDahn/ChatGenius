@@ -17,7 +17,10 @@ export function useWebSocket(user: User | null) {
   useEffect(() => {
     if (!user) return;
 
-    ws.current = new WebSocket(`ws://${window.location.host}/ws?userId=${user.id}`);
+    // Use secure WebSocket if the page is loaded over HTTPS
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}`;
+    ws.current = new WebSocket(wsUrl);
 
     ws.current.onmessage = (event) => {
       const message: WSMessage = JSON.parse(event.data);
