@@ -2,9 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq, and, ne, ilike } from "drizzle-orm";
+import { eq, and, ne, ilike, or } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels } from "@db/schema";
 import { WebSocketServer } from "ws";
 
 declare module 'express-session' {
@@ -477,6 +477,51 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add direct messages endpoint
+  app.get("/api/direct-messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const userId = req.user.id;
+      const directChannels = await db.query.directMessageChannels.findMany({
+        where: or(
+          eq(directMessageChannels.user1Id, userId),
+          eq(directMessageChannels.user2Id, userId)
+        ),
+        with: {
+          channel: true,
+          user1: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true
+            }
+          },
+          user2: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true
+            }
+          }
+        }
+      });
+
+      // Transform the data to include the other user's info
+      const formattedChannels = directChannels.map(dc => ({
+        ...dc.channel,
+        otherUser: dc.user1.id === userId ? dc.user2 : dc.user1
+      }));
+
+      res.json(formattedChannels);
+    } catch (error) {
+      console.error("Error fetching direct messages:", error);
+      res.status(500).send("Error fetching direct messages");
+    }
+  });
+
   app.put("/api/friend-requests/:requestId", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -510,13 +555,44 @@ export function registerRoutes(app: Express): Server {
         .set({ status })
         .where(eq(friendRequests.id, requestId));
 
-      // If accepted, create friend relationship
+      // If accepted, create friend relationship and direct message channel
       if (status === 'accepted') {
+        // Create friend relationship
         await db
           .insert(friends)
           .values({
             user1Id: request.senderId,
             user2Id: req.user.id
+          });
+
+        // Create a new channel for direct messages
+        const [dmChannel] = await db
+          .insert(channels)
+          .values({
+            name: 'Direct Message',
+            isDirectMessage: true
+          })
+          .returning();
+
+        // Add both users to the channel
+        await db.insert(channelMembers).values([
+          {
+            userId: request.senderId,
+            channelId: dmChannel.id
+          },
+          {
+            userId: req.user.id,
+            channelId: dmChannel.id
+          }
+        ]);
+
+        // Create direct message channel relationship
+        await db
+          .insert(directMessageChannels)
+          .values({
+            user1Id: request.senderId,
+            user2Id: req.user.id,
+            channelId: dmChannel.id
           });
       }
 

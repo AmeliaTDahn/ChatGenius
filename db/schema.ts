@@ -62,6 +62,8 @@ export const userRelations = relations(users, ({ many }) => ({
   messages: many(messages),
   channelMembers: many(channelMembers),
   messageReactions: many(messageReactions),
+  directMessageChannels1: many(directMessageChannels, { relationName: "user1" }),
+  directMessageChannels2: many(directMessageChannels, { relationName: "user2" }),
 }));
 
 export const messageRelations = relations(messages, ({ one, many }) => ({
@@ -168,8 +170,31 @@ export const channelInviteRelations = relations(channelInvites, ({ one }) => ({
 }));
 
 
-// Export schemas for validation
+// Added Direct Message Channel Table and Relations
+export const directMessageChannels = pgTable("direct_message_channels", {
+  id: serial("id").primaryKey(),
+  user1Id: integer("user1_id").references(() => users.id).notNull(),
+  user2Id: integer("user2_id").references(() => users.id).notNull(),
+  channelId: integer("channel_id").references(() => channels.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
+export const directMessageChannelRelations = relations(directMessageChannels, ({ one }) => ({
+  user1: one(users, {
+    fields: [directMessageChannels.user1Id],
+    references: [users.id],
+  }),
+  user2: one(users, {
+    fields: [directMessageChannels.user2Id],
+    references: [users.id],
+  }),
+  channel: one(channels, {
+    fields: [directMessageChannels.channelId],
+    references: [channels.id],
+  }),
+}));
+
+// Export schemas for validation
 export const insertFriendRequestSchema = createInsertSchema(friendRequests);
 export const selectFriendRequestSchema = createSelectSchema(friendRequests);
 
