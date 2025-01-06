@@ -5,12 +5,20 @@ import { UserHeader } from "@/components/chat/UserHeader";
 import { ChannelList } from "@/components/chat/ChannelList";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
+import { UserSearch } from "@/components/chat/UserSearch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Channel } from "@db/schema";
 
 export default function ChatPage() {
   const { user, logout } = useUser();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const { sendMessage } = useWebSocket(user);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   if (!user) return null;
 
@@ -27,7 +35,11 @@ export default function ChatPage() {
   return (
     <div className="h-screen flex">
       <div className="w-64 flex flex-col border-r">
-        <UserHeader user={user} onLogout={logout} />
+        <UserHeader 
+          user={user} 
+          onLogout={logout} 
+          onAddFriend={() => setIsSearchOpen(true)}
+        />
         <ChannelList
           selectedChannel={selectedChannel}
           onSelectChannel={setSelectedChannel}
@@ -53,6 +65,15 @@ export default function ChatPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Friend</DialogTitle>
+          </DialogHeader>
+          <UserSearch />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

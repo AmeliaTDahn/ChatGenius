@@ -1,15 +1,16 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, UserPlus } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 
 type UserHeaderProps = {
   user: User;
   onLogout: () => Promise<void>;
+  onAddFriend: () => void;
 };
 
-export function UserHeader({ user, onLogout }: UserHeaderProps) {
+export function UserHeader({ user, onLogout, onAddFriend }: UserHeaderProps) {
   const { toast } = useToast();
 
   // Safe fallback for username display
@@ -48,14 +49,25 @@ export function UserHeader({ user, onLogout }: UserHeaderProps) {
           <p className="text-xs text-muted-foreground">Online</p>
         </div>
       </div>
-      <Button 
-        variant="ghost" 
-        size="icon"
-        onClick={handleLogout}
-        className="hover:bg-destructive/10"
-      >
-        <LogOut className="h-4 w-4" />
-      </Button>
+      <div className="flex gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={onAddFriend}
+          title="Add Friend"
+        >
+          <UserPlus className="h-4 w-4" />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={handleLogout}
+          className="hover:bg-destructive/10"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
