@@ -25,12 +25,35 @@ export function useMessages(channelId: number) {
         throw new Error(await res.text());
       }
 
-      return res.json();
+      return res.json() as Promise<Message>;
     },
     onSuccess: (newMessage) => {
-      // Update the cache with the new message
       queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
         return [newMessage, ...oldMessages];
+      });
+    },
+  });
+
+  const addReaction = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: number; emoji: string }) => {
+      const res = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json() as Promise<Message>;
+    },
+    onSuccess: (updatedMessage) => {
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        return oldMessages.map((msg) =>
+          msg.id === updatedMessage.id ? updatedMessage : msg
+        );
       });
     },
   });
@@ -39,5 +62,7 @@ export function useMessages(channelId: number) {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
+    addReaction: (messageId: number, emoji: string) =>
+      addReaction.mutateAsync({ messageId, emoji }),
   };
 }

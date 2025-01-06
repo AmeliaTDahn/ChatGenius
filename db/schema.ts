@@ -19,6 +19,10 @@ export const channels = pgTable("channels", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Define base types first to avoid circular dependencies
+export type User = typeof users.$inferSelect;
+export type Channel = typeof channels.$inferSelect;
+
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
@@ -28,11 +32,11 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const channelMembers = pgTable("channel_members", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  channelId: integer("channel_id").references(() => channels.id).notNull(),
-});
+export type Message = typeof messages.$inferSelect & {
+  user: User;
+  replies?: (Message & { user: User })[];
+  reactions?: MessageReaction[];
+};
 
 export const messageReactions = pgTable("message_reactions", {
   id: serial("id").primaryKey(),
@@ -42,13 +46,17 @@ export const messageReactions = pgTable("message_reactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Define base types first to avoid circular dependencies
-export type User = typeof users.$inferSelect;
-export type Channel = typeof channels.$inferSelect;
-export type BaseMessage = typeof messages.$inferSelect;
-export type ChannelMember = typeof channelMembers.$inferSelect;
+export type MessageReaction = typeof messageReactions.$inferSelect & {
+  user: User;
+};
 
-// Then define the relations
+export const channelMembers = pgTable("channel_members", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  channelId: integer("channel_id").references(() => channels.id).notNull(),
+});
+
+// Relations
 export const userRelations = relations(users, ({ many }) => ({
   messages: many(messages),
   channelMembers: many(channelMembers),
@@ -98,7 +106,6 @@ export const messageReactionRelations = relations(messageReactions, ({ one }) =>
   }),
 }));
 
-
 // Schemas for validation
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -111,12 +118,3 @@ export const selectMessageSchema = createSelectSchema(messages);
 
 export const insertMessageReactionSchema = createInsertSchema(messageReactions);
 export const selectMessageReactionSchema = createSelectSchema(messageReactions);
-
-// Extended type for messages with relations
-export type Message = BaseMessage & {
-  user: User;
-  replies?: (BaseMessage & { user: User })[];
-  reactions?: MessageReaction[];
-};
-
-export type MessageReaction = typeof messageReactions.$inferSelect;

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupWebSocket } from "./websocket";
 import { db } from "@db";
-import { channels, messages, channelMembers } from "@db/schema";
+import { channels, messages, channelMembers, messageReactions } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export function registerRoutes(app: Express): Server {
@@ -106,6 +106,65 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error creating message:", error);
       res.status(500).send("Error creating message");
+    }
+  });
+
+  // Message Reactions
+  app.post("/api/messages/:messageId/reactions", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const messageId = parseInt(req.params.messageId);
+    if (isNaN(messageId)) {
+      return res.status(400).send("Invalid message ID");
+    }
+
+    const { emoji } = req.body;
+    if (!emoji || typeof emoji !== "string") {
+      return res.status(400).send("Emoji is required");
+    }
+
+    try {
+      // Check if user already reacted with this emoji
+      const [existingReaction] = await db
+        .select()
+        .from(messageReactions)
+        .where(eq(messageReactions.messageId, messageId))
+        .where(eq(messageReactions.userId, req.user.id))
+        .where(eq(messageReactions.emoji, emoji));
+
+      if (existingReaction) {
+        // Remove reaction if it already exists
+        await db
+          .delete(messageReactions)
+          .where(eq(messageReactions.id, existingReaction.id));
+      } else {
+        // Add new reaction
+        await db.insert(messageReactions).values({
+          messageId,
+          userId: req.user.id,
+          emoji,
+        });
+      }
+
+      const [message] = await db.query.messages.findMany({
+        where: eq(messages.id, messageId),
+        with: {
+          user: true,
+          reactions: {
+            with: {
+              user: true,
+            },
+          },
+        },
+        limit: 1,
+      });
+
+      res.json(message);
+    } catch (error) {
+      console.error("Error managing reaction:", error);
+      res.status(500).send("Error managing reaction");
     }
   });
 
