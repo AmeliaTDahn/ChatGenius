@@ -4,7 +4,7 @@ import { db } from "@db";
 import { users, type User } from "@db/schema";
 import { eq, and, ne, ilike } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, messages, channelInvites, messageReactions } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends } from "@db/schema";
 import { WebSocketServer } from "ws";
 
 declare module 'express-session' {
@@ -400,6 +400,130 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error handling message reaction:", error);
       res.status(500).send("Error handling message reaction");
+    }
+  });
+
+  // Friend requests
+  app.post("/api/friend-requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const { receiverId } = req.body;
+
+    if (!receiverId) {
+      return res.status(400).send("Invalid receiver ID");
+    }
+
+    try {
+      // Check if friend request already exists
+      const [existingRequest] = await db
+        .select()
+        .from(friendRequests)
+        .where(and(
+          eq(friendRequests.senderId, req.user.id),
+          eq(friendRequests.receiverId, receiverId),
+          eq(friendRequests.status, 'pending')
+        ))
+        .limit(1);
+
+      if (existingRequest) {
+        return res.status(400).send("Friend request already sent");
+      }
+
+      // Create friend request
+      const [request] = await db
+        .insert(friendRequests)
+        .values({
+          senderId: req.user.id,
+          receiverId,
+          status: 'pending'
+        })
+        .returning();
+
+      res.json(request);
+    } catch (error) {
+      console.error("Error creating friend request:", error);
+      res.status(500).send("Error creating friend request");
+    }
+  });
+
+  app.get("/api/friend-requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const requests = await db.query.friendRequests.findMany({
+        where: and(
+          eq(friendRequests.receiverId, req.user.id),
+          eq(friendRequests.status, 'pending')
+        ),
+        with: {
+          sender: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true
+            }
+          }
+        }
+      });
+
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching friend requests:", error);
+      res.status(500).send("Error fetching friend requests");
+    }
+  });
+
+  app.put("/api/friend-requests/:requestId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const requestId = parseInt(req.params.requestId);
+    const { status } = req.body;
+
+    if (isNaN(requestId) || !['accepted', 'rejected'].includes(status)) {
+      return res.status(400).send("Invalid request ID or status");
+    }
+
+    try {
+      const [request] = await db
+        .select()
+        .from(friendRequests)
+        .where(and(
+          eq(friendRequests.id, requestId),
+          eq(friendRequests.receiverId, req.user.id),
+          eq(friendRequests.status, 'pending')
+        ))
+        .limit(1);
+
+      if (!request) {
+        return res.status(404).send("Friend request not found");
+      }
+
+      // Update request status
+      await db
+        .update(friendRequests)
+        .set({ status })
+        .where(eq(friendRequests.id, requestId));
+
+      // If accepted, create friend relationship
+      if (status === 'accepted') {
+        await db
+          .insert(friends)
+          .values({
+            user1Id: request.senderId,
+            user2Id: req.user.id
+          });
+      }
+
+      res.json({ message: `Friend request ${status}` });
+    } catch (error) {
+      console.error("Error handling friend request:", error);
+      res.status(500).send("Error handling friend request");
     }
   });
 
