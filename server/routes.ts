@@ -603,5 +603,109 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add these endpoints after the existing friend-related endpoints
+
+  app.get("/api/friends", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const userFriends = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      res.json(userFriends);
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+      res.status(500).send("Error fetching friends");
+    }
+  });
+
+  app.delete("/api/friends/:friendId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const friendId = parseInt(req.params.friendId);
+    if (isNaN(friendId)) {
+      return res.status(400).send("Invalid friend ID");
+    }
+
+    try {
+      // Remove from friends table
+      await db
+        .delete(friends)
+        .where(or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(friends.user2Id, friendId)
+          ),
+          and(
+            eq(friends.user1Id, friendId),
+            eq(friends.user2Id, req.user.id)
+          )
+        ));
+
+      // Find and remove the direct message channel
+      const [dmChannel] = await db
+        .select({
+          channelId: directMessageChannels.channelId
+        })
+        .from(directMessageChannels)
+        .where(or(
+          and(
+            eq(directMessageChannels.user1Id, req.user.id),
+            eq(directMessageChannels.user2Id, friendId)
+          ),
+          and(
+            eq(directMessageChannels.user1Id, friendId),
+            eq(directMessageChannels.user2Id, req.user.id)
+          )
+        ))
+        .limit(1);
+
+      if (dmChannel) {
+        // Remove channel members
+        await db
+          .delete(channelMembers)
+          .where(eq(channelMembers.channelId, dmChannel.channelId));
+
+        // Remove direct message channel relation
+        await db
+          .delete(directMessageChannels)
+          .where(eq(directMessageChannels.channelId, dmChannel.channelId));
+
+        // Remove the channel itself
+        await db
+          .delete(channels)
+          .where(eq(channels.id, dmChannel.channelId));
+      }
+
+      res.json({ message: "Friend removed successfully" });
+    } catch (error) {
+      console.error("Error removing friend:", error);
+      res.status(500).send("Error removing friend");
+    }
+  });
+
   return server;
 }

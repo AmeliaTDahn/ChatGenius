@@ -7,6 +7,7 @@ import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { UserSearch } from "@/components/chat/UserSearch";
 import { FriendRequests } from "@/components/chat/FriendRequests";
+import { FriendList } from "@/components/chat/FriendList";
 import { InviteToChannel } from "@/components/chat/InviteToChannel";
 import {
   Dialog,
@@ -15,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 import type { Channel } from "@db/schema";
 
 export default function ChatPage() {
@@ -25,6 +26,7 @@ export default function ChatPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isFriendsOpen, setIsFriendsOpen] = useState(false);
 
   if (!user) return null;
 
@@ -46,6 +48,7 @@ export default function ChatPage() {
           onLogout={logout} 
           onAddFriend={() => setIsSearchOpen(true)}
           onViewRequests={() => setIsRequestsOpen(true)}
+          onViewFriends={() => setIsFriendsOpen(true)}
         />
         <ChannelList
           selectedChannel={selectedChannel}
@@ -100,6 +103,15 @@ export default function ChatPage() {
             <DialogTitle>Friend Requests</DialogTitle>
           </DialogHeader>
           <FriendRequests />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isFriendsOpen} onOpenChange={setIsFriendsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Friends</DialogTitle>
+          </DialogHeader>
+          <FriendList />
         </DialogContent>
       </Dialog>
 
