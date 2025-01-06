@@ -27,11 +27,6 @@
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 84% 4.9%;
     --sidebar-border: 214.3 31.8% 91.4%;
-    --chart-1: 222.2 47.4% 11.2%;
-    --chart-2: 222.2 47.4% 21.2%;
-    --chart-3: 222.2 47.4% 31.2%;
-    --chart-4: 222.2 47.4% 41.2%;
-    --chart-5: 222.2 47.4% 51.2%;
   }
 
   .dark {
@@ -57,11 +52,6 @@
     --sidebar-background: 222.2 84% 4.9%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 17.5%;
-    --chart-1: 210 40% 98%;
-    --chart-2: 210 40% 88%;
-    --chart-3: 210 40% 78%;
-    --chart-4: 210 40% 68%;
-    --chart-5: 210 40% 58%;
   }
 
   * {
@@ -69,19 +59,19 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased bg-background text-foreground transition-colors duration-300;
   }
+}
 
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
 
-  ::-webkit-scrollbar-track {
-    @apply bg-muted;
-  }
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
 
-  ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30;
-  }
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30;
 }

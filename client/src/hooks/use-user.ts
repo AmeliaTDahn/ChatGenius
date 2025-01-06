@@ -85,6 +85,8 @@ export function useUser() {
     mutationFn: () => handleRequest('/api/logout', 'POST'),
     onSuccess: () => {
       queryClient.setQueryData(['user'], null);
+      // Force reload to clear all state
+      window.location.href = '/';
     },
   });
 
