@@ -13,11 +13,11 @@ export function useMessages(channelId: number) {
   });
 
   const sendMessage = useMutation({
-    mutationFn: async (messageData: { content: string; parentId?: number }) => {
+    mutationFn: async (content: string) => {
       const res = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messageData),
+        body: JSON.stringify({ content }),
         credentials: 'include',
       });
 
@@ -27,8 +27,11 @@ export function useMessages(channelId: number) {
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+    onSuccess: (newMessage) => {
+      // Update the cache with the new message
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        return [newMessage, ...oldMessages];
+      });
     },
   });
 

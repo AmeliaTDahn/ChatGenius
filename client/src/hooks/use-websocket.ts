@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { User } from '@db/schema';
+import type { User, Message } from '@db/schema';
 
 type WSMessage = {
   type: 'message' | 'typing' | 'presence' | 'ping';
@@ -8,6 +8,7 @@ type WSMessage = {
   content?: string;
   userId?: number;
   isOnline?: boolean;
+  message?: Message;
 };
 
 export function useWebSocket(user: User | null) {
@@ -27,14 +28,14 @@ export function useWebSocket(user: User | null) {
 
       switch (message.type) {
         case 'message':
-          if (message.channelId) {
-            queryClient.invalidateQueries({
-              queryKey: [`/api/channels/${message.channelId}/messages`],
-            });
+          if (message.channelId && message.message) {
+            queryClient.setQueryData<Message[]>(
+              [`/api/channels/${message.channelId}/messages`],
+              (oldMessages = []) => [message.message, ...oldMessages]
+            );
           }
           break;
         case 'presence':
-          // Update user presence in cache
           if (message.userId) {
             queryClient.setQueryData(['users', message.userId], (oldData: any) => ({
               ...oldData,

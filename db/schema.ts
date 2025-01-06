@@ -34,6 +34,14 @@ export const channelMembers = pgTable("channel_members", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
 });
 
+export const messageReactions = pgTable("message_reactions", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").references(() => messages.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  emoji: text("emoji").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Define base types first to avoid circular dependencies
 export type User = typeof users.$inferSelect;
 export type Channel = typeof channels.$inferSelect;
@@ -65,6 +73,7 @@ export const messageRelations = relations(messages, ({ one, many }) => ({
     references: [messages.id],
   }),
   replies: many(messages, { relationName: "message_replies" }),
+  reactions: many(messageReactions),
 }));
 
 export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
@@ -78,6 +87,18 @@ export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
   }),
 }));
 
+export const messageReactionRelations = relations(messageReactions, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageReactions.messageId],
+    references: [messages.id],
+  }),
+  user: one(users, {
+    fields: [messageReactions.userId],
+    references: [users.id],
+  }),
+}));
+
+
 // Schemas for validation
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -88,8 +109,14 @@ export const selectChannelSchema = createSelectSchema(channels);
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
 
+export const insertMessageReactionSchema = createInsertSchema(messageReactions);
+export const selectMessageReactionSchema = createSelectSchema(messageReactions);
+
 // Extended type for messages with relations
 export type Message = BaseMessage & {
   user: User;
   replies?: (BaseMessage & { user: User })[];
+  reactions?: MessageReaction[];
 };
+
+export type MessageReaction = typeof messageReactions.$inferSelect;

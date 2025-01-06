@@ -15,11 +15,11 @@ export default function ChatPage() {
   if (!user) return null;
 
   const handleSendMessage = (content: string) => {
-    if (selectedChannel) {
+    if (selectedChannel && content.trim()) {
       sendMessage({
         type: "message",
         channelId: selectedChannel.id,
-        content,
+        content: content.trim()
       });
     }
   };

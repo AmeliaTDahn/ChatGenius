@@ -1,10 +1,10 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
-import type { User } from '@db/schema';
+import type { User, Message } from '@db/schema';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
-import { users } from '@db/schema';
+import { users, messages } from '@db/schema';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -17,6 +17,7 @@ type WSMessage = {
   content?: string;
   userId?: number;
   isOnline?: boolean;
+  message?: Message;
 };
 
 type VerifyClientInfo = {
@@ -58,18 +59,64 @@ export function setupWebSocket(server: Server) {
     });
   }, 30000);
 
-  const broadcastToChannel = (channelId: number, message: WSMessage) => {
-    wss.clients.forEach((ws) => {
-      const client = ws as AuthenticatedWebSocket;
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(message));
+  const broadcastToChannel = async (channelId: number, message: WSMessage) => {
+    try {
+      if (message.type === 'message' && message.content && message.userId) {
+        // Save message to database
+        const [newMessage] = await db
+          .insert(messages)
+          .values({
+            content: message.content,
+            channelId: channelId,
+            userId: message.userId,
+          })
+          .returning();
+
+        if (!newMessage) {
+          throw new Error('Failed to insert message');
+        }
+
+        // Fetch complete message with user data
+        const messageWithUser = await db.query.messages.findFirst({
+          where: eq(messages.id, newMessage.id),
+          with: {
+            user: true,
+          },
+        });
+
+        if (!messageWithUser) {
+          throw new Error('Failed to fetch message with user');
+        }
+
+        // Broadcast to all clients in the channel
+        wss.clients.forEach((ws) => {
+          const client = ws as AuthenticatedWebSocket;
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+              type: 'message',
+              channelId,
+              message: messageWithUser,
+            }));
+          }
+        });
+      } else {
+        // For non-message types (typing, presence)
+        wss.clients.forEach((ws) => {
+          const client = ws as AuthenticatedWebSocket;
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(message));
+          }
+        });
       }
-    });
+    } catch (error) {
+      console.error('Error broadcasting message:', error);
+    }
   };
 
   const updateUserPresence = async (userId: number, isOnline: boolean) => {
     try {
-      await db.update(users)
+      await db
+        .update(users)
         .set({ isOnline })
         .where(eq(users.id, userId));
 
@@ -110,7 +157,7 @@ export function setupWebSocket(server: Server) {
           switch (message.type) {
             case 'message':
               if (message.channelId && message.content) {
-                broadcastToChannel(message.channelId, {
+                await broadcastToChannel(message.channelId, {
                   ...message,
                   userId: ws.userId
                 });
@@ -118,7 +165,7 @@ export function setupWebSocket(server: Server) {
               break;
             case 'typing':
               if (message.channelId) {
-                broadcastToChannel(message.channelId, {
+                await broadcastToChannel(message.channelId, {
                   type: 'typing',
                   channelId: message.channelId,
                   userId: ws.userId

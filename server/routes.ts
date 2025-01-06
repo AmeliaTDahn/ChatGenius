@@ -59,11 +59,6 @@ export function registerRoutes(app: Express): Server {
         where: eq(messages.channelId, channelId),
         with: {
           user: true,
-          replies: {
-            with: {
-              user: true
-            }
-          }
         },
         orderBy: desc(messages.createdAt)
       });
@@ -85,7 +80,7 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).send("Invalid channel ID");
     }
 
-    const { content, parentId } = req.body;
+    const { content } = req.body;
     if (!content || typeof content !== "string") {
       return res.status(400).send("Message content is required");
     }
@@ -96,7 +91,6 @@ export function registerRoutes(app: Express): Server {
           content,
           channelId,
           userId: req.user.id,
-          parentId: parentId || null
         })
         .returning();
 
