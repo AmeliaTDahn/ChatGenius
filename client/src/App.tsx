@@ -3,6 +3,7 @@ import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 import AuthPage from "./pages/AuthPage";
 import ChatPage from "./pages/ChatPage";
+import ProfileSetupPage from "./pages/ProfileSetupPage";
 
 function App() {
   const { user, isLoading } = useUser();
@@ -17,6 +18,11 @@ function App() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  // Check if user needs to complete profile setup
+  if (!user.profile?.isProfileComplete) {
+    return <ProfileSetupPage />;
   }
 
   return (
