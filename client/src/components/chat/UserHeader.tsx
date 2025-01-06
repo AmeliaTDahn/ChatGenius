@@ -26,6 +26,8 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
         title: "Logged out successfully",
         description: "Redirecting to login page...",
       });
+      // Redirect after showing the toast
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout failed:', error);
       toast({

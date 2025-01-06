@@ -65,8 +65,10 @@ export function useUser() {
       return response.json();
     },
     onSuccess: () => {
+      // Clear all queries from the cache
+      queryClient.clear();
+      // Set user data to null
       queryClient.setQueryData(['user'], null);
-      window.location.href = '/';
     },
   });
 
