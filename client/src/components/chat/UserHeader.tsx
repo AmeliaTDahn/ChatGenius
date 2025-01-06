@@ -28,17 +28,22 @@ export function UserHeader({ user, onLogout }: UserHeaderProps) {
 
   const pendingRequests = requests?.filter(r => r.status === 'pending')?.length || 0;
 
+  // Safe fallback for username display
+  const displayName = user?.username || 'User';
+  const fallbackInitial = displayName.charAt(0).toUpperCase();
+
   return (
     <div className="flex items-center justify-between p-4 border-b bg-sidebar">
       <div className="flex items-center gap-3">
         <Avatar>
-          {user.avatarUrl && (
-            <AvatarImage src={user.avatarUrl} alt={user.username} />
+          {user?.avatarUrl ? (
+            <AvatarImage src={user.avatarUrl} alt={displayName} />
+          ) : (
+            <AvatarFallback>{fallbackInitial}</AvatarFallback>
           )}
-          <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
         </Avatar>
         <div>
-          <p className="font-medium text-sm">{user.username}</p>
+          <p className="font-medium text-sm">{displayName}</p>
           <p className="text-xs text-muted-foreground">Online</p>
         </div>
       </div>
