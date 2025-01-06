@@ -1,0 +1,80 @@
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Hash, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useChannels } from "@/hooks/use-channels";
+import type { Channel } from "@db/schema";
+
+type ChannelListProps = {
+  selectedChannel: Channel | null;
+  onSelectChannel: (channel: Channel) => void;
+};
+
+export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [newChannelName, setNewChannelName] = useState("");
+  const { channels, createChannel } = useChannels();
+
+  const handleCreateChannel = async () => {
+    if (newChannelName.trim()) {
+      await createChannel({ name: newChannelName.trim() });
+      setNewChannelName("");
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-sidebar">
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-semibold text-lg">Channels</h2>
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Channel</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input
+                  placeholder="Channel name"
+                  value={newChannelName}
+                  onChange={(e) => setNewChannelName(e.target.value)}
+                />
+                <Button onClick={handleCreateChannel} className="w-full">
+                  Create Channel
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="space-y-1 p-2">
+          {channels.map((channel) => (
+            <Button
+              key={channel.id}
+              variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => onSelectChannel(channel)}
+            >
+              <Hash className="h-4 w-4 mr-2" />
+              {channel.name}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
