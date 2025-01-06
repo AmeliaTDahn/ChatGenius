@@ -36,6 +36,10 @@ async function handleRequest(
       return { ok: false, message };
     }
 
+    if (method === 'POST' && url === '/api/logout') {
+      return { ok: true, user: null as any };
+    }
+
     const data = await response.json();
     return { ok: true, user: data };
   } catch (e: any) {
