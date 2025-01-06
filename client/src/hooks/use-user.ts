@@ -36,10 +36,6 @@ async function handleRequest(
       return { ok: false, message };
     }
 
-    if (method === 'POST' && url === '/api/logout') {
-      return { ok: true, user: null as any }; // Special case for logout
-    }
-
     const data = await response.json();
     return { ok: true, user: data };
   } catch (e: any) {
@@ -99,11 +95,6 @@ export function useUser() {
     },
   });
 
-  const updateProfile = async () => {
-    const updatedUser = await fetchUser();
-    queryClient.setQueryData(['user'], updatedUser);
-  };
-
   return {
     user,
     isLoading,
@@ -111,6 +102,5 @@ export function useUser() {
     login: loginMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
     register: registerMutation.mutateAsync,
-    updateProfile,
   };
 }

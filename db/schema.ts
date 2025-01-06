@@ -6,48 +6,14 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
-  isOnline: boolean("is_online").default(false).notNull(),
   avatarUrl: text("avatar_url"),
+  isOnline: boolean("is_online").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const userProfiles = pgTable("user_profiles", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  displayName: text("display_name").notNull(),
-  bio: text("bio"),
-  city: text("city"),
-  timezone: text("timezone").notNull(),
-  age: integer("age"),
-  avatarUrl: text("avatar_url"),
-  isProfileComplete: boolean("is_profile_complete").default(false).notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Define base types first
+// Base types
 export type User = typeof users.$inferSelect;
-export type UserProfile = typeof userProfiles.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-export type InsertUserProfile = typeof userProfiles.$inferInsert;
-
-// Then extend User type to include optional profile
-export type UserWithProfile = User & {
-  profile?: UserProfile;
-};
-
-// Relations
-export const userRelations = relations(users, ({ one }) => ({
-  profile: one(userProfiles, {
-    fields: [users.id],
-    references: [userProfiles.userId],
-  }),
-}));
-
-// Export schemas for validation
-export const insertUserSchema = createInsertSchema(users);
-export const selectUserSchema = createSelectSchema(users);
-export const insertUserProfileSchema = createInsertSchema(userProfiles);
-export const selectUserProfileSchema = createSelectSchema(userProfiles);
 
 export const channels = pgTable("channels", {
   id: serial("id").primaryKey(),
@@ -57,9 +23,7 @@ export const channels = pgTable("channels", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Base types
 export type Channel = typeof channels.$inferSelect;
-
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -94,35 +58,11 @@ export const channelMembers = pgTable("channel_members", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
 });
 
-export const friendRequests = pgTable("friend_requests", {
-  id: serial("id").primaryKey(),
-  senderId: integer("sender_id").references(() => users.id).notNull(),
-  receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), // pending, accepted, rejected
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const friends = pgTable("friends", {
-  id: serial("id").primaryKey(),
-  user1Id: integer("user1_id").references(() => users.id).notNull(),
-  user2Id: integer("user2_id").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const channelInvites = pgTable("channel_invites", {
-  id: serial("id").primaryKey(),
-  channelId: integer("channel_id").references(() => channels.id).notNull(),
-  senderId: integer("sender_id").references(() => users.id).notNull(),
-  receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), // pending, accepted, rejected
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // Relations
-export const channelRelations = relations(channels, ({ many }) => ({
+export const userRelations = relations(users, ({ many }) => ({
   messages: many(messages),
   channelMembers: many(channelMembers),
-  channelInvites: many(channelInvites),
+  messageReactions: many(messageReactions),
 }));
 
 export const messageRelations = relations(messages, ({ one, many }) => ({
@@ -142,6 +82,11 @@ export const messageRelations = relations(messages, ({ one, many }) => ({
   reactions: many(messageReactions),
 }));
 
+export const channelRelations = relations(channels, ({ many }) => ({
+  messages: many(messages),
+  channelMembers: many(channelMembers),
+}));
+
 export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
   user: one(users, {
     fields: [channelMembers.userId],
@@ -153,17 +98,44 @@ export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
   }),
 }));
 
-export const messageReactionRelations = relations(messageReactions, ({ one }) => ({
-  message: one(messages, {
-    fields: [messageReactions.messageId],
-    references: [messages.id],
-  }),
-  user: one(users, {
-    fields: [messageReactions.userId],
-    references: [users.id],
-  }),
-}));
+// Export schemas for validation
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
 
+export const insertMessageSchema = createInsertSchema(messages);
+export const selectMessageSchema = createSelectSchema(messages);
+
+export const insertMessageReactionSchema = createInsertSchema(messageReactions);
+export const selectMessageReactionSchema = createSelectSchema(messageReactions);
+
+export const insertChannelSchema = createInsertSchema(channels);
+export const selectChannelSchema = createSelectSchema(channels);
+
+export const channelInvites = pgTable("channel_invites", {
+  id: serial("id").primaryKey(),
+  channelId: integer("channel_id").references(() => channels.id).notNull(),
+  senderId: integer("sender_id").references(() => users.id).notNull(),
+  receiverId: integer("receiver_id").references(() => users.id).notNull(),
+  status: text("status").notNull().default('pending'), // pending, accepted, rejected
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const friendRequests = pgTable("friend_requests", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").references(() => users.id).notNull(),
+  receiverId: integer("receiver_id").references(() => users.id).notNull(),
+  status: text("status").notNull().default('pending'), // pending, accepted, rejected
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const friends = pgTable("friends", {
+  id: serial("id").primaryKey(),
+  user1Id: integer("user1_id").references(() => users.id).notNull(),
+  user2Id: integer("user2_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Relations
 export const friendRequestRelations = relations(friendRequests, ({ one }) => ({
   sender: one(users, {
     fields: [friendRequests.senderId],
@@ -190,16 +162,8 @@ export const channelInviteRelations = relations(channelInvites, ({ one }) => ({
   }),
 }));
 
+
 // Export schemas for validation
-
-export const insertChannelSchema = createInsertSchema(channels);
-export const selectChannelSchema = createSelectSchema(channels);
-
-export const insertMessageSchema = createInsertSchema(messages);
-export const selectMessageSchema = createSelectSchema(messages);
-
-export const insertMessageReactionSchema = createInsertSchema(messageReactions);
-export const selectMessageReactionSchema = createSelectSchema(messageReactions);
 
 export const insertFriendRequestSchema = createInsertSchema(friendRequests);
 export const selectFriendRequestSchema = createSelectSchema(friendRequests);
