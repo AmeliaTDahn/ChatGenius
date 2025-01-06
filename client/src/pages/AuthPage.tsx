@@ -24,8 +24,9 @@ const formSchema = z.object({
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState("login");
-  const { login, register } = useUser();
+  const { login } = useUser();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -37,20 +38,17 @@ export default function AuthPage() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      const result = await (activeTab === "login" ? login : register)(values);
-      if (!result.ok) {
-        toast({
-          title: "Error",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
+      setIsLoading(true);
+      await login(values);
+      // No need to show success toast as the app will redirect automatically
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -101,8 +99,8 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full">
-                    Login
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Loading..." : "Login"}
                   </Button>
                 </form>
               </Form>
@@ -140,8 +138,8 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full">
-                    Register
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Loading..." : "Register"}
                   </Button>
                 </form>
               </Form>
