@@ -7,12 +7,15 @@ import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { UserSearch } from "@/components/chat/UserSearch";
 import { FriendRequests } from "@/components/chat/FriendRequests";
+import { InviteToChannel } from "@/components/chat/InviteToChannel";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { UserPlus } from "lucide-react";
 import type { Channel } from "@db/schema";
 
 export default function ChatPage() {
@@ -21,6 +24,7 @@ export default function ChatPage() {
   const { sendMessage } = useWebSocket(user);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   if (!user) return null;
 
@@ -51,12 +55,24 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col">
         {selectedChannel ? (
           <>
-            <div className="p-4 border-b">
-              <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
-              {selectedChannel.description && (
-                <p className="text-sm text-muted-foreground">
-                  {selectedChannel.description}
-                </p>
+            <div className="p-4 border-b flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
+                {selectedChannel.description && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedChannel.description}
+                  </p>
+                )}
+              </div>
+              {!selectedChannel.isDirectMessage && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsInviteOpen(true)}
+                  title="Invite to Channel"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
               )}
             </div>
             <MessageList channelId={selectedChannel.id} />
@@ -86,6 +102,17 @@ export default function ChatPage() {
           <FriendRequests />
         </DialogContent>
       </Dialog>
+
+      {selectedChannel && !selectedChannel.isDirectMessage && (
+        <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Invite to {selectedChannel.name}</DialogTitle>
+            </DialogHeader>
+            <InviteToChannel channelId={selectedChannel.id} />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

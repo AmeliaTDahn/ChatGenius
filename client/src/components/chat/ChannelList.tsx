@@ -11,6 +11,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useChannels } from "@/hooks/use-channels";
+import { DirectMessageList } from "./DirectMessageList";
+import { Separator } from "@/components/ui/separator";
 import type { Channel } from "@db/schema";
 
 type ChannelListProps = {
@@ -22,6 +24,9 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   const [isOpen, setIsOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const { channels, createChannel } = useChannels();
+
+  // Filter out direct message channels
+  const regularChannels = channels.filter(channel => !channel.isDirectMessage);
 
   const handleCreateChannel = async () => {
     if (newChannelName.trim()) {
@@ -62,7 +67,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
       </div>
       <ScrollArea className="flex-1">
         <div className="space-y-1 p-2">
-          {channels.map((channel) => (
+          {regularChannels.map((channel) => (
             <Button
               key={channel.id}
               variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
@@ -73,6 +78,13 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
               {channel.name}
             </Button>
           ))}
+        </div>
+
+        <Separator className="my-2 mx-2" />
+
+        <div className="p-2">
+          <h3 className="text-sm font-medium mb-2 px-2">Direct Messages</h3>
+          <DirectMessageList onSelectChannel={onSelectChannel} />
         </div>
       </ScrollArea>
     </div>
