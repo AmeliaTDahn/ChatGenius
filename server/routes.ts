@@ -4,7 +4,7 @@ import { db } from "@db";
 import { users, type User } from "@db/schema";
 import { eq, and, ne, ilike } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, messages, channelInvites } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites, messageReactions } from "@db/schema";
 import { WebSocketServer } from "ws";
 
 declare module 'express-session' {
@@ -323,6 +323,67 @@ export function registerRoutes(app: Express): Server {
     });
 
     res.json(channelMessages);
+  });
+
+  // Add message reactions endpoint after the messages endpoints
+  app.post("/api/messages/:messageId/reactions", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const messageId = parseInt(req.params.messageId);
+    const { emoji } = req.body;
+
+    if (isNaN(messageId) || !emoji) {
+      return res.status(400).send("Invalid message ID or emoji");
+    }
+
+    try {
+      // Check if reaction already exists
+      const [existingReaction] = await db
+        .select()
+        .from(messageReactions)
+        .where(and(
+          eq(messageReactions.messageId, messageId),
+          eq(messageReactions.userId, req.user.id),
+          eq(messageReactions.emoji, emoji)
+        ))
+        .limit(1);
+
+      if (existingReaction) {
+        // Remove reaction if it exists
+        await db
+          .delete(messageReactions)
+          .where(eq(messageReactions.id, existingReaction.id));
+      } else {
+        // Add new reaction
+        await db
+          .insert(messageReactions)
+          .values({
+            messageId,
+            userId: req.user.id,
+            emoji
+          });
+      }
+
+      // Get updated message with reactions
+      const updatedMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, messageId),
+        with: {
+          user: true,
+          reactions: {
+            with: {
+              user: true
+            }
+          }
+        }
+      });
+
+      res.json(updatedMessage);
+    } catch (error) {
+      console.error("Error handling message reaction:", error);
+      res.status(500).send("Error handling message reaction");
+    }
   });
 
   return server;

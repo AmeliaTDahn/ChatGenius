@@ -41,12 +41,13 @@ export function MessageList({ channelId }: MessageListProps) {
     return (
       <div className="flex items-start gap-3">
         <Avatar className="h-8 w-8">
-          {message.user.avatarUrl && (
+          {message.user.avatarUrl ? (
             <AvatarImage src={message.user.avatarUrl} alt={message.user.username} />
+          ) : (
+            <AvatarFallback>
+              {message.user.username[0].toUpperCase()}
+            </AvatarFallback>
           )}
-          <AvatarFallback>
-            {message.user.username[0].toUpperCase()}
-          </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <div className="flex items-baseline gap-2">
@@ -76,14 +77,6 @@ export function MessageList({ channelId }: MessageListProps) {
             </div>
             <ReactionPicker onSelectEmoji={handleReaction} />
           </div>
-
-          {message.replies && message.replies.length > 0 && (
-            <div className="ml-4 mt-2 space-y-2 border-l-2 pl-4">
-              {message.replies.map((reply) => (
-                <MessageComponent key={reply.id} message={reply} />
-              ))}
-            </div>
-          )}
         </div>
       </div>
     );
