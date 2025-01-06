@@ -99,6 +99,11 @@ export function useUser() {
     },
   });
 
+  const updateProfile = async () => {
+    const updatedUser = await fetchUser();
+    queryClient.setQueryData(['user'], updatedUser);
+  };
+
   return {
     user,
     isLoading,
@@ -106,5 +111,6 @@ export function useUser() {
     login: loginMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
     register: registerMutation.mutateAsync,
+    updateProfile,
   };
 }

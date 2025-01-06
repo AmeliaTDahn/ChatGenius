@@ -51,7 +51,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfileSetupPage() {
-  const { user } = useUser();
+  const { user, updateProfile } = useUser();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -75,7 +75,7 @@ export default function ProfileSetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
-          age: Number(values.age), // Ensure age is sent as a number
+          age: Number(values.age),
         }),
         credentials: "include",
       });
@@ -84,14 +84,17 @@ export default function ProfileSetupPage() {
         throw new Error(await response.text());
       }
 
-      const data = await response.json();
+      await response.json();
+
+      // Update the user data in react-query cache
+      await updateProfile();
 
       toast({
         title: "Profile setup complete",
         description: "Welcome to the chat application!",
       });
 
-      // Force a reload of the user data and redirect to home
+      // Redirect to home page
       window.location.href = "/";
     } catch (error: any) {
       toast({
