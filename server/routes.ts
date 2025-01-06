@@ -2,15 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq, and, or, ilike, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { friendRequests } from "@db/schema";
-import { channelMembers } from "@db/schema";
-import { channels } from "@db/schema";
-import { messages } from "@db/schema";
-import { channelInvites } from "@db/schema";
-import { messageReactions } from "@db/schema";
-
 
 declare module 'express-session' {
   interface SessionData {
@@ -22,7 +15,8 @@ declare module 'express-session' {
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    // Fix circular type reference
+    interface User extends Omit<User, 'password'> {}
   }
 }
 
@@ -38,7 +32,13 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const [user] = await db
-        .select()
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+          isOnline: users.isOnline,
+          createdAt: users.createdAt
+        })
         .from(users)
         .where(eq(users.id, req.user.id))
         .limit(1);
@@ -53,5 +53,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error fetching user");
     }
   });
-return server;
+
+  return server;
 }

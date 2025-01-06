@@ -28,12 +28,6 @@ const crypto = {
   },
 };
 
-declare global {
-  namespace Express {
-    interface User extends SelectUser { }
-  }
-}
-
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
@@ -73,7 +67,10 @@ export function setupAuth(app: Express) {
         if (!isMatch) {
           return done(null, false, { message: "Incorrect password." });
         }
-        return done(null, user);
+
+        // Don't send password in the user object
+        const { password: _, ...userWithoutPassword } = user;
+        return done(null, userWithoutPassword);
       } catch (err) {
         return done(err);
       }
@@ -87,10 +84,17 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const [user] = await db
-        .select()
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+          isOnline: users.isOnline,
+          createdAt: users.createdAt
+        })
         .from(users)
         .where(eq(users.id, id))
         .limit(1);
+
       done(null, user);
     } catch (err) {
       done(err);
@@ -107,7 +111,6 @@ export function setupAuth(app: Express) {
       }
 
       const { username, password } = result.data;
-      const avatarUrl = `https://i.pravatar.cc/150?u=${username}`;
 
       const [existingUser] = await db
         .select()
@@ -126,17 +129,18 @@ export function setupAuth(app: Express) {
         .values({
           username,
           password: hashedPassword,
-          avatarUrl
         })
         .returning();
 
-      req.login(newUser, (err) => {
+      const { password: _, ...userWithoutPassword } = newUser;
+
+      req.login(userWithoutPassword, (err) => {
         if (err) {
           return next(err);
         }
         return res.json({
           message: "Registration successful",
-          user: { id: newUser.id, username: newUser.username, avatarUrl: newUser.avatarUrl },
+          user: userWithoutPassword,
         });
       });
     } catch (error) {
@@ -145,14 +149,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    const result = insertUserSchema.safeParse(req.body);
-    if (!result.success) {
-      return res
-        .status(400)
-        .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
-    }
-
-    passport.authenticate("local", (err: any, user: Express.User, info: IVerifyOptions) => {
+    passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {
       if (err) {
         return next(err);
       }
@@ -168,7 +165,7 @@ export function setupAuth(app: Express) {
 
         return res.json({
           message: "Login successful",
-          user: { id: user.id, username: user.username, avatarUrl: user.avatarUrl },
+          user,
         });
       });
     })(req, res, next);
