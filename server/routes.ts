@@ -2,9 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, ne, ilike } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, messages } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites } from "@db/schema";
 import { WebSocketServer } from "ws";
 
 declare module 'express-session' {
@@ -95,6 +95,179 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).send("Error fetching user");
+    }
+  });
+
+  // Search users
+  app.get("/api/users/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const query = req.query.q as string;
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+
+    try {
+      const searchResults = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(users)
+        .where(and(
+          ilike(users.username, `%${query}%`),
+          ne(users.id, req.user.id)
+        ))
+        .limit(10);
+
+      res.json(searchResults);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).send("Error searching users");
+    }
+  });
+
+  // Channel invites
+  app.post("/api/channels/:channelId/invites", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    const { userId } = req.body;
+
+    if (isNaN(channelId) || !userId) {
+      return res.status(400).send("Invalid channel ID or user ID");
+    }
+
+    try {
+      // Check if user is a member of the channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      // Check if invite already exists
+      const [existingInvite] = await db
+        .select()
+        .from(channelInvites)
+        .where(and(
+          eq(channelInvites.channelId, channelId),
+          eq(channelInvites.receiverId, userId),
+          eq(channelInvites.status, 'pending')
+        ))
+        .limit(1);
+
+      if (existingInvite) {
+        return res.status(400).send("Invite already sent");
+      }
+
+      // Create invite
+      const [invite] = await db
+        .insert(channelInvites)
+        .values({
+          channelId,
+          senderId: req.user.id,
+          receiverId: userId,
+          status: 'pending'
+        })
+        .returning();
+
+      res.json(invite);
+    } catch (error) {
+      console.error("Error creating channel invite:", error);
+      res.status(500).send("Error creating channel invite");
+    }
+  });
+
+  app.get("/api/channel-invites", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const invites = await db.query.channelInvites.findMany({
+        where: and(
+          eq(channelInvites.receiverId, req.user.id),
+          eq(channelInvites.status, 'pending')
+        ),
+        with: {
+          channel: true,
+          sender: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true
+            }
+          }
+        }
+      });
+
+      res.json(invites);
+    } catch (error) {
+      console.error("Error fetching channel invites:", error);
+      res.status(500).send("Error fetching channel invites");
+    }
+  });
+
+  app.put("/api/channel-invites/:inviteId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const inviteId = parseInt(req.params.inviteId);
+    const { status } = req.body;
+
+    if (isNaN(inviteId) || !['accepted', 'rejected'].includes(status)) {
+      return res.status(400).send("Invalid invite ID or status");
+    }
+
+    try {
+      const [invite] = await db
+        .select()
+        .from(channelInvites)
+        .where(and(
+          eq(channelInvites.id, inviteId),
+          eq(channelInvites.receiverId, req.user.id),
+          eq(channelInvites.status, 'pending')
+        ))
+        .limit(1);
+
+      if (!invite) {
+        return res.status(404).send("Invite not found");
+      }
+
+      // Update invite status
+      await db
+        .update(channelInvites)
+        .set({ status })
+        .where(eq(channelInvites.id, inviteId));
+
+      // If accepted, add user to channel
+      if (status === 'accepted') {
+        await db
+          .insert(channelMembers)
+          .values({
+            channelId: invite.channelId,
+            userId: req.user.id
+          });
+      }
+
+      res.json({ message: `Invite ${status}` });
+    } catch (error) {
+      console.error("Error handling channel invite:", error);
+      res.status(500).send("Error handling channel invite");
     }
   });
 
