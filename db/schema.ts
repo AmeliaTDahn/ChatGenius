@@ -34,6 +34,13 @@ export const channelMembers = pgTable("channel_members", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
 });
 
+// Define base types first to avoid circular dependencies
+export type User = typeof users.$inferSelect;
+export type Channel = typeof channels.$inferSelect;
+export type BaseMessage = typeof messages.$inferSelect;
+export type ChannelMember = typeof channelMembers.$inferSelect;
+
+// Then define the relations
 export const userRelations = relations(users, ({ many }) => ({
   messages: many(messages),
   channelMembers: many(channelMembers),
@@ -53,11 +60,11 @@ export const messageRelations = relations(messages, ({ one, many }) => ({
     fields: [messages.channelId],
     references: [channels.id],
   }),
-  parent: one(messages, {
+  parentMessage: one(messages, {
     fields: [messages.parentId],
     references: [messages.id],
   }),
-  replies: many(messages),
+  replies: many(messages, { relationName: "message_replies" }),
 }));
 
 export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
@@ -71,6 +78,7 @@ export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
   }),
 }));
 
+// Schemas for validation
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 
@@ -80,7 +88,8 @@ export const selectChannelSchema = createSelectSchema(channels);
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
 
-export type User = typeof users.$inferSelect;
-export type Channel = typeof channels.$inferSelect;
-export type Message = typeof messages.$inferSelect;
-export type ChannelMember = typeof channelMembers.$inferSelect;
+// Extended type for messages with relations
+export type Message = BaseMessage & {
+  user: User;
+  replies?: (BaseMessage & { user: User })[];
+};

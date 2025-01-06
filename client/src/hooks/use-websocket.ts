@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { User } from '@db/schema';
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence';
+  type: 'message' | 'typing' | 'presence' | 'ping';
   channelId?: number;
   content?: string;
   userId?: number;
@@ -35,10 +35,12 @@ export function useWebSocket(user: User | null) {
           break;
         case 'presence':
           // Update user presence in cache
-          queryClient.setQueryData(['users', message.userId], (oldData: any) => ({
-            ...oldData,
-            isOnline: message.isOnline,
-          }));
+          if (message.userId) {
+            queryClient.setQueryData(['users', message.userId], (oldData: any) => ({
+              ...oldData,
+              isOnline: message.isOnline,
+            }));
+          }
           break;
       }
     };

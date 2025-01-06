@@ -8,6 +8,8 @@ export function useMessages(channelId: number) {
   const { data: messages, isLoading } = useQuery<Message[]>({
     queryKey,
     enabled: !!channelId,
+    refetchInterval: false,
+    refetchOnWindowFocus: true,
   });
 
   const sendMessage = useMutation({

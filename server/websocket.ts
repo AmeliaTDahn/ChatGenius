@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
+import type { IncomingMessage } from 'http';
 import type { User } from '@db/schema';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
@@ -15,16 +16,21 @@ type WSMessage = {
   channelId?: number;
   content?: string;
   userId?: number;
+  isOnline?: boolean;
+};
+
+type VerifyClientInfo = {
+  origin: string;
+  secure: boolean;
+  req: IncomingMessage;
 };
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ 
     server,
     path: '/ws',
-    // Handle vite HMR connections
-    verifyClient: (info) => {
+    verifyClient: (info: VerifyClientInfo) => {
       const protocol = info.req.headers['sec-websocket-protocol'];
-      // Allow vite HMR connections
       if (protocol === 'vite-hmr') {
         return false;
       }
@@ -39,18 +45,22 @@ export function setupWebSocket(server: Server) {
   };
 
   const interval = setInterval(() => {
-    wss.clients.forEach((ws: AuthenticatedWebSocket) => {
-      if (ws.isAlive === false) {
-        updateUserPresence(ws.userId!, false);
-        return ws.terminate();
+    wss.clients.forEach((ws) => {
+      const client = ws as AuthenticatedWebSocket;
+      if (client.isAlive === false) {
+        if (client.userId) {
+          updateUserPresence(client.userId, false);
+        }
+        return client.terminate();
       }
-      ws.isAlive = false;
-      ws.ping();
+      client.isAlive = false;
+      client.ping();
     });
   }, 30000);
 
   const broadcastToChannel = (channelId: number, message: WSMessage) => {
-    wss.clients.forEach((client: AuthenticatedWebSocket) => {
+    wss.clients.forEach((ws) => {
+      const client = ws as AuthenticatedWebSocket;
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify(message));
       }
@@ -63,7 +73,8 @@ export function setupWebSocket(server: Server) {
         .set({ isOnline })
         .where(eq(users.id, userId));
 
-      wss.clients.forEach((client: AuthenticatedWebSocket) => {
+      wss.clients.forEach((ws) => {
+        const client = ws as AuthenticatedWebSocket;
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({
             type: 'presence',
@@ -77,9 +88,9 @@ export function setupWebSocket(server: Server) {
     }
   };
 
-  wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
+  wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
     try {
-      const userId = parseInt(req.url?.split('=')[1] || '0');
+      const userId = parseInt(new URL(req.url!, `http://${req.headers.host}`).searchParams.get('userId') || '0');
       if (!userId) {
         ws.close();
         return;
@@ -88,7 +99,7 @@ export function setupWebSocket(server: Server) {
       ws.userId = userId;
       ws.isAlive = true;
       clients.set(userId, ws);
-      updateUserPresence(userId, true);
+      await updateUserPresence(userId, true);
 
       ws.on('pong', () => heartbeat(ws));
 
@@ -99,7 +110,10 @@ export function setupWebSocket(server: Server) {
           switch (message.type) {
             case 'message':
               if (message.channelId && message.content) {
-                broadcastToChannel(message.channelId, message);
+                broadcastToChannel(message.channelId, {
+                  ...message,
+                  userId: ws.userId
+                });
               }
               break;
             case 'typing':
@@ -121,8 +135,10 @@ export function setupWebSocket(server: Server) {
       });
 
       ws.on('close', () => {
-        updateUserPresence(userId, false);
-        clients.delete(userId);
+        if (ws.userId) {
+          updateUserPresence(ws.userId, false);
+          clients.delete(ws.userId);
+        }
       });
 
       ws.on('error', (error) => {
