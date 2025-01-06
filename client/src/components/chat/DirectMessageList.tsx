@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { MessageCircle } from "lucide-react";
 import type { Channel, User } from "@db/schema";
 

@@ -36,14 +36,16 @@ export function FriendRequests() {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       toast({
         title: variables.status === 'accepted' ? "Friend request accepted" : "Friend request rejected",
         description: variables.status === 'accepted' 
           ? "You are now friends!" 
           : "The friend request has been rejected.",
       });
+      // Invalidate friend requests and direct messages queries
       queryClient.invalidateQueries({ queryKey: ['/api/friend-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
     },
     onError: (error: Error) => {
       toast({
