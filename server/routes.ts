@@ -317,7 +317,24 @@ export function registerRoutes(app: Express): Server {
     const channelMessages = await db.query.messages.findMany({
       where: eq(messages.channelId, channelId),
       with: {
-        user: true
+        user: {
+          columns: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          }
+        },
+        reactions: {
+          with: {
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+              }
+            }
+          }
+        }
       },
       orderBy: (messages, { desc }) => [desc(messages.createdAt)]
     });

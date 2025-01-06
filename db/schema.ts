@@ -36,7 +36,6 @@ export const messages = pgTable("messages", {
 
 export type Message = typeof messages.$inferSelect & {
   user: User;
-  replies?: (Message & { user: User })[];
   reactions?: MessageReaction[];
 };
 
@@ -74,12 +73,18 @@ export const messageRelations = relations(messages, ({ one, many }) => ({
     fields: [messages.channelId],
     references: [channels.id],
   }),
-  parentMessage: one(messages, {
-    fields: [messages.parentId],
+  reactions: many(messageReactions),
+}));
+
+export const messageReactionRelations = relations(messageReactions, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageReactions.messageId],
     references: [messages.id],
   }),
-  replies: many(messages, { relationName: "message_replies" }),
-  reactions: many(messageReactions),
+  user: one(users, {
+    fields: [messageReactions.userId],
+    references: [users.id],
+  }),
 }));
 
 export const channelRelations = relations(channels, ({ many }) => ({
