@@ -5,28 +5,40 @@ import { users, type User } from "@db/schema";
 import { eq, and, ne, ilike, or, inArray } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads } from "@db/schema";
-import { WebSocketServer } from "ws";
-import { WebSocket } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
+import type { Message } from "@db/schema";
 
-declare module 'express-session' {
-  interface SessionData {
-    passport: {
-      user: number;
-    };
-  }
-}
+// WebSocket message types
+type WebSocketMessageType = 
+  | { type: 'message'; content: string; channelId: number; userId: number }
+  | { type: 'typing'; channelId: number; userId: number }
+  | { type: 'status_update'; userId: number; isOnline: boolean; hideActivity: boolean };
 
-declare global {
-  namespace Express {
-    // Fix circular type reference
-    interface User extends Omit<User, 'password'> {}
-  }
+// Add this type for the extended WebSocket
+interface ExtendedWebSocket extends WebSocket {
+  userId?: number;
+  isAlive?: boolean;
 }
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
   const server = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
+
+  // Set up ping interval to keep connections alive
+  const pingInterval = setInterval(() => {
+    wss.clients.forEach((ws: ExtendedWebSocket) => {
+      if (ws.isAlive === false) {
+        return ws.terminate();
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  wss.on('close', () => {
+    clearInterval(pingInterval);
+  });
 
   // WebSocket upgrade handling
   server.on('upgrade', (request, socket, head) => {
@@ -41,31 +53,118 @@ export function registerRoutes(app: Express): Server {
   });
 
   // WebSocket connection handling
-  wss.on('connection', (ws) => {
-    ws.on('message', async (data) => {
+  wss.on('connection', (ws: ExtendedWebSocket) => {
+    ws.isAlive = true;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+
+    ws.on('message', async (data: Buffer) => {
       try {
-        const message = JSON.parse(data.toString());
-        if (message.type === 'message') {
-          // Handle new message
-          const newMessage = await db.insert(messages)
-            .values({
-              content: message.content,
+        const message = JSON.parse(data.toString()) as WebSocketMessageType;
+
+        switch (message.type) {
+          case 'message': {
+            // Handle new message
+            const [newMessage] = await db.insert(messages)
+              .values({
+                content: message.content,
+                channelId: message.channelId,
+                userId: message.userId,
+              })
+              .returning();
+
+            // Fetch full message with user details for broadcasting
+            const fullMessage = await db.query.messages.findFirst({
+              where: eq(messages.id, newMessage.id),
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    avatarUrl: true,
+                  }
+                },
+                reactions: {
+                  with: {
+                    user: {
+                      columns: {
+                        id: true,
+                        username: true,
+                        avatarUrl: true,
+                      }
+                    }
+                  }
+                },
+              }
+            });
+
+            // Broadcast to all connected clients
+            const broadcastMessage = JSON.stringify({
+              type: 'new_message',
+              message: fullMessage,
+            });
+
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(broadcastMessage);
+              }
+            });
+            break;
+          }
+
+          case 'status_update': {
+            // Broadcast status update to all connected clients
+            const statusUpdate = JSON.stringify({
+              type: 'status_update',
+              userId: message.userId,
+              isOnline: message.isOnline,
+              hideActivity: message.hideActivity,
+            });
+
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(statusUpdate);
+              }
+            });
+            break;
+          }
+
+          case 'typing': {
+            // Broadcast typing status to all clients in the same channel
+            const typingUpdate = JSON.stringify({
+              type: 'typing',
               channelId: message.channelId,
               userId: message.userId,
-            })
-            .returning();
+            });
 
-          // Broadcast to all connected clients
-          wss.clients.forEach((client) => {
-            client.send(JSON.stringify({
-              type: 'new_message',
-              message: newMessage[0],
-            }));
-          });
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(typingUpdate);
+              }
+            });
+            break;
+          }
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
+        // Send error message back to the client
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Failed to process message',
+        }));
       }
+    });
+
+    ws.on('close', () => {
+      // Handle disconnection
+      ws.isAlive = false;
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      ws.terminate();
     });
   });
 
