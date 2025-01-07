@@ -7,8 +7,8 @@ export const users = pgTable("users", {
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
   avatarUrl: text("avatar_url"),
-  age: integer("age"),  // Optional field
-  city: text("city"),   // Optional field
+  age: integer("age"),
+  city: text("city"),
   isOnline: boolean("is_online").default(false).notNull(),
   hideActivity: boolean("hide_activity").default(false).notNull(),
   timezone: text("timezone").default("UTC").notNull(),
@@ -19,6 +19,10 @@ export const users = pgTable("users", {
 // Base types
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+// Export schemas for validation
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
 
 export const channels = pgTable("channels", {
   id: serial("id").primaryKey(),
@@ -113,8 +117,6 @@ export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
 }));
 
 // Export schemas for validation
-export const insertUserSchema = createInsertSchema(users);
-export const selectUserSchema = createSelectSchema(users);
 
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);

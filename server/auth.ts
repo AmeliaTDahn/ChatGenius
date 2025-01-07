@@ -5,7 +5,7 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema } from "@db/schema";
+import { users, type User } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
 
@@ -27,6 +27,12 @@ const crypto = {
     return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
   },
 };
+
+declare global {
+  namespace Express {
+    interface User extends Omit<User, 'password'> {}
+  }
+}
 
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
@@ -68,7 +74,8 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Incorrect password." });
         }
 
-        return done(null, user);
+        const { password: _, ...userWithoutPassword } = user;
+        return done(null, userWithoutPassword);
       } catch (err) {
         return done(err);
       }
@@ -87,7 +94,12 @@ export function setupAuth(app: Express) {
         .where(eq(users.id, id))
         .limit(1);
 
-      done(null, user);
+      if (!user) {
+        return done(null, false);
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      done(null, userWithoutPassword);
     } catch (err) {
       done(err);
     }
@@ -124,13 +136,15 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      req.login(newUser, (err) => {
+      const { password: _, ...userWithoutPassword } = newUser;
+
+      req.login(userWithoutPassword, (err) => {
         if (err) {
           return next(err);
         }
         return res.json({
           message: "Registration successful",
-          user: newUser,
+          user: userWithoutPassword,
         });
       });
     } catch (error) {
