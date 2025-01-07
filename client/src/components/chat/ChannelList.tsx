@@ -50,7 +50,15 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         credentials: 'include'
       });
 
-      // Invalidate both queries to refresh the unread status
+      // Immediately update the UI to remove the unread indicator
+      queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(ch => 
+          ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
+        );
+      });
+
+      // Then invalidate queries to refresh the data
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] }),
         queryClient.invalidateQueries({ queryKey: ['/api/channels'] }),
@@ -105,7 +113,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
-              {channel.unreadCount && channel.unreadCount > 0 && (
+              {channel.unreadCount > 0 && (
                 <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
               )}
             </Button>
