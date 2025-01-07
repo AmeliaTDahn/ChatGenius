@@ -22,6 +22,14 @@ export function UserProfileView({ user, isOpen, onClose }: UserProfileViewProps)
     }
   };
 
+  const formatDate = (date: Date | string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -67,13 +75,13 @@ export function UserProfileView({ user, isOpen, onClose }: UserProfileViewProps)
 
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-1">Member since</h4>
-              <p>{new Date(user.createdAt).toLocaleDateString()}</p>
+              <p>{formatDate(user.createdAt)}</p>
             </div>
 
             {user.lastActive && (
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-1">Last active</h4>
-                <p>{new Date(user.lastActive).toLocaleString()}</p>
+                <p>{formatDate(user.lastActive)}</p>
               </div>
             )}
           </div>
