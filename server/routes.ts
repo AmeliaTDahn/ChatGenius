@@ -834,7 +834,7 @@ export function registerRoutes(app: Express): Server {
   });
 
 
-  // Update DELETE /api/friends/:friendId endpoint to handle cascading deletes properly
+  // Update DELETE /api/friends/:friendId endpoint after the existing friend routes
   app.delete("/api/friends/:friendId", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
