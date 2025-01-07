@@ -7,6 +7,8 @@ export const users = pgTable("users", {
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
   avatarUrl: text("avatar_url"),
+  age: integer("age"),
+  city: text("city"),
   isOnline: boolean("is_online").default(false).notNull(),
   status: text("status").default('online').notNull(), // Can be: 'online', 'away', 'busy'
   statusMessage: text("status_message"), // Optional custom status message
