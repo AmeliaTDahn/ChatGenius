@@ -27,7 +27,7 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   }
 
-  const MessageComponent = ({ message }: { message: Message }) => {
+  const MessageComponent = ({ message, onReply }: { message: Message, onReply?: (message: Message) => void }) => {
     const handleReaction = async (emoji: string) => {
       await addReaction({ messageId: message.id, emoji });
     };
@@ -100,6 +100,24 @@ export function MessageList({ channelId }: MessageListProps) {
           )}
 
           <div className="flex items-center gap-2 mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => onReply?.(message)}
+            >
+              Reply
+            </Button>
+            {message.replyCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                onClick={() => onReply?.(message)}
+              >
+                {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+              </Button>
+            )}
             <div className="flex gap-1">
               {Object.entries(reactionGroups).map(([emoji, count]) => (
                 <Button

@@ -44,6 +44,7 @@ export const messages = pgTable("messages", {
   userId: integer("user_id").references(() => users.id).notNull(),
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   parentId: integer("parent_id").references(() => messages.id),
+  replyCount: integer("reply_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

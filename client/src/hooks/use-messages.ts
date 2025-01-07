@@ -39,9 +39,12 @@ export function useMessages(channelId: number) {
   });
 
   const sendMessage = useMutation({
-    mutationFn: async ({ content, files }: { content: string, files?: File[] }) => {
+    mutationFn: async ({ content, files, parentId }: { content: string, files?: File[], parentId?: number }) => {
       const formData = new FormData();
       formData.append('content', content);
+      if (parentId) {
+        formData.append('parentId', parentId.toString());
+      }
 
       if (files && files.length > 0) {
         files.forEach(file => {

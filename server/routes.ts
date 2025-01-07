@@ -1306,6 +1306,7 @@ export function registerRoutes(app: Express): Server {
 
     const channelId = parseInt(req.params.channelId);
     const content = req.body.content || '';
+    const parentId = req.body.parentId ? parseInt(req.body.parentId) : undefined;
     const files = req.files as Express.Multer.File[];
 
     if (!channelId) {
@@ -1334,6 +1335,7 @@ export function registerRoutes(app: Express): Server {
           content,
           channelId,
           userId: req.user.id,
+          parentId,
         })
         .returning();
 
