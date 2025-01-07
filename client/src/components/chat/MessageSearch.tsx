@@ -19,6 +19,18 @@ export function MessageSearch({ isOpen, onClose, channelId, onMessageSelect }: M
   const [query, setQuery] = useState("");
   const { data: messages, isLoading } = useMessageSearch(query, channelId);
 
+  // Function to highlight matching text
+  const highlightMatch = (text: string, searchQuery: string) => {
+    if (!searchQuery) return text;
+
+    const parts = text.split(new RegExp(`(${searchQuery})`, 'gi'));
+    return parts.map((part, i) => 
+      part.toLowerCase() === searchQuery.toLowerCase() ? 
+        <span key={i} className="bg-yellow-200 dark:bg-yellow-900">{part}</span> : 
+        part
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
@@ -33,6 +45,7 @@ export function MessageSearch({ isOpen, onClose, channelId, onMessageSelect }: M
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9"
+            autoFocus
           />
         </div>
 
@@ -71,7 +84,7 @@ export function MessageSearch({ isOpen, onClose, channelId, onMessageSelect }: M
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2">
-                          {message.content}
+                          {highlightMatch(message.content, query)}
                         </p>
                         {!channelId && message.channel && (
                           <p className="text-xs text-muted-foreground mt-1">
