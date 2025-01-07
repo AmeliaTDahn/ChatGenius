@@ -37,7 +37,7 @@ export function useWebSocket(user: User | null) {
       const message: WSMessage = JSON.parse(event.data);
 
       switch (message.type) {
-        case 'message':
+        case 'new_message':
           if (message.channelId && message.message) {
             queryClient.setQueryData<Message[]>(
               [`/api/channels/${message.channelId}/messages`],
