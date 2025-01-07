@@ -18,6 +18,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -33,12 +40,28 @@ const avatarOptions = [
   "https://api.dicebear.com/7.x/bottts/svg?seed=fox&backgroundColor=f4f1d1",
 ];
 
+const TIMEZONES = [
+  { value: "UTC", label: "UTC (Coordinated Universal Time)" },
+  { value: "America/New_York", label: "Eastern Time (ET)" },
+  { value: "America/Chicago", label: "Central Time (CT)" },
+  { value: "America/Denver", label: "Mountain Time (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "America/Anchorage", label: "Alaska Time (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii Time (HT)" },
+  { value: "Europe/London", label: "London (GMT)" },
+  { value: "Europe/Paris", label: "Paris (CET)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+  { value: "Asia/Shanghai", label: "China (CST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEST)" },
+];
+
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
   city: z.string().min(2, "City must be at least 2 characters").nullable(),
   status: z.enum(["online", "away", "busy"]),
   avatarUrl: z.string().url("Invalid avatar URL"),
+  timezone: z.string().min(1, "Please select a timezone"),
 });
 
 type UserSettingsFormData = z.infer<typeof formSchema>;
@@ -62,6 +85,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       city: user.city || "",
       status: user.status as "online" | "away" | "busy",
       avatarUrl: user.avatarUrl || avatarOptions[0],
+      timezone: user.timezone || "UTC",
     },
   });
 
@@ -73,7 +97,8 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
         body: JSON.stringify({
           ...data,
           age: data.age || null,
-          city: data.city || null
+          city: data.city || null,
+          timezone: data.timezone
         }),
         credentials: 'include'
       });
@@ -82,25 +107,16 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       return res.json();
     },
     onMutate: async (newData) => {
-      // Cancel any outgoing refetches 
       await queryClient.cancelQueries({ queryKey: ['user'] });
-
-      // Snapshot the previous value
       const previousData = queryClient.getQueryData(['user']);
-
-      // Optimistically update to the new value
       queryClient.setQueryData(['user'], old => ({
         ...old,
         ...newData
       }));
-
-      // Return a context object with the snapshotted value
       return { previousData };
     },
     onSuccess: (updatedUser) => {
-      // Update the user data in the cache
       queryClient.setQueryData(['user'], updatedUser);
-
       toast({
         title: "Changes saved",
         description: "Your profile has been updated successfully.",
@@ -108,11 +124,9 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       });
     },
     onError: (error: Error, _newData, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousData) {
         queryClient.setQueryData(['user'], context.previousData);
       }
-
       toast({
         title: "Error",
         description: error.message,
@@ -125,13 +139,11 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     }
   });
 
-  // Debounced auto-save function
   const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
     setIsAutoSaving(true);
     updateProfile.mutate(data);
-  }, 1000); // Wait 1 second after the last change before saving
+  }, 1000);
 
-  // Watch for form changes and trigger auto-save
   const handleFormChange = useCallback(() => {
     const data = form.getValues();
     const isValid = form.formState.isValid;
@@ -207,20 +219,53 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
             <FormField
               control={form.control}
+              name="timezone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Timezone</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your timezone" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {TIMEZONES.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="status"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <FormControl>
-                    <select
-                      {...field}
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option value="online">Online</option>
-                      <option value="away">Away</option>
-                      <option value="busy">Busy</option>
-                    </select>
-                  </FormControl>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="away">Away</SelectItem>
+                      <SelectItem value="busy">Busy</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
