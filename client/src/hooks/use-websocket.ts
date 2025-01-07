@@ -41,8 +41,15 @@ export function useWebSocket(user: User | null) {
           if (message.channelId && message.message) {
             queryClient.setQueryData<Message[]>(
               [`/api/channels/${message.channelId}/messages`],
-              (oldMessages = []) => [message.message, ...oldMessages]
+              (oldMessages = []) => {
+                // Avoid duplicate messages
+                const exists = oldMessages.some(m => m.id === message.message!.id);
+                if (exists) return oldMessages;
+                return [message.message, ...oldMessages];
+              }
             );
+            // Invalidate the query to ensure consistency
+            queryClient.invalidateQueries([`/api/channels/${message.channelId}/messages`]);
           }
           break;
         case 'presence':
