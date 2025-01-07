@@ -717,21 +717,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Remove from friends table
-      await db
-        .delete(friends)
-        .where(or(
-          and(
-            eq(friends.user1Id, req.user.id),
-            eq(friends.user2Id, friendId)
-          ),
-          and(
-            eq(friends.user1Id, friendId),
-            eq(friends.user2Id, req.user.id)
-          )
-        ));
-
-      // Find and remove the direct message channel
+      // Find the direct message channel first
       const [dmChannel] = await db
         .select({
           channelId: directMessageChannels.channelId
@@ -750,6 +736,17 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (dmChannel) {
+        // Delete all messages in the channel first
+        await db
+          .delete(messages)
+          .where(eq(messages.channelId, dmChannel.channelId));
+
+        // Delete message reactions for this channel's messages
+        await db
+          .delete(messageReactions)
+          .where(eq(messageReactions.messageId, dmChannel.channelId));
+
+
         // Remove channel members
         await db
           .delete(channelMembers)
@@ -765,6 +762,20 @@ export function registerRoutes(app: Express): Server {
           .delete(channels)
           .where(eq(channels.id, dmChannel.channelId));
       }
+
+      // Remove from friends table
+      await db
+        .delete(friends)
+        .where(or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(friends.user2Id, friendId)
+          ),
+          and(
+            eq(friends.user1Id, friendId),
+            eq(friends.user2Id, req.user.id)
+          )
+        ));
 
       res.json({ message: "Friend removed successfully" });
     } catch (error) {
