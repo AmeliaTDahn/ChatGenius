@@ -35,7 +35,9 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   const regularChannels = channels.filter(channel => !channel.isDirectMessage);
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://${window.location.host}`);
+    // Use secure WebSocket (wss://) when the page is loaded over HTTPS
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
