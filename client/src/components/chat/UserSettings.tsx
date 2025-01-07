@@ -97,6 +97,8 @@ export function UserSettings({ user }: UserSettingsProps) {
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
       });
+
+      // Close the dialog
       setIsOpen(false);
     },
     onError: (error: Error) => {
