@@ -44,7 +44,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
     try {
       onSelectChannel(channel);
 
-      // Immediately update the UI to remove the unread indicator
+      // Update local state immediately
       queryClient.setQueryData(['/api/channels'], (oldData: Channel[] | undefined) => {
         if (!oldData) return oldData;
         return oldData.map(ch => 
@@ -52,17 +52,22 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         );
       });
 
-      // Mark messages as read when selecting the channel
+      // Mark messages as read
       await fetch(`/api/channels/${channel.id}/read`, {
         method: 'POST',
         credentials: 'include'
       });
 
-      // Then invalidate queries to refresh the data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] }),
-        queryClient.invalidateQueries({ queryKey: ['/api/channels'] })
-      ]);
+      // Set channel data again to ensure it stays at 0
+      queryClient.setQueryData(['/api/channels'], (oldData: Channel[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(ch => 
+          ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
+        );
+      });
+      
+      // Only invalidate direct messages query
+      await queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
     } catch (error) {
       toast({
         title: "Error",
