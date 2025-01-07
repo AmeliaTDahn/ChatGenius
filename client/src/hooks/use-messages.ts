@@ -63,7 +63,8 @@ export function useMessages(channelId: number) {
     },
     onSuccess: (newMessage) => {
       queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-        return [...oldMessages, newMessage];
+        // Add the new message to the end of the list
+        return [...(oldMessages || []), newMessage];
       });
     },
   });

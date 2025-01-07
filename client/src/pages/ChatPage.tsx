@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserPlus, Loader2, Search } from "lucide-react";
 import type { Channel } from "@db/schema";
+import type { Message } from "@db/schema"; // Added import for Message type
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -40,15 +41,40 @@ export default function ChatPage() {
   const handleSendMessage = async (content: string, files?: File[]) => {
     if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
       try {
-        // Send message through React Query (this will handle file uploads)
-        await sendMessage({ content: content.trim(), files });
+        // First, handle file upload and message creation through REST API
+        const queryKey = [`/api/channels/${selectedChannel.id}/messages`];
+        const formData = new FormData();
+        formData.append('content', content.trim());
 
-        // Also notify other users through WebSocket
+        if (files && files.length > 0) {
+          files.forEach(file => {
+            formData.append('files', file);
+          });
+        }
+
+        const response = await fetch(`/api/channels/${selectedChannel.id}/messages`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        const newMessage = await response.json();
+
+        // Update local cache with the new message
+        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+          return [...oldMessages, newMessage];
+        });
+
+        // Notify other users through WebSocket
         sendMessage({
           type: "message",
           channelId: selectedChannel.id,
           content: content.trim(),
-          userId: user.id
+          userId: user.id,
         });
       } catch (error: any) {
         console.error('Failed to send message:', error);
