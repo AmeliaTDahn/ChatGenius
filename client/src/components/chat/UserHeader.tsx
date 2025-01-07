@@ -155,27 +155,29 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
               )}
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettings(true)}
-            title="Settings"
-            className="w-9 h-9"
-          >
-            <UserIcon className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 
-      {/* Add Friend button in its own row */}
-      <Button 
-        variant="ghost"
-        onClick={onAddFriend}
-        className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t"
-      >
-        <UserPlus className="h-4 w-4" />
-        <span className="text-sm font-medium">Add Friend</span>
-      </Button>
+      {/* Action buttons section */}
+      <div className="flex flex-col border-t">
+        <Button 
+          variant="ghost"
+          onClick={onAddFriend}
+          className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none"
+        >
+          <UserPlus className="h-4 w-4" />
+          <span className="text-sm font-medium">Add Friend</span>
+        </Button>
+
+        <Button 
+          variant="ghost"
+          onClick={() => setShowSettings(true)}
+          className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t"
+        >
+          <UserIcon className="h-4 w-4" />
+          <span className="text-sm font-medium">Settings</span>
+        </Button>
+      </div>
 
       {/* Settings Dialog */}
       {showSettings && (

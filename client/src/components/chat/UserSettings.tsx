@@ -49,7 +49,7 @@ type UserSettingsProps = {
 };
 
 export function UserSettings({ user, onClose }: UserSettingsProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -149,125 +149,115 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
   };
 
   return (
-    <>
-      <Button
-        variant="ghost"
-        onClick={() => setIsOpen(true)}
-        className="w-64 py-4 rounded-none border-t hover:bg-accent/10 text-sm font-medium transition-colors relative"
-      >
-        Settings
-      </Button>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>User Settings</DialogTitle>
+        </DialogHeader>
 
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>User Settings</DialogTitle>
-          </DialogHeader>
-
-          <Form {...form}>
-            <form onChange={handleFormChange} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Display Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter display name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="age"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Age</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="Enter age" 
-                        {...field} 
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter city" {...field} value={field.value || ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <FormControl>
-                      <select
-                        {...field}
-                        className="w-full px-3 py-2 border rounded-md"
-                      >
-                        <option value="online">Online</option>
-                        <option value="away">Away</option>
-                        <option value="busy">Busy</option>
-                      </select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div>
-                <FormLabel>Avatar</FormLabel>
-                <div className="grid grid-cols-3 gap-4 mt-2">
-                  {avatarOptions.map((avatar) => (
-                    <Button
-                      key={avatar}
-                      type="button"
-                      variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
-                      className="p-2 relative overflow-hidden transition-all hover:scale-105"
-                      onClick={() => {
-                        form.setValue("avatarUrl", avatar);
-                        handleFormChange();
-                      }}
-                    >
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={avatar} alt="Avatar option" />
-                        <AvatarFallback>A</AvatarFallback>
-                      </Avatar>
-                      {form.getValues("avatarUrl") === avatar && (
-                        <div className="absolute inset-0 bg-primary/10 rounded-md" />
-                      )}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {isAutoSaving && (
-                <p className="text-sm text-muted-foreground">Saving changes...</p>
+        <Form {...form}>
+          <form onChange={handleFormChange} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Display Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter display name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    </>
+            />
+
+            <FormField
+              control={form.control}
+              name="age"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Age</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Enter age" 
+                      {...field} 
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter city" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <FormControl>
+                    <select
+                      {...field}
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="online">Online</option>
+                      <option value="away">Away</option>
+                      <option value="busy">Busy</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div>
+              <FormLabel>Avatar</FormLabel>
+              <div className="grid grid-cols-3 gap-4 mt-2">
+                {avatarOptions.map((avatar) => (
+                  <Button
+                    key={avatar}
+                    type="button"
+                    variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
+                    className="p-2 relative overflow-hidden transition-all hover:scale-105"
+                    onClick={() => {
+                      form.setValue("avatarUrl", avatar);
+                      handleFormChange();
+                    }}
+                  >
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={avatar} alt="Avatar option" />
+                      <AvatarFallback>A</AvatarFallback>
+                    </Avatar>
+                    {form.getValues("avatarUrl") === avatar && (
+                      <div className="absolute inset-0 bg-primary/10 rounded-md" />
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {isAutoSaving && (
+              <p className="text-sm text-muted-foreground">Saving changes...</p>
+            )}
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
