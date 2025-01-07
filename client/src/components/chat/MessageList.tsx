@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileIcon, Download } from "lucide-react";
+import { Loader2, FileIcon, Download, Reply } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
+import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
 
 type MessageListProps = {
@@ -14,6 +15,8 @@ type MessageListProps = {
 export function MessageList({ channelId }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [showThread, setShowThread] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,6 +33,11 @@ export function MessageList({ channelId }: MessageListProps) {
   const MessageComponent = ({ message, onReply }: { message: Message, onReply?: (message: Message) => void }) => {
     const handleReaction = async (emoji: string) => {
       await addReaction({ messageId: message.id, emoji });
+    };
+
+    const handleReply = () => {
+      setSelectedMessage(message);
+      setShowThread(true);
     };
 
     // Group reactions by emoji
@@ -104,8 +112,9 @@ export function MessageList({ channelId }: MessageListProps) {
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs"
-              onClick={() => onReply?.(message)}
+              onClick={handleReply}
             >
+              <Reply className="h-3 w-3 mr-1" />
               Reply
             </Button>
             {message.replyCount > 0 && (
@@ -113,7 +122,7 @@ export function MessageList({ channelId }: MessageListProps) {
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs text-muted-foreground"
-                onClick={() => onReply?.(message)}
+                onClick={handleReply}
               >
                 {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
               </Button>
@@ -140,13 +149,26 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   return (
-    <ScrollArea className="flex-1 p-4">
-      <div className="space-y-4">
-        {messages.map((message) => (
-          <MessageComponent key={message.id} message={message} />
-        ))}
-        <div ref={bottomRef} />
-      </div>
-    </ScrollArea>
+    <div className="flex flex-1">
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <MessageComponent key={message.id} message={message} />
+          ))}
+          <div ref={bottomRef} />
+        </div>
+      </ScrollArea>
+      {showThread && selectedMessage && (
+        <div className="w-80 border-l">
+          <ThreadView 
+            message={selectedMessage} 
+            onClose={() => {
+              setShowThread(false);
+              setSelectedMessage(null);
+            }} 
+          />
+        </div>
+      )}
+    </div>
   );
 }

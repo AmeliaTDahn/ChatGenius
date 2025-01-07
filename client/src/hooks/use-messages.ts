@@ -67,7 +67,20 @@ export function useMessages(channelId: number) {
     onSuccess: (newMessage) => {
       queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
         // Add the new message to the end of the list
-        return [...(oldMessages || []), newMessage];
+        const updatedMessages = [...(oldMessages || [])];
+
+        // If this is a reply, increment the parent message's reply count
+        if (newMessage.parentId) {
+          const parentIndex = updatedMessages.findIndex(m => m.id === newMessage.parentId);
+          if (parentIndex !== -1) {
+            updatedMessages[parentIndex] = {
+              ...updatedMessages[parentIndex],
+              replyCount: (updatedMessages[parentIndex].replyCount || 0) + 1
+            };
+          }
+        }
+
+        return [...updatedMessages, newMessage];
       });
     },
   });
