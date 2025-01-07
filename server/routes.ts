@@ -125,22 +125,22 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add status update endpoint
+  // Update the status endpoint to handle hideActivity
   app.put("/api/user/status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
-    const { status } = req.body;
-    if (!['online', 'away', 'busy'].includes(status)) {
-      return res.status(400).send("Invalid status");
+    const { hideActivity } = req.body;
+    if (typeof hideActivity !== 'boolean') {
+      return res.status(400).send("Invalid hideActivity value");
     }
 
     try {
       const [updatedUser] = await db
         .update(users)
         .set({
-          status,
+          hideActivity,
           lastActive: new Date()
         })
         .where(eq(users.id, req.user.id))
@@ -153,7 +153,8 @@ export function registerRoutes(app: Express): Server {
         client.send(JSON.stringify({
           type: 'status_update',
           userId: updatedUser.id,
-          status: updatedUser.status
+          hideActivity: updatedUser.hideActivity,
+          isOnline: true
         }));
       });
     } catch (error) {

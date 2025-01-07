@@ -12,7 +12,7 @@ type Friend = {
   username: string;
   avatarUrl?: string;
   isOnline: boolean;
-  status: string;
+  hideActivity: boolean;
   age?: number;
   city?: string;
   lastActive?: Date;
@@ -92,17 +92,11 @@ export function FriendList() {
     }
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'bg-green-500';
-      case 'away':
-        return 'bg-yellow-500';
-      case 'busy':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
+  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
+    if (hideActivity || !isOnline) {
+      return 'bg-gray-500';
     }
+    return 'bg-green-500';
   };
 
   if (isLoading) {
@@ -133,12 +127,12 @@ export function FriendList() {
                     </AvatarFallback>
                   )}
                 </Avatar>
-                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${friend.isOnline ? getStatusColor(friend.status) : 'bg-gray-500'}`} />
+                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${getStatusColor(friend.isOnline, friend.hideActivity)}`} />
               </div>
               <div>
                 <p className="font-medium">{friend.username}</p>
                 <p className="text-xs text-muted-foreground">
-                  {friend.isOnline ? friend.status : 'offline'}
+                  {friend.hideActivity || !friend.isOnline ? 'offline' : 'online'}
                 </p>
               </div>
             </div>
