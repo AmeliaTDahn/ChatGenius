@@ -10,7 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { UserSettings } from "./UserSettings";
+import { useState } from "react";
 
 type UserHeaderProps = {
   user: User;
@@ -23,6 +25,7 @@ type UserHeaderProps = {
 export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onViewFriends }: UserHeaderProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showSettings, setShowSettings] = useState(false);
 
   // Safe fallback for username display
   const displayName = user?.username || 'User';
@@ -86,16 +89,22 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
         <div className="flex items-center gap-4">
           <Logo showText={false} />
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Avatar>
-                {user?.avatarUrl ? (
-                  <AvatarImage src={user.avatarUrl} alt={displayName} />
-                ) : (
-                  <AvatarFallback>{fallbackInitial}</AvatarFallback>
-                )}
-              </Avatar>
-              <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
-            </div>
+            <Button 
+              variant="ghost" 
+              className="p-0 hover:bg-transparent relative"
+              onClick={() => setShowSettings(true)}
+            >
+              <div className="relative">
+                <Avatar>
+                  {user?.avatarUrl ? (
+                    <AvatarImage src={user.avatarUrl} alt={displayName} />
+                  ) : (
+                    <AvatarFallback>{fallbackInitial}</AvatarFallback>
+                  )}
+                </Avatar>
+                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
+              </div>
+            </Button>
             <div>
               <p className="font-medium text-sm">{displayName}</p>
               <DropdownMenu>
@@ -164,6 +173,11 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
         <UserPlus className="h-4 w-4" />
         <span className="text-sm font-medium">Add Friend</span>
       </Button>
+
+      {/* Settings Dialog */}
+      {showSettings && (
+        <UserSettings user={user} onClose={() => setShowSettings(false)} />
+      )}
     </div>
   );
 }

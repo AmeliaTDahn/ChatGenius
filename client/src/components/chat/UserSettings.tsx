@@ -25,28 +25,18 @@ import type { User } from "@db/schema";
 import { useDebouncedCallback } from "use-debounce";
 
 const avatarOptions = [
-  "/avatars/cat.svg",
-  "/avatars/dog.svg",
-  "/avatars/fox.svg",
-  "/avatars/owl.svg",
-  "/avatars/panda.svg",
-  "/avatars/penguin.svg",
-  "/avatars/rabbit.svg",
-  "/avatars/tiger.svg",
-  "/avatars/koala.svg",
-  "/avatars/bear.svg",
-  "/avatars/lion.svg",
-  "/avatars/elephant.svg",
-  "/avatars/monkey.svg",
-  "/avatars/giraffe.svg",
-  "/avatars/unicorn.svg",
-  "/avatars/dragon.svg"
+  "https://api.dicebear.com/7.x/bottts/svg?seed=panda&backgroundColor=b6e3f4",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=kitten&backgroundColor=ffdfbf",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=puppy&backgroundColor=d1f4d1",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=bunny&backgroundColor=ffd1f4",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=penguin&backgroundColor=f4d1d1",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=fox&backgroundColor=f4f1d1",
 ];
 
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
-  age: z.string().regex(/^\d*$/, "Age must be a number").optional().transform(val => val === "" ? null : parseInt(val, 10)),
-  city: z.string().min(2, "City must be at least 2 characters").optional().nullable(),
+  age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
+  city: z.string().min(2, "City must be at least 2 characters").nullable(),
   status: z.enum(["online", "away", "busy"]),
   avatarUrl: z.string().url("Invalid avatar URL"),
 });
@@ -55,9 +45,10 @@ type UserSettingsFormData = z.infer<typeof formSchema>;
 
 type UserSettingsProps = {
   user: User;
+  onClose?: () => void;
 };
 
-export function UserSettings({ user }: UserSettingsProps) {
+export function UserSettings({ user, onClose }: UserSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const { toast } = useToast();
@@ -67,9 +58,9 @@ export function UserSettings({ user }: UserSettingsProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: user.username,
-      age: user.age?.toString() || "",
+      age: user.age,
       city: user.city || "",
-      status: user.status || "online",
+      status: user.status as "online" | "away" | "busy",
       avatarUrl: user.avatarUrl || avatarOptions[0],
     },
   });
@@ -128,6 +119,13 @@ export function UserSettings({ user }: UserSettingsProps) {
     }
   }, [form, debouncedSave]);
 
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open && onClose) {
+      onClose();
+    }
+  };
+
   return (
     <>
       <Button
@@ -138,7 +136,7 @@ export function UserSettings({ user }: UserSettingsProps) {
         Settings
       </Button>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>User Settings</DialogTitle>
@@ -167,7 +165,12 @@ export function UserSettings({ user }: UserSettingsProps) {
                   <FormItem>
                     <FormLabel>Age</FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="Enter age" {...field} />
+                      <Input 
+                        type="number" 
+                        placeholder="Enter age" 
+                        {...field} 
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,7 +214,7 @@ export function UserSettings({ user }: UserSettingsProps) {
 
               <div>
                 <FormLabel>Avatar</FormLabel>
-                <div className="grid grid-cols-4 gap-4 mt-2 max-h-64 overflow-y-auto">
+                <div className="grid grid-cols-3 gap-4 mt-2">
                   {avatarOptions.map((avatar) => (
                     <Button
                       key={avatar}
@@ -234,6 +237,10 @@ export function UserSettings({ user }: UserSettingsProps) {
                   ))}
                 </div>
               </div>
+
+              {isAutoSaving && (
+                <p className="text-sm text-muted-foreground">Saving changes...</p>
+              )}
             </form>
           </Form>
         </DialogContent>
