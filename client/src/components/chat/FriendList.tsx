@@ -30,14 +30,21 @@ export function FriendList() {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, friendId) => {
+      // Immediately update the friends list cache
+      queryClient.setQueryData<Friend[]>(['/api/friends'], (oldFriends = []) => {
+        return oldFriends.filter(friend => friend.id !== friendId);
+      });
+
+      // Immediately update the direct messages cache
+      queryClient.setQueryData<any[]>(['/api/direct-messages'], (oldDMs = []) => {
+        return oldDMs.filter(dm => dm.otherUser.id !== friendId);
+      });
+
       toast({
         title: "Friend removed",
         description: "The friend has been removed from your list.",
       });
-      // Invalidate friends and direct messages queries
-      queryClient.invalidateQueries({ queryKey: ['/api/friends'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
     },
     onError: (error: Error) => {
       toast({
