@@ -8,19 +8,25 @@ import { channels, channelMembers, messages, channelInvites, messageReactions, f
 import { WebSocketServer } from "ws";
 import { WebSocket } from 'ws';
 
-// Type for connected clients
-type ConnectedClient = {
-  ws: WebSocket;
-  userId: number;
-};
+declare module 'express-session' {
+  interface SessionData {
+    passport: {
+      user: number;
+    };
+  }
+}
+
+declare global {
+  namespace Express {
+    // Fix circular type reference
+    interface User extends Omit<User, 'password'> {}
+  }
+}
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
   const server = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
-
-  // Track connected clients
-  const connectedClients: ConnectedClient[] = [];
 
   // WebSocket upgrade handling
   server.on('upgrade', (request, socket, head) => {
@@ -36,129 +42,31 @@ export function registerRoutes(app: Express): Server {
 
   // WebSocket connection handling
   wss.on('connection', (ws) => {
-    let userId: number | null = null;
-
     ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString());
-
-        // Handle client authentication
-        if (message.type === 'auth') {
-          userId = message.userId;
-          connectedClients.push({ ws, userId });
-          return;
-        }
-
-        // Handle new message
-        if (message.type === 'message' && userId) {
-          // Store the message in database
-          const [newMessage] = await db.insert(messages)
+        if (message.type === 'message') {
+          // Handle new message
+          const newMessage = await db.insert(messages)
             .values({
               content: message.content,
               channelId: message.channelId,
-              userId: userId,
+              userId: message.userId,
             })
             .returning();
 
-          // Get the full message with user details for broadcasting
-          const fullMessage = await db.query.messages.findFirst({
-            where: eq(messages.id, newMessage.id),
-            with: {
-              user: {
-                columns: {
-                  id: true,
-                  username: true,
-                  avatarUrl: true,
-                }
-              }
-            }
-          });
-
-          // Get channel members to determine who should receive the message
-          const channelMembers = await db
-            .select({ userId: channelMembers.userId })
-            .from(channelMembers)
-            .where(eq(channelMembers.channelId, message.channelId));
-
-          const recipientIds = new Set(channelMembers.map(m => m.userId));
-
-          // Broadcast to all connected clients who are members of the channel
-          connectedClients.forEach((client) => {
-            if (client.ws.readyState === WebSocket.OPEN && recipientIds.has(client.userId)) {
-              client.ws.send(JSON.stringify({
-                type: 'new_message',
-                message: fullMessage,
-              }));
-            }
+          // Broadcast to all connected clients
+          wss.clients.forEach((client) => {
+            client.send(JSON.stringify({
+              type: 'new_message',
+              message: newMessage[0],
+            }));
           });
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
       }
     });
-
-    // Handle client disconnection
-    ws.on('close', () => {
-      const index = connectedClients.findIndex(client => client.ws === ws);
-      if (index !== -1) {
-        connectedClients.splice(index, 1);
-      }
-    });
-  });
-
-  // Get messages for a channel
-  app.get("/api/channels/:channelId/messages", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const channelId = parseInt(req.params.channelId);
-    if (isNaN(channelId)) {
-      return res.status(400).send("Invalid channel ID");
-    }
-
-    try {
-      const channelMessages = await db.query.messages.findMany({
-        where: eq(messages.channelId, channelId),
-        with: {
-          user: {
-            columns: {
-              id: true,
-              username: true,
-              avatarUrl: true,
-            }
-          },
-          reactions: {
-            with: {
-              user: {
-                columns: {
-                  id: true,
-                  username: true,
-                  avatarUrl: true,
-                }
-              }
-            }
-          },
-          reads: {
-            with: {
-              user: {
-                columns: {
-                  id: true,
-                  username: true,
-                  avatarUrl: true,
-                }
-              }
-            }
-          }
-        },
-        orderBy: (messages, { asc }) => [asc(messages.createdAt)]
-      });
-
-      res.json(channelMessages);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-      res.status(500).send("Error fetching messages");
-    }
   });
 
   // Get user data
@@ -495,8 +403,54 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages
-  //This route is replaced by the edited code above.
+  app.get("/api/channels/:channelId/messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
 
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    const channelMessages = await db.query.messages.findMany({
+      where: eq(messages.channelId, channelId),
+      with: {
+        user: {
+          columns: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          }
+        },
+        reactions: {
+          with: {
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+              }
+            }
+          }
+        },
+        reads: {
+          with: {
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: (messages, { asc }) => [asc(messages.createdAt)]
+    });
+
+    res.json(channelMessages);
+  });
 
   // Add message search endpoint after the messages endpoints
   app.get("/api/messages/search", async (req, res) => {
@@ -1133,4 +1087,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
   return server;
+}
+
+function setupWebSocket(server: Server){
+  const wss = new WebSocketServer({ noServer: true });
+  server.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
+  return {wss}
 }
