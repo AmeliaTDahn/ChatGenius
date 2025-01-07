@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { User } from "@db/schema";
+import { useDebouncedCallback } from "use-debounce";
 
 const avatarOptions = [
   "/avatars/cat.svg",
@@ -59,6 +60,7 @@ type UserSettingsProps = {
 
 export function UserSettings({ user }: UserSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -93,13 +95,22 @@ export function UserSettings({ user }: UserSettingsProps) {
       // Update the user data in the cache
       queryClient.setQueryData(['user'], updatedUser);
 
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-      });
-
-      // Close the dialog
-      setIsOpen(false);
+      // Show success message only for manual saves
+      if (!isAutoSaving) {
+        toast({
+          title: "Profile updated",
+          description: "Your profile has been updated successfully.",
+        });
+        // Close the dialog only for manual saves
+        setIsOpen(false);
+      } else {
+        // Show a subtle toast for auto-save
+        toast({
+          title: "Changes saved",
+          description: "Your changes have been saved automatically.",
+          duration: 2000,
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -107,10 +118,31 @@ export function UserSettings({ user }: UserSettingsProps) {
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      setIsAutoSaving(false);
     }
   });
 
+  // Debounced auto-save function
+  const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
+    setIsAutoSaving(true);
+    updateProfile.mutate(data);
+  }, 1000); // Wait 1 second after the last change before saving
+
+  // Watch for form changes and trigger auto-save
+  const handleFormChange = useCallback(() => {
+    const data = form.getValues();
+    const isValid = form.formState.isValid;
+
+    if (isValid) {
+      debouncedSave(data);
+    }
+  }, [form, debouncedSave]);
+
+  // Manual save handler
   const onSubmit = (data: UserSettingsFormData) => {
+    setIsAutoSaving(false);
     updateProfile.mutate(data);
   };
 
@@ -132,7 +164,7 @@ export function UserSettings({ user }: UserSettingsProps) {
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onChange={handleFormChange} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="username"
@@ -205,7 +237,10 @@ export function UserSettings({ user }: UserSettingsProps) {
                       type="button"
                       variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
                       className="p-2"
-                      onClick={() => form.setValue("avatarUrl", avatar)}
+                      onClick={() => {
+                        form.setValue("avatarUrl", avatar);
+                        handleFormChange();
+                      }}
                     >
                       <Avatar>
                         <AvatarImage src={avatar} alt="Avatar option" />
@@ -217,7 +252,7 @@ export function UserSettings({ user }: UserSettingsProps) {
               </div>
 
               <Button type="submit" className="w-full" disabled={updateProfile.isPending}>
-                {updateProfile.isPending ? "Updating..." : "Save Changes"}
+                {updateProfile.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </form>
           </Form>
