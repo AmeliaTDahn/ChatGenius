@@ -24,7 +24,7 @@ const formSchema = z.object({
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState("login");
-  const { login } = useUser();
+  const { login, register } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,7 +36,7 @@ export default function AuthPage() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onLogin = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
       await login(values);
@@ -47,6 +47,25 @@ export default function AuthPage() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onRegister = async (values: z.infer<typeof formSchema>) => {
+    try {
+      setIsLoading(true);
+      await register(values);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      // If username already exists, switch to login tab
+      if (error.message.includes("already exists")) {
+        setActiveTab("login");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +87,7 @@ export default function AuthPage() {
             </TabsList>
             <TabsContent value="login">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onLogin)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="username"
@@ -107,7 +126,7 @@ export default function AuthPage() {
             </TabsContent>
             <TabsContent value="register">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onRegister)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="username"
