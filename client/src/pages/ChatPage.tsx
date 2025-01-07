@@ -35,6 +35,10 @@ export default function ChatPage() {
 
   const handleSendMessage = (content: string) => {
     if (selectedChannel && content.trim() && user) {
+      // Send message optimistically through React Query (implementation not provided in the snippet)
+      sendMessage(content.trim());
+
+      // Also send through WebSocket for real-time updates to other users
       sendMessage({
         type: "message",
         channelId: selectedChannel.id,
