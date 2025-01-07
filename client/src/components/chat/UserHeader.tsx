@@ -83,7 +83,17 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border-b bg-background">
+    <div className="relative flex items-center justify-between p-4 border-b bg-background">
+      {/* Absolute positioned logout button */}
+      <Button 
+        variant="ghost" 
+        size="sm"
+        onClick={handleLogout}
+        className="absolute top-2 right-2 text-sm font-medium hover:bg-destructive/10"
+      >
+        Logout
+      </Button>
+
       {/* Left side: User info */}
       <div className="flex items-center gap-3">
         <div className="relative">
@@ -156,16 +166,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           <UserPlus className="h-5 w-5" />
         </Button>
       </div>
-
-      {/* Right side: Logout text button */}
-      <Button 
-        variant="ghost" 
-        size="sm"
-        onClick={handleLogout}
-        className="text-sm font-medium hover:bg-destructive/10"
-      >
-        Logout
-      </Button>
     </div>
   );
 }
