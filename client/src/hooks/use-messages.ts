@@ -16,24 +16,40 @@ export function useMessages(channelId: number) {
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
-      const res = await fetch(`/api/channels/${channelId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-        credentials: 'include',
+      const ws = new WebSocket(window.location.protocol === 'https:' ? 'wss://' : 'ws://' + window.location.host);
+
+      return new Promise<Message>((resolve, reject) => {
+        ws.onopen = () => {
+          // First authenticate
+          ws.send(JSON.stringify({
+            type: 'auth',
+            userId: user?.id
+          }));
+
+          // Then send the message
+          ws.send(JSON.stringify({
+            type: 'message',
+            content,
+            channelId
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_message' && data.message.content === content) {
+            resolve(data.message);
+            ws.close();
+          }
+        };
+
+        ws.onerror = (error) => {
+          reject(error);
+          ws.close();
+        };
       });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      return res.json() as Promise<Message>;
     },
     onMutate: async (content) => {
-      // Cancel outgoing fetches
       await queryClient.cancelQueries({ queryKey });
-
-      // Get current messages
       const previousMessages = queryClient.getQueryData<Message[]>(queryKey) || [];
 
       // Create optimistic message
@@ -48,54 +64,25 @@ export function useMessages(channelId: number) {
           username: user?.username || '',
           avatarUrl: user?.avatarUrl,
         },
-        reactions: []
+        reactions: [],
+        reads: []
       };
 
-      // Add optimistic message to end of messages
-      queryClient.setQueryData<Message[]>(queryKey, (old = []) => {
-        return [...old, optimisticMessage];
-      });
-
+      queryClient.setQueryData<Message[]>(queryKey, (old = []) => [...old, optimisticMessage]);
       return { previousMessages };
     },
     onError: (err, variables, context) => {
-      // Revert to previous messages on error
       if (context?.previousMessages) {
-        queryClient.setQueryData(queryKey, context.previousMessages);
+        queryClient.setQueryData(queryKey, context?.previousMessages);
       }
     },
     onSettled: () => {
-      // Refetch after error or success to ensure consistency
       queryClient.invalidateQueries({ queryKey });
     },
   });
 
-  const markAsRead = useMutation({
-    mutationFn: async (messageId: number) => {
-      const res = await fetch(`/api/messages/${messageId}/read`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      return res.json() as Promise<Message>;
-    },
-    onSuccess: (updatedMessage) => {
-      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-        return oldMessages.map((msg) =>
-          msg.id === updatedMessage.id ? updatedMessage : msg
-        );
-      });
-    },
-  });
-
-  // Function to add a new message from WebSocket
   const addMessage = (newMessage: Message) => {
     queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-      // Check if message already exists to prevent duplicates
       if (oldMessages.some(msg => msg.id === newMessage.id)) {
         return oldMessages;
       }
@@ -107,7 +94,6 @@ export function useMessages(channelId: number) {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
-    markAsRead: markAsRead.mutateAsync,
-    addMessage, // Export addMessage function for WebSocket updates
+    addMessage,
   };
 }
