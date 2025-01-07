@@ -39,7 +39,7 @@ export function MessageList({ channelId }: MessageListProps) {
     }, {}) ?? {};
 
     return (
-      <div className="flex items-start gap-3">
+      <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
         <Avatar className="h-8 w-8">
           {message.user.avatarUrl ? (
             <AvatarImage src={message.user.avatarUrl} alt={message.user.username} />

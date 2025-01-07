@@ -9,6 +9,7 @@ import { UserSearch } from "@/components/chat/UserSearch";
 import { FriendRequests } from "@/components/chat/FriendRequests";
 import { FriendList } from "@/components/chat/FriendList";
 import { InviteToChannel } from "@/components/chat/InviteToChannel";
+import { MessageSearch } from "@/components/chat/MessageSearch";
 import {
   Dialog,
   DialogContent,
@@ -16,20 +17,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Loader2 } from "lucide-react";
+import { UserPlus, Loader2, Search } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
-import type { Message } from "@/types/message"; // Assuming this is where the type is defined. Adjust as needed.
 import { useQueryClient } from "@tanstack/react-query";
 
 
 export default function ChatPage() {
-  const queryClient = useQueryClient(); // Added queryClient hook
+  const queryClient = useQueryClient();
   const { user, logout } = useUser();
   const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const { sendMessage } = useWebSocket(user);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isFriendsOpen, setIsFriendsOpen] = useState(false);
@@ -56,7 +57,7 @@ export default function ChatPage() {
       };
 
       // Update local message cache optimistically - append to end
-      queryClient.setQueryData<Message[]>(queryKey, (old = []) => {
+      queryClient.setQueryData(queryKey, (old = []) => {
         return [...old, optimisticMessage];
       });
 
@@ -90,6 +91,16 @@ export default function ChatPage() {
       });
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  const handleMessageSelect = (messageId: number) => {
+    // Scroll to message or highlight it
+    const element = document.getElementById(`message-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+      element.classList.add("bg-accent/20");
+      setTimeout(() => element.classList.remove("bg-accent/20"), 2000);
     }
   };
 
@@ -138,16 +149,26 @@ export default function ChatPage() {
                     </p>
                   )}
                 </div>
-                {!selectedChannel.isDirectMessage && (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setIsInviteOpen(true)}
-                    title="Invite to Channel"
+                    onClick={() => setIsMessageSearchOpen(true)}
+                    title="Search Messages"
                   >
-                    <UserPlus className="h-4 w-4" />
+                    <Search className="h-4 w-4" />
                   </Button>
-                )}
+                  {!selectedChannel.isDirectMessage && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsInviteOpen(true)}
+                      title="Invite to Channel"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <MessageList channelId={selectedChannel.id} />
               <MessageInput onSendMessage={handleSendMessage} />
@@ -197,6 +218,13 @@ export default function ChatPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      <MessageSearch 
+        isOpen={isMessageSearchOpen} 
+        onClose={() => setIsMessageSearchOpen(false)}
+        channelId={selectedChannel?.id}
+        onMessageSelect={handleMessageSelect}
+      />
     </div>
   );
 }
