@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, QueryClient } from "react";
 import { useUser } from "@/hooks/use-user";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { UserHeader } from "@/components/chat/UserHeader";
@@ -19,8 +19,12 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Loader2 } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
+import type { Message } from "@/types/message"; // Assuming this is where the type is defined. Adjust as needed.
+import { useQueryClient } from "@tanstack/react-query";
+
 
 export default function ChatPage() {
+  const queryClient = useQueryClient(); // Added queryClient hook
   const { user, logout } = useUser();
   const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -35,8 +39,26 @@ export default function ChatPage() {
 
   const handleSendMessage = (content: string) => {
     if (selectedChannel && content.trim() && user) {
-      // Send message optimistically through React Query (implementation not provided in the snippet)
-      sendMessage(content.trim());
+      // Send message optimistically through React Query
+      const queryKey = [`/api/channels/${selectedChannel.id}/messages`];
+      const optimisticMessage = {
+        id: Date.now(),
+        content: content.trim(),
+        channelId: selectedChannel.id,
+        userId: user.id,
+        createdAt: new Date().toISOString(),
+        user: {
+          id: user.id,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+        },
+        reactions: []
+      };
+
+      // Update local message cache optimistically
+      queryClient.setQueryData<Message[]>(queryKey, (old = []) => {
+        return [optimisticMessage, ...old];
+      });
 
       // Also send through WebSocket for real-time updates to other users
       sendMessage({
