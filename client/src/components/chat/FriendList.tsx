@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { UserProfileView } from "./UserProfileView";
 
 type Friend = {
   id: number;
@@ -11,11 +13,16 @@ type Friend = {
   avatarUrl?: string;
   isOnline: boolean;
   status: string;
+  age?: number;
+  city?: string;
+  lastActive?: Date;
+  createdAt: Date;
 };
 
 export function FriendList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
 
   const { data: friends, isLoading } = useQuery<Friend[]>({
     queryKey: ['/api/friends'],
@@ -112,7 +119,10 @@ export function FriendList() {
       <div className="space-y-4">
         {friends.map((friend) => (
           <div key={friend.id} className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setSelectedFriend(friend)}
+            >
               <div className="relative">
                 <Avatar>
                   {friend.avatarUrl ? (
@@ -153,6 +163,15 @@ export function FriendList() {
           </div>
         ))}
       </div>
+
+      {/* Friend Profile View Dialog */}
+      {selectedFriend && (
+        <UserProfileView
+          user={selectedFriend}
+          isOpen={true}
+          onClose={() => setSelectedFriend(null)}
+        />
+      )}
     </Card>
   );
 }
