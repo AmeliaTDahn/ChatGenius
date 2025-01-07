@@ -1280,6 +1280,54 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error marking message as read");
     }
   });
+  // Mark messages as read endpoint
+  app.post("/api/channels/:channelId/read", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      // Get all unread messages in the channel
+      const unreadMessages = await db
+        .select({ id: messages.id })
+        .from(messages)
+        .leftJoin(
+          messageReads,
+          and(
+            eq(messageReads.messageId, messages.id),
+            eq(messageReads.userId, req.user.id)
+          )
+        )
+        .where(and(
+          eq(messages.channelId, channelId),
+          ne(messages.userId, req.user.id),
+          sql`${messageReads.id} IS NULL`
+        ));
+
+      // Mark all messages as read
+      if (unreadMessages.length > 0) {
+        await db.insert(messageReads)
+          .values(
+            unreadMessages.map(msg => ({
+              messageId: msg.id,
+              userId: req.user.id,
+              readAt: new Date()
+            }))
+          );
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).send("Error marking messages as read");
+    }
+  });
+
   return server;
 }
 

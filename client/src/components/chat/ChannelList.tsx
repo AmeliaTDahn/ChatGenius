@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useChannels } from "@/hooks/use-channels";
 import { DirectMessageList } from "./DirectMessageList";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import type { Channel } from "@db/schema";
 
 type ChannelListProps = {
@@ -24,6 +25,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   const [isOpen, setIsOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const { channels, createChannel } = useChannels();
+  const { toast } = useToast();
 
   // Filter out direct message channels
   const regularChannels = channels.filter(channel => !channel.isDirectMessage);
@@ -33,6 +35,23 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
       await createChannel({ name: newChannelName.trim() });
       setNewChannelName("");
       setIsOpen(false);
+    }
+  };
+
+  const handleChannelSelect = async (channel: Channel) => {
+    try {
+      // Mark messages as read when selecting the channel
+      await fetch(`/api/channels/${channel.id}/read`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      onSelectChannel(channel);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark messages as read",
+        variant: "destructive"
+      });
     }
   };
 
@@ -72,7 +91,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
               key={channel.id}
               variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
               className="w-full justify-start relative"
-              onClick={() => onSelectChannel(channel)}
+              onClick={() => handleChannelSelect(channel)}
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
@@ -91,7 +110,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
 
         <div className="p-2">
           <h3 className="text-sm font-medium mb-2 px-2">Direct Messages</h3>
-          <DirectMessageList onSelectChannel={onSelectChannel} />
+          <DirectMessageList onSelectChannel={handleChannelSelect} />
         </div>
       </ScrollArea>
     </div>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MessageCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Channel, User } from "@db/schema";
 
 type DirectMessage = Channel & {
@@ -14,12 +14,30 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
     queryKey: ['/api/direct-messages'],
     refetchInterval: 5000, // Refresh every 5 seconds
   });
+  const { toast } = useToast();
 
   const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
     if (hideActivity || !isOnline) {
       return 'bg-gray-500';
     }
     return 'bg-green-500';
+  };
+
+  const handleSelectChannel = async (dm: DirectMessage) => {
+    try {
+      // Mark messages as read when selecting the channel
+      await fetch(`/api/channels/${dm.id}/read`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      onSelectChannel(dm);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark messages as read",
+        variant: "destructive"
+      });
+    }
   };
 
   if (isLoading) {
@@ -42,7 +60,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
           key={dm.id}
           variant="ghost"
           className="w-full justify-start relative"
-          onClick={() => onSelectChannel(dm)}
+          onClick={() => handleSelectChannel(dm)}
         >
           <div className="flex items-center gap-2 flex-1">
             <div className="relative">
