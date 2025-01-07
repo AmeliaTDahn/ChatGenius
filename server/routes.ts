@@ -801,8 +801,7 @@ export function registerRoutes(app: Express): Server {
           age: users.age,
           city: users.city,
           isOnline: users.isOnline,
-          status: users.status,
-          statusMessage: users.statusMessage,
+          hideActivity: users.hideActivity,
           lastActive: users.lastActive,
         })
         .from(friends)
