@@ -3,9 +3,9 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileIcon, Download } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
-import type { Message } from "@db/schema";
+import type { Message, MessageAttachment } from "@db/schema";
 
 type MessageListProps = {
   channelId: number;
@@ -38,6 +38,14 @@ export function MessageList({ channelId }: MessageListProps) {
       return acc;
     }, {}) ?? {};
 
+    const formatFileSize = (bytes: number) => {
+      if (bytes < 1024) return bytes + ' B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
     return (
       <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
         <Avatar className="h-8 w-8">
@@ -59,6 +67,37 @@ export function MessageList({ channelId }: MessageListProps) {
             </span>
           </div>
           <p className="text-sm mt-1">{message.content}</p>
+
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {message.attachments.map((attachment: MessageAttachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center gap-2 p-2 rounded-md bg-secondary/50"
+                >
+                  <FileIcon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {attachment.filename}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(attachment.fileSize)}
+                    </p>
+                  </div>
+                  <a
+                    href={attachment.fileUrl}
+                    download={attachment.filename}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 mt-2">
             <div className="flex gap-1">

@@ -4,9 +4,15 @@ import { db } from "@db";
 import { users, type User } from "@db/schema";
 import { eq, and, ne, ilike, or, inArray, desc, gt, sql } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Message } from "@db/schema";
+import multer from "multer";
+import { randomBytes } from "crypto";
+import path from "path";
+import fs from "fs/promises";
+import express from "express";
+
 
 // WebSocket message types
 type WebSocketMessageType = 
@@ -69,9 +75,26 @@ async function getUnreadMessageCounts(userId: number) {
   return unreadCounts;
 }
 
+// Add this before registerRoutes function
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "./uploads",
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = randomBytes(16).toString("hex");
+      cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+    },
+  }),
+});
+
+// Ensure uploads directory exists
+(async () => {
+  await fs.mkdir("./uploads", { recursive: true });
+})();
+
+
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
-  const server = createServer(app);
+  const httpServer = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
   // Set up ping interval to keep connections alive
@@ -90,7 +113,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // WebSocket upgrade handling
-  server.on('upgrade', (request, socket, head) => {
+  httpServer.on('upgrade', (request, socket, head) => {
     // Skip vite HMR requests
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
@@ -599,7 +622,8 @@ export function registerRoutes(app: Express): Server {
               }
             }
           }
-        }
+        },
+        attachments: true
       },
       orderBy: (messages, { asc }) => [asc(messages.createdAt)]
     });
@@ -1045,8 +1069,7 @@ export function registerRoutes(app: Express): Server {
       const [dmChannel] = await db
         .select({
           channelId: directMessageChannels.channelId
-        })
-        .from(directMessageChannels)
+        })        .from(directMessageChannels)
         .where(or(
           and(
             eq(directMessageChannels.user1Id, req.user.id),
@@ -1328,15 +1351,112 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  return server;
-}
+  // Add file upload route
+  app.post("/api/upload", upload.array("files"), async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
 
-function setupWebSocket(server: Server){
-  const wss = new WebSocketServer({ noServer: true });
-  server.on('upgrade', (request, socket, head) => {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
-    });
+    try {
+      const files = req.files as Express.Multer.File[];
+      const fileData = files.map(file => ({
+        filename: file.originalname,
+        fileUrl: `/uploads/${file.filename}`,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      }));
+
+      res.json(fileData);
+    } catch (error) {
+      console.error("Error handling file upload:", error);
+      res.status(500).send("Error handling file upload");
+    }
   });
-  return {wss}
+
+  // Serve uploaded files
+  app.use("/uploads", express.static("uploads"));
+
+  // Update messages route to handle attachments
+  app.post("/api/channels/:channelId/messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    const { content, attachments } = req.body;
+
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      // Create message
+      const [message] = await db
+        .insert(messages)
+        .values({
+          content,
+          channelId,
+          userId: req.user.id,
+        })
+        .returning();
+
+      // Add attachments if any
+      if (attachments?.length) {
+        await db.insert(messageAttachments).values(
+          attachments.map((att: any) => ({
+            messageId: message.id,
+            filename: att.filename,
+            fileUrl: att.fileUrl,
+            fileSize: att.fileSize,
+            mimeType: att.mimeType,
+          }))
+        );
+      }
+
+      // Fetch full message with all relations
+      const fullMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, message.id),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            }
+          },
+          reactions: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                }
+              }
+            }
+          },
+          attachments: true,
+        }
+      });
+
+      res.json(fullMessage);
+
+      // Broadcast to WebSocket clients
+      const messageUpdate = JSON.stringify({
+        type: 'new_message',
+        message: fullMessage,
+      });
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(messageUpdate);
+        }
+      });
+    } catch (error) {
+      console.error("Error creating message:", error);
+      res.status(500).send("Error creating message");
+    }
+  });
+
+  return httpServer;
 }

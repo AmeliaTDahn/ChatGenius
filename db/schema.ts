@@ -51,6 +51,7 @@ export type Message = typeof messages.$inferSelect & {
   user: User;
   reactions?: MessageReaction[];
   reads?: MessageRead[];
+  attachments?: MessageAttachment[];
 };
 
 export const messageReactions = pgTable("message_reactions", {
@@ -91,6 +92,7 @@ export const messageRelations = relations(messages, ({ one, many }) => ({
   }),
   reactions: many(messageReactions),
   reads: many(messageReads),
+  attachments: many(messageAttachments),
 }));
 
 export const messageReactionRelations = relations(messageReactions, ({ one }) => ({
@@ -238,3 +240,27 @@ export const messageReadRelations = relations(messageReads, ({ one }) => ({
 
 export const insertMessageReadSchema = createInsertSchema(messageReads);
 export const selectMessageReadSchema = createSelectSchema(messageReads);
+
+export const messageAttachments = pgTable("message_attachments", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").references(() => messages.id).notNull(),
+  filename: text("filename").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size").notNull(),
+  mimeType: text("mime_type").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type MessageAttachment = typeof messageAttachments.$inferSelect;
+export type InsertMessageAttachment = typeof messageAttachments.$inferInsert;
+
+
+export const messageAttachmentRelations = relations(messageAttachments, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageAttachments.messageId],
+    references: [messages.id],
+  }),
+}));
+
+export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments);
+export const selectMessageAttachmentSchema = createSelectSchema(messageAttachments);
