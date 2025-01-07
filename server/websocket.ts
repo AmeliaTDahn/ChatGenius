@@ -105,7 +105,7 @@ export function setupWebSocket(server: Server) {
           const client = ws as AuthenticatedWebSocket;
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({
-              type: 'new_message',
+              type: 'message',
               channelId,
               message: messageWithUser,
             }));
