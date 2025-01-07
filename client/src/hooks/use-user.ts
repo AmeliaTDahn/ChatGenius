@@ -61,15 +61,12 @@ export function useUser() {
       if (!response.ok) {
         throw new Error(await response.text());
       }
-
-      return response.json();
-    },
-    onSuccess: () => {
       // Clear all queries from the cache
       queryClient.clear();
       // Set user data to null
       queryClient.setQueryData(['user'], null);
-    },
+      return response.json();
+    }
   });
 
   return {

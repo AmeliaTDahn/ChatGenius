@@ -23,17 +23,15 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   const handleLogout = useCallback(async () => {
     try {
       await onLogout();
-      // Clear any client-side data or caches here if needed
 
-      // Show success message and redirect
       toast({
         title: "Logged out successfully",
         description: "Redirecting to login page...",
       });
 
-      // Use a short timeout to ensure the toast is shown
+      // Set a small timeout to allow the toast to show
       setTimeout(() => {
-        window.location.href = '/';
+        window.location.reload(); // Force a reload to clear all state
       }, 500);
     } catch (error) {
       console.error('Logout failed:', error);
