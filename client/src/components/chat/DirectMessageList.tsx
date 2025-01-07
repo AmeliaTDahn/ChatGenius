@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
     refetchInterval: 5000, // Refresh every 5 seconds
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
     if (hideActivity || !isOnline) {
@@ -30,6 +31,11 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
         method: 'POST',
         credentials: 'include'
       });
+
+      // Invalidate both queries to refresh the unread status
+      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+
       onSelectChannel(dm);
     } catch (error) {
       toast({
@@ -81,7 +87,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
             </div>
             <span className="text-sm truncate">{dm.otherUser.username}</span>
           </div>
-          {dm.unreadCount > 0 && (
+          {dm.unreadCount! > 0 && (
             <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
           )}
         </Button>

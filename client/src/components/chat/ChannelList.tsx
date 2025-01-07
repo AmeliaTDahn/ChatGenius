@@ -14,6 +14,7 @@ import { useChannels } from "@/hooks/use-channels";
 import { DirectMessageList } from "./DirectMessageList";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Channel } from "@db/schema";
 
 type ChannelListProps = {
@@ -26,6 +27,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   const [newChannelName, setNewChannelName] = useState("");
   const { channels, createChannel } = useChannels();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Filter out direct message channels
   const regularChannels = channels.filter(channel => !channel.isDirectMessage);
@@ -45,6 +47,11 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         method: 'POST',
         credentials: 'include'
       });
+
+      // Invalidate both queries to refresh the unread status
+      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+
       onSelectChannel(channel);
     } catch (error) {
       toast({
@@ -95,7 +102,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
-              {channel.unreadCount > 0 && (
+              {channel.unreadCount && channel.unreadCount > 0 && (
                 <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
               )}
             </Button>
