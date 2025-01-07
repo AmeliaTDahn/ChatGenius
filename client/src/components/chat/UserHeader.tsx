@@ -65,24 +65,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
     }
   });
 
-  const handleLogout = async () => {
-    try {
-      await onLogout();
-      toast({
-        title: "Logged out successfully",
-        description: "Redirecting to login page...",
-      });
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Logout failed:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to logout",
-        variant: "destructive",
-      });
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'online':
@@ -97,87 +79,91 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b bg-background">
-      {/* Left side: Logo and User info */}
-      <div className="flex items-center gap-4">
-        <Logo showText={false} />
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar>
-              {user?.avatarUrl ? (
-                <AvatarImage src={user.avatarUrl} alt={displayName} />
-              ) : (
-                <AvatarFallback>{fallbackInitial}</AvatarFallback>
-              )}
-            </Avatar>
-            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
+    <div className="flex flex-col border-b bg-background">
+      {/* Top section with logo, user info, and main actions */}
+      <div className="flex items-center justify-between px-6 py-4">
+        {/* Left side: Logo and User info */}
+        <div className="flex items-center gap-4">
+          <Logo showText={false} />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Avatar>
+                {user?.avatarUrl ? (
+                  <AvatarImage src={user.avatarUrl} alt={displayName} />
+                ) : (
+                  <AvatarFallback>{fallbackInitial}</AvatarFallback>
+                )}
+              </Avatar>
+              <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
+            </div>
+            <div>
+              <p className="font-medium text-sm">{displayName}</p>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
+                  {user.status}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate('online')}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      Online
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate('away')}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                      Away
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate('busy')}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                      Busy
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-sm">{displayName}</p>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
-                {user.status}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => updateStatus.mutate('online')}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    Online
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => updateStatus.mutate('away')}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                    Away
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => updateStatus.mutate('busy')}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500" />
-                    Busy
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        </div>
+
+        {/* Right side: Action buttons */}
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={onViewFriends}
+            title="Friends"
+            className="w-9 h-9"
+          >
+            <Users className="h-5 w-5" />
+          </Button>
+          <div className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={onViewRequests}
+              title="Friend Requests"
+              className="w-9 h-9"
+            >
+              <Bell className="h-5 w-5" />
+              {hasNotifications && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+              )}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Right side: Action buttons */}
-      <div className="flex items-center gap-3">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={onViewFriends}
-          title="Friends"
-          className="w-9 h-9"
-        >
-          <Users className="h-5 w-5" />
-        </Button>
-        <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onViewRequests}
-            title="Friend Requests"
-            className="w-9 h-9"
-          >
-            <Bell className="h-5 w-5" />
-            {hasNotifications && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
-            )}
-          </Button>
-        </div>
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={onAddFriend}
-          title="Add Friend"
-          className="w-9 h-9"
-        >
-          <UserPlus className="h-5 w-5" />
-        </Button>
-      </div>
+      {/* Add Friend button in its own row */}
+      <Button 
+        variant="ghost"
+        onClick={onAddFriend}
+        className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t"
+      >
+        <UserPlus className="h-4 w-4" />
+        <span className="text-sm font-medium">Add Friend</span>
+      </Button>
     </div>
   );
 }
