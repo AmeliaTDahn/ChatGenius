@@ -12,7 +12,7 @@ interface AuthenticatedWebSocket extends WebSocket {
 }
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request';
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request' | 'message_read';
   channelId?: number;
   content?: string;
   userId?: number;
@@ -26,6 +26,8 @@ type WSMessage = {
       avatarUrl?: string;
     };
   };
+  messageId?: number;
+  readAt?: string;
 };
 
 type VerifyClientInfo = {
@@ -87,6 +89,11 @@ export function setupWebSocket(server: Server) {
           where: eq(messages.id, newMessage.id),
           with: {
             user: true,
+            reads: {
+              with: {
+                user: true
+              }
+            }
           },
         });
 
@@ -186,9 +193,12 @@ export function setupWebSocket(server: Server) {
             case 'ping':
               ws.isAlive = true;
               break;
-              case 'friend_request':
-                //Handle friend request
-                break;
+            case 'friend_request':
+              //Handle friend request
+              break;
+            case 'message_read':
+              //Handle message read
+              break;
           }
         } catch (err) {
           console.error('Invalid message format:', err);

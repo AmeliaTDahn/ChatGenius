@@ -70,9 +70,32 @@ export function useMessages(channelId: number) {
     },
   });
 
+  const markAsRead = useMutation({
+    mutationFn: async (messageId: number) => {
+      const res = await fetch(`/api/messages/${messageId}/read`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json() as Promise<Message>;
+    },
+    onSuccess: (updatedMessage) => {
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        return oldMessages.map((msg) =>
+          msg.id === updatedMessage.id ? updatedMessage : msg
+        );
+      });
+    },
+  });
+
   return {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
+    markAsRead: markAsRead.mutateAsync,
   };
 }

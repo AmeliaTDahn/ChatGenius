@@ -4,8 +4,9 @@ import { db } from "@db";
 import { users, type User } from "@db/schema";
 import { eq, and, ne, ilike, or } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads } from "@db/schema";
 import { WebSocketServer } from "ws";
+import { WebSocket } from 'ws';
 
 declare module 'express-session' {
   interface SessionData {
@@ -400,6 +401,17 @@ export function registerRoutes(app: Express): Server {
               }
             }
           }
+        },
+        reads: {
+          with: {
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+              }
+            }
+          }
         }
       },
       orderBy: (messages, { desc }) => [desc(messages.createdAt)]
@@ -769,7 +781,7 @@ export function registerRoutes(app: Express): Server {
         await db
           .delete(messageReactions)
           .where(
-            eq(messageReactions.messageId, 
+            eq(messageReactions.messageId,
               db.select({ id: messages.id })
                 .from(messages)
                 .where(eq(messages.channelId, dmChannel.channelId))
@@ -907,5 +919,86 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add message read status endpoint
+  app.post("/api/messages/:messageId/read", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const messageId = parseInt(req.params.messageId);
+    if (isNaN(messageId)) {
+      return res.status(400).send("Invalid message ID");
+    }
+
+    try {
+      // Check if read receipt already exists
+      const [existingRead] = await db
+        .select()
+        .from(messageReads)
+        .where(and(
+          eq(messageReads.messageId, messageId),
+          eq(messageReads.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!existingRead) {
+        // Create new read receipt
+        await db.insert(messageReads).values({
+          messageId,
+          userId: req.user.id,
+        });
+      }
+
+      // Get updated message with read receipts
+      const updatedMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, messageId),
+        with: {
+          user: true,
+          reactions: {
+            with: {
+              user: true
+            }
+          },
+          reads: {
+            with: {
+              user: true
+            }
+          }
+        }
+      });
+
+      if (!updatedMessage) {
+        return res.status(404).send("Message not found");
+      }
+
+      // Send WebSocket notification about the read status
+      wss.clients.forEach((client: any) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'message_read',
+            messageId,
+            userId: req.user.id,
+            readAt: new Date().toISOString()
+          }));
+        }
+      });
+
+      res.json(updatedMessage);
+    } catch (error) {
+      console.error("Error marking message as read:", error);
+      res.status(500).send("Error marking message as read");
+    }
+  });
+
   return server;
+}
+
+function setupWebSocket(server: Server){
+  const wss = new WebSocketServer({ noServer: true });
+  server.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
+  return {wss}
 }

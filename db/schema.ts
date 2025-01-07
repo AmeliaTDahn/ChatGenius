@@ -40,6 +40,7 @@ export const messages = pgTable("messages", {
 export type Message = typeof messages.$inferSelect & {
   user: User;
   reactions?: MessageReaction[];
+  reads?: MessageRead[];
 };
 
 export const messageReactions = pgTable("message_reactions", {
@@ -79,6 +80,7 @@ export const messageRelations = relations(messages, ({ one, many }) => ({
     references: [channels.id],
   }),
   reactions: many(messageReactions),
+  reads: many(messageReads),
 }));
 
 export const messageReactionRelations = relations(messageReactions, ({ one }) => ({
@@ -203,3 +205,28 @@ export const selectFriendRequestSchema = createSelectSchema(friendRequests);
 
 export const insertChannelInviteSchema = createInsertSchema(channelInvites);
 export const selectChannelInviteSchema = createSelectSchema(channelInvites);
+
+export const messageReads = pgTable("message_reads", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").references(() => messages.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  readAt: timestamp("read_at").defaultNow().notNull(),
+});
+
+export type MessageRead = typeof messageReads.$inferSelect;
+export type InsertMessageRead = typeof messageReads.$inferInsert;
+
+
+export const messageReadRelations = relations(messageReads, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageReads.messageId],
+    references: [messages.id],
+  }),
+  user: one(users, {
+    fields: [messageReads.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertMessageReadSchema = createInsertSchema(messageReads);
+export const selectMessageReadSchema = createSelectSchema(messageReads);
