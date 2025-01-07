@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq, and, ne, ilike, or, inArray } from "drizzle-orm";
+import { eq, and, ne, ilike, or, inArray, desc, gt, sql } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads } from "@db/schema";
 import { WebSocketServer, WebSocket } from 'ws';
@@ -18,6 +18,51 @@ type WebSocketMessageType =
 interface ExtendedWebSocket extends WebSocket {
   userId?: number;
   isAlive?: boolean;
+}
+
+// Add this helper function at the top of the file with other imports
+async function getUnreadMessageCounts(userId: number) {
+  // Get all channels the user is a member of
+  const userChannels = await db.query.channelMembers.findMany({
+    where: eq(channelMembers.userId, userId),
+    with: {
+      channel: true
+    }
+  });
+
+  const unreadCounts = await Promise.all(
+    userChannels.map(async ({ channel }) => {
+      // Get the latest message read by the user in this channel
+      const latestRead = await db
+        .select({ messageId: messageReads.messageId })
+        .from(messageReads)
+        .where(and(
+          eq(messageReads.userId, userId),
+          eq(messages.channelId, channel.id)
+        ))
+        .orderBy(desc(messageReads.readAt))
+        .limit(1);
+
+      // Count unread messages
+      const unreadCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(and(
+          eq(messages.channelId, channel.id),
+          ne(messages.userId, userId),
+          latestRead.length > 0
+            ? gt(messages.id, latestRead[0].messageId)
+            : sql`TRUE`
+        ));
+
+      return {
+        channelId: channel.id,
+        unreadCount: Number(unreadCount[0]?.count || 0)
+      };
+    })
+  );
+
+  return unreadCounts;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -482,7 +527,14 @@ export function registerRoutes(app: Express): Server {
       }
     });
 
-    res.json(userChannels.map(uc => uc.channel));
+    const unreadCounts = await getUnreadMessageCounts(req.user.id);
+
+    const channelsWithUnread = userChannels.map(uc => ({
+      ...uc.channel,
+      unreadCount: unreadCounts.find(c => c.channelId === uc.channel.id)?.unreadCount || 0
+    }));
+
+    res.json(channelsWithUnread);
   });
 
   app.post("/api/channels", async (req, res) => {
@@ -756,23 +808,59 @@ export function registerRoutes(app: Express): Server {
             columns: {
               id: true,
               username: true,
-              avatarUrl: true
+              avatarUrl: true,
+              isOnline: true,
+              hideActivity: true
             }
           },
           user2: {
             columns: {
               id: true,
               username: true,
-              avatarUrl: true
+              avatarUrl: true,
+              isOnline: true,
+              hideActivity: true
             }
           }
         }
       });
 
-      // Transform the data to include the other user's info
+      // Get unread counts for each direct message channel
+      const unreadCounts = await Promise.all(
+        directChannels.map(async (dc) => {
+          const latestRead = await db
+            .select({ messageId: messageReads.messageId })
+            .from(messageReads)
+            .where(and(
+              eq(messageReads.userId, userId),
+              eq(messages.channelId, dc.channelId)
+            ))
+            .orderBy(desc(messageReads.readAt))
+            .limit(1);
+
+          const unreadCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(messages)
+            .where(and(
+              eq(messages.channelId, dc.channelId),
+              ne(messages.userId, userId),
+              latestRead.length > 0
+                ? gt(messages.id, latestRead[0].messageId)
+                : sql`TRUE`
+            ));
+
+          return {
+            channelId: dc.channelId,
+            unreadCount: Number(unreadCount[0]?.count || 0)
+          };
+        })
+      );
+
+      // Transform the data to include the other user's info and unread counts
       const formattedChannels = directChannels.map(dc => ({
         ...dc.channel,
-        otherUser: dc.user1.id === userId ? dc.user2 : dc.user1
+        otherUser: dc.user1.id === userId ? dc.user2 : dc.user1,
+        unreadCount: unreadCounts.find(uc => uc.channelId === dc.channelId)?.unreadCount || 0
       }));
 
       res.json(formattedChannels);
@@ -991,8 +1079,7 @@ export function registerRoutes(app: Express): Server {
 
         // Remove channel members
         await db
-          .delete(channelMembers)
-          .where(eq(channelMembers.channelId, dmChannel.channelId));
+          .delete(channelMembers)          .where(eq(channelMembers.channelId, dmChannel.channelId));
 
         // Remove direct message channel relation
         await db
@@ -1029,7 +1116,7 @@ export function registerRoutes(app: Express): Server {
   // Add endpoint for creating direct message channels
   app.post("/api/direct-messages/create", async (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
+            return res.status(401).send("Not authenticated");
     }
 
     const { friendId } = req.body;

@@ -6,6 +6,7 @@ import type { Channel, User } from "@db/schema";
 
 type DirectMessage = Channel & {
   otherUser: User;
+  unreadCount?: number;
 };
 
 export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (channel: Channel) => void }) {
@@ -14,17 +15,11 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'bg-green-500';
-      case 'away':
-        return 'bg-yellow-500';
-      case 'busy':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
+  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
+    if (hideActivity || !isOnline) {
+      return 'bg-gray-500';
     }
+    return 'bg-green-500';
   };
 
   if (isLoading) {
@@ -46,28 +41,33 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
         <Button
           key={dm.id}
           variant="ghost"
-          className="w-full justify-start space-x-2"
+          className="w-full justify-start relative"
           onClick={() => onSelectChannel(dm)}
         >
-          <div className="relative">
-            <Avatar className="h-6 w-6">
-              {dm.otherUser.avatarUrl ? (
-                <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
-              ) : (
-                <AvatarFallback>
-                  {dm.otherUser.username[0].toUpperCase()}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${dm.otherUser.isOnline ? getStatusColor(dm.otherUser.status) : 'bg-gray-500'}`} />
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative">
+              <Avatar className="h-6 w-6">
+                {dm.otherUser.avatarUrl ? (
+                  <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
+                ) : (
+                  <AvatarFallback>
+                    {dm.otherUser.username[0].toUpperCase()}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div 
+                className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${
+                  getStatusColor(dm.otherUser.isOnline, dm.otherUser.hideActivity)
+                }`} 
+              />
+            </div>
+            <span className="text-sm truncate">{dm.otherUser.username}</span>
           </div>
-          <div className="flex flex-col items-start text-left">
-            <span className="text-sm">{dm.otherUser.username}</span>
-            <span className="text-xs text-muted-foreground">
-              {dm.otherUser.isOnline ? dm.otherUser.status : 'offline'}
-            </span>
-          </div>
-          <MessageCircle className="h-4 w-4 ml-auto text-muted-foreground" />
+          {dm.unreadCount > 0 && (
+            <div className="bg-red-500 text-white text-xs rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1">
+              {dm.unreadCount}
+            </div>
+          )}
         </Button>
       ))}
     </div>
