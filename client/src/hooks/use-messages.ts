@@ -2,13 +2,31 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Message } from '@db/schema';
 import { useUser } from '@/hooks/use-user';
 
-export function useMessages(channelId: number) {
+export function useMessages(channelId: number, parentId?: number) {
   const queryClient = useQueryClient();
   const { user } = useUser();
-  const queryKey = [`/api/channels/${channelId}/messages`];
+  // Different query key for thread replies vs main chat
+  const queryKey = parentId 
+    ? [`/api/channels/${channelId}/messages`, parentId] 
+    : [`/api/channels/${channelId}/messages`];
 
   const { data: messages, isLoading } = useQuery<Message[]>({
     queryKey,
+    queryFn: async () => {
+      const url = new URL(`/api/channels/${channelId}/messages`, window.location.origin);
+      if (parentId) {
+        url.searchParams.append('parentId', parentId.toString());
+      }
+      const res = await fetch(url, {
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json();
+    },
     enabled: !!channelId,
     refetchInterval: false,
     refetchOnWindowFocus: true
@@ -65,23 +83,30 @@ export function useMessages(channelId: number) {
       return res.json() as Promise<Message>;
     },
     onSuccess: (newMessage) => {
-      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-        // Add the new message to the end of the list
-        const updatedMessages = [...(oldMessages || [])];
+      // Update the appropriate query based on whether it's a reply or main message
+      const mainQueryKey = [`/api/channels/${channelId}/messages`];
+      const threadQueryKey = [`/api/channels/${channelId}/messages`, newMessage.parentId];
 
-        // If this is a reply, increment the parent message's reply count
-        if (newMessage.parentId) {
-          const parentIndex = updatedMessages.findIndex(m => m.id === newMessage.parentId);
-          if (parentIndex !== -1) {
-            updatedMessages[parentIndex] = {
-              ...updatedMessages[parentIndex],
-              replyCount: (updatedMessages[parentIndex].replyCount || 0) + 1
-            };
-          }
-        }
+      // If it's a reply, update the thread messages
+      if (newMessage.parentId) {
+        queryClient.setQueryData<Message[]>(threadQueryKey, (oldMessages = []) => {
+          return [...oldMessages, newMessage];
+        });
 
-        return [...updatedMessages, newMessage];
-      });
+        // Also update the reply count in the main chat
+        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
+          return oldMessages.map(msg => 
+            msg.id === newMessage.parentId
+              ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
+              : msg
+          );
+        });
+      } else {
+        // If it's a main message, update the main chat
+        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
+          return [...oldMessages, newMessage];
+        });
+      }
     },
   });
 

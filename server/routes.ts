@@ -557,48 +557,59 @@ export function registerRoutes(app: Express): Server {
     }
 
     const channelId = parseInt(req.params.channelId);
+    const parentId = req.query.parentId ? parseInt(req.query.parentId as string) : undefined;
+
     if (isNaN(channelId)) {
       return res.status(400).send("Invalid channel ID");
     }
 
-    const channelMessages = await db.query.messages.findMany({
-      where: eq(messages.channelId, channelId),
-      with: {
-        user: {
-          columns: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          }
-        },
-        reactions: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                username: true,
-                avatarUrl: true,
-              }
-            }
-          }
-        },
-        reads: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                username: true,
-                avatarUrl: true,
-              }
-            }
-          }
-        },
-        attachments: true
-      },
-      orderBy: (messages, { asc }) => [asc(messages.createdAt)]
-    });
+    try {
+      const whereClause = parentId !== undefined
+        ? and(eq(messages.channelId, channelId), eq(messages.parentId, parentId))
+        : and(eq(messages.channelId, channelId), sql`${messages.parentId} IS NULL`);
 
-    res.json(channelMessages);
+      const channelMessages = await db.query.messages.findMany({
+        where: whereClause,
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            }
+          },
+          reactions: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                }
+              }
+            }
+          },
+          reads: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                }
+              }
+            }
+          },
+          attachments: true
+        },
+        orderBy: (messages, { asc }) => [asc(messages.createdAt)]
+      });
+
+      res.json(channelMessages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).send("Error fetching messages");
+    }
   });
 
   app.get("/api/messages/search", async (req, res) => {
