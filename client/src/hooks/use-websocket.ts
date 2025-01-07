@@ -1,19 +1,29 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Message } from '@db/schema';
+import { useToast } from '@/hooks/use-toast';
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping';
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request';
   channelId?: number;
   content?: string;
   userId?: number;
   isOnline?: boolean;
   message?: Message;
+  friendRequest?: {
+    id: number;
+    sender: {
+      id: number;
+      username: string;
+      avatarUrl?: string;
+    };
+  };
 };
 
 export function useWebSocket(user: User | null) {
   const ws = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user) return;
@@ -43,6 +53,22 @@ export function useWebSocket(user: User | null) {
             }));
           }
           break;
+        case 'friend_request':
+          if (message.friendRequest) {
+            // Update friend requests cache
+            queryClient.setQueryData<any[]>(
+              ['/api/friend-requests'],
+              (oldRequests = []) => [message.friendRequest, ...oldRequests]
+            );
+
+            // Show notification toast
+            toast({
+              title: "New Friend Request",
+              description: `${message.friendRequest.sender.username} sent you a friend request!`,
+              duration: 5000,
+            });
+          }
+          break;
       }
     };
 
@@ -56,7 +82,7 @@ export function useWebSocket(user: User | null) {
       clearInterval(pingInterval);
       ws.current?.close();
     };
-  }, [user, queryClient]);
+  }, [user, queryClient, toast]);
 
   const sendMessage = useCallback((message: WSMessage & { userId: number }) => {
     if (ws.current?.readyState === WebSocket.OPEN) {

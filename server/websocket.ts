@@ -12,12 +12,20 @@ interface AuthenticatedWebSocket extends WebSocket {
 }
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping';
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request';
   channelId?: number;
   content?: string;
   userId?: number;
   isOnline?: boolean;
   message?: Message;
+  friendRequest?: {
+    id: number;
+    sender: {
+      id: number;
+      username: string;
+      avatarUrl?: string;
+    };
+  };
 };
 
 type VerifyClientInfo = {
@@ -27,7 +35,7 @@ type VerifyClientInfo = {
 };
 
 export function setupWebSocket(server: Server) {
-  const wss = new WebSocketServer({ 
+  const wss = new WebSocketServer({
     server,
     path: '/ws',
     verifyClient: (info: VerifyClientInfo) => {
@@ -62,7 +70,6 @@ export function setupWebSocket(server: Server) {
   const broadcastToChannel = async (channelId: number, message: WSMessage) => {
     try {
       if (message.type === 'message' && message.content && message.userId) {
-        // Save message to database
         const [newMessage] = await db
           .insert(messages)
           .values({
@@ -76,7 +83,6 @@ export function setupWebSocket(server: Server) {
           throw new Error('Failed to insert message');
         }
 
-        // Fetch complete message with user data
         const messageWithUser = await db.query.messages.findFirst({
           where: eq(messages.id, newMessage.id),
           with: {
@@ -88,7 +94,6 @@ export function setupWebSocket(server: Server) {
           throw new Error('Failed to fetch message with user');
         }
 
-        // Broadcast to all clients in the channel
         wss.clients.forEach((ws) => {
           const client = ws as AuthenticatedWebSocket;
           if (client.readyState === WebSocket.OPEN) {
@@ -100,7 +105,6 @@ export function setupWebSocket(server: Server) {
           }
         });
       } else {
-        // For non-message types (typing, presence)
         wss.clients.forEach((ws) => {
           const client = ws as AuthenticatedWebSocket;
           if (client.readyState === WebSocket.OPEN) {
@@ -132,6 +136,13 @@ export function setupWebSocket(server: Server) {
       });
     } catch (err) {
       console.error('Error updating user presence:', err);
+    }
+  };
+
+  const broadcastToUser = (userId: number, message: WSMessage) => {
+    const client = clients.get(userId);
+    if (client?.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
     }
   };
 
@@ -175,6 +186,9 @@ export function setupWebSocket(server: Server) {
             case 'ping':
               ws.isAlive = true;
               break;
+              case 'friend_request':
+                //Handle friend request
+                break;
           }
         } catch (err) {
           console.error('Invalid message format:', err);
@@ -202,5 +216,5 @@ export function setupWebSocket(server: Server) {
     clearInterval(interval);
   });
 
-  return wss;
+  return { wss, broadcastToUser };
 }
