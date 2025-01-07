@@ -83,17 +83,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   return (
-    <div className="relative flex items-center justify-between p-4 border-b bg-background">
-      {/* Absolute positioned logout button */}
-      <Button 
-        variant="ghost" 
-        size="sm"
-        onClick={handleLogout}
-        className="absolute top-2 right-2 text-sm font-medium hover:bg-destructive/10"
-      >
-        Logout
-      </Button>
-
+    <div className="flex items-center justify-between p-4 border-b bg-background">
       {/* Left side: User info */}
       <div className="flex items-center gap-3">
         <div className="relative">

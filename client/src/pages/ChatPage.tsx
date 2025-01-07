@@ -42,52 +42,63 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen flex">
-      <div className="w-64 flex flex-col border-r">
-        <UserHeader 
-          user={user} 
-          onLogout={logout} 
-          onAddFriend={() => setIsSearchOpen(true)}
-          onViewRequests={() => setIsRequestsOpen(true)}
-          onViewFriends={() => setIsFriendsOpen(true)}
-        />
-        <ChannelList
-          selectedChannel={selectedChannel}
-          onSelectChannel={setSelectedChannel}
-        />
-      </div>
-      <div className="flex-1 flex flex-col">
-        {selectedChannel ? (
-          <>
-            <div className="p-4 border-b flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
-                {selectedChannel.description && (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedChannel.description}
-                  </p>
+    <div className="h-screen flex flex-col">
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-64 flex flex-col border-r">
+          <UserHeader 
+            user={user} 
+            onLogout={logout} 
+            onAddFriend={() => setIsSearchOpen(true)}
+            onViewRequests={() => setIsRequestsOpen(true)}
+            onViewFriends={() => setIsFriendsOpen(true)}
+          />
+          <ChannelList
+            selectedChannel={selectedChannel}
+            onSelectChannel={setSelectedChannel}
+          />
+        </div>
+        <div className="flex-1 flex flex-col">
+          {selectedChannel ? (
+            <>
+              <div className="p-4 border-b flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
+                  {selectedChannel.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {selectedChannel.description}
+                    </p>
+                  )}
+                </div>
+                {!selectedChannel.isDirectMessage && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsInviteOpen(true)}
+                    title="Invite to Channel"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
-              {!selectedChannel.isDirectMessage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsInviteOpen(true)}
-                  title="Invite to Channel"
-                >
-                  <UserPlus className="h-4 w-4" />
-                </Button>
-              )}
+              <MessageList channelId={selectedChannel.id} />
+              <MessageInput onSendMessage={handleSendMessage} />
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground">
+              Select a channel to start chatting
             </div>
-            <MessageList channelId={selectedChannel.id} />
-            <MessageInput onSendMessage={handleSendMessage} />
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            Select a channel to start chatting
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Fixed logout button at the bottom */}
+      <Button 
+        variant="ghost" 
+        onClick={logout}
+        className="w-full py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors"
+      >
+        Logout
+      </Button>
 
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
         <DialogContent>
