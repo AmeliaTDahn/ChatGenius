@@ -103,7 +103,7 @@ export function setupWebSocket(server: Server) {
 
         wss.clients.forEach((ws) => {
           const client = ws as AuthenticatedWebSocket;
-          if (client.readyState === WebSocket.OPEN) {
+          if (client.readyState === WebSocket.OPEN && (client.userId === messageWithUser.userId || messageWithUser.channel?.memberIds?.includes(client.userId))) {
             client.send(JSON.stringify({
               type: 'message',
               channelId,

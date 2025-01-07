@@ -32,6 +32,15 @@ export function useWebSocket(user: User | null) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}`;
     ws.current = new WebSocket(wsUrl);
+    
+    // Attempt to reconnect on connection close
+    ws.current.onclose = () => {
+      setTimeout(() => {
+        if (user) {
+          ws.current = new WebSocket(wsUrl);
+        }
+      }, 1000);
+    };
 
     ws.current.onmessage = (event) => {
       const message: WSMessage = JSON.parse(event.data);
