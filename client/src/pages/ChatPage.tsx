@@ -54,6 +54,7 @@ export default function ChatPage() {
         title: "Logged out successfully",
         description: "Redirecting to login page...",
       });
+      window.location.reload();
     } catch (error: any) {
       console.error('Logout failed:', error);
       toast({
@@ -81,6 +82,23 @@ export default function ChatPage() {
             selectedChannel={selectedChannel}
             onSelectChannel={setSelectedChannel}
           />
+
+          {/* Bottom left logout button */}
+          <Button 
+            variant="ghost" 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="mt-auto w-64 py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors relative"
+          >
+            {isLoggingOut ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Logging out...
+              </>
+            ) : (
+              'Logout'
+            )}
+          </Button>
         </div>
         <div className="flex-1 flex flex-col">
           {selectedChannel ? (
@@ -115,23 +133,6 @@ export default function ChatPage() {
           )}
         </div>
       </div>
-
-      {/* Fixed logout button at the bottom */}
-      <Button 
-        variant="ghost" 
-        onClick={handleLogout}
-        disabled={isLoggingOut}
-        className="w-full py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors relative"
-      >
-        {isLoggingOut ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Logging out...
-          </>
-        ) : (
-          'Logout'
-        )}
-      </Button>
 
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
         <DialogContent>
