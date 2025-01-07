@@ -9,13 +9,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useChannels } from "@/hooks/use-channels";
 import { DirectMessageList } from "./DirectMessageList";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Channel } from "@db/schema";
+import { useUser } from "@/hooks/use-user";
 
 type ChannelListProps = {
   selectedChannel: Channel | null;
@@ -28,9 +29,34 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   const { channels, createChannel } = useChannels();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useUser();
 
   // Filter out direct message channels
   const regularChannels = channels.filter(channel => !channel.isDirectMessage);
+
+  useEffect(() => {
+    const ws = new WebSocket(`ws://${window.location.host}`);
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'new_message' && data.senderId !== user?.id) {
+        // Only update unread count if the message is not from the current user
+        // and the channel is not currently selected
+        if (selectedChannel?.id !== data.channelId) {
+          queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
+            if (!oldData) return oldData;
+            return oldData.map(ch => 
+              ch.id === data.channelId ? { ...ch, unreadCount: (ch.unreadCount || 0) + 1 } : ch
+            );
+          });
+        }
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [selectedChannel?.id, user?.id, queryClient]);
 
   const handleCreateChannel = async () => {
     if (newChannelName.trim()) {
@@ -44,8 +70,8 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
     try {
       onSelectChannel(channel);
 
-      // Update local state immediately
-      queryClient.setQueryData(['/api/channels'], (oldData: Channel[] | undefined) => {
+      // Immediately update the UI to remove the unread indicator
+      queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
         if (!oldData) return oldData;
         return oldData.map(ch => 
           ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
@@ -58,6 +84,11 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         credentials: 'include'
       });
 
+      // Then invalidate queries to refresh the data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/channels'] }),
+      ]);
     } catch (error) {
       toast({
         title: "Error",
@@ -107,7 +138,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
-              {channel.unreadCount! > 0 && (
+              {channel.unreadCount > 0 && channel.id !== selectedChannel?.id && (
                 <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
               )}
             </Button>

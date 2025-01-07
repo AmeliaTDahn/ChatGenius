@@ -14,21 +14,7 @@ import fs from "fs/promises";
 import express from "express";
 
 
-// WebSocket message types
-type WebSocketMessageType = 
-  | { type: 'message'; content: string; channelId: number; userId: number }
-  | { type: 'typing'; channelId: number; userId: number }
-  | { type: 'status_update'; userId: number; isOnline: boolean; hideActivity: boolean };
-
-// Add this type for the extended WebSocket
-interface ExtendedWebSocket extends WebSocket {
-  userId?: number;
-  isAlive?: boolean;
-}
-
-// Add this helper function at the top of the file with other imports
 async function getUnreadMessageCounts(userId: number) {
-  // Get all channels the user is a member of
   const userChannels = await db.query.channelMembers.findMany({
     where: eq(channelMembers.userId, userId),
     with: {
@@ -38,7 +24,6 @@ async function getUnreadMessageCounts(userId: number) {
 
   const unreadCounts = await Promise.all(
     userChannels.map(async ({ channel }) => {
-      // Get the latest message read by the user in this channel
       const latestRead = await db
         .select({
           messageId: messageReads.messageId,
@@ -53,7 +38,6 @@ async function getUnreadMessageCounts(userId: number) {
         .orderBy(desc(messageReads.readAt))
         .limit(1);
 
-      // Count unread messages
       const unreadCount = await db
         .select({ count: sql<number>`count(*)` })
         .from(messages)
@@ -75,7 +59,6 @@ async function getUnreadMessageCounts(userId: number) {
   return unreadCounts;
 }
 
-// Add this before registerRoutes function
 const upload = multer({
   storage: multer.diskStorage({
     destination: "./uploads",
@@ -86,18 +69,21 @@ const upload = multer({
   }),
 });
 
-// Ensure uploads directory exists
 (async () => {
   await fs.mkdir("./uploads", { recursive: true });
 })();
 
+
+interface ExtendedWebSocket extends WebSocket {
+  userId?: number;
+  isAlive?: boolean;
+}
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
-  // Set up ping interval to keep connections alive
   const pingInterval = setInterval(() => {
     wss.clients.forEach((ws: ExtendedWebSocket) => {
       if (ws.isAlive === false) {
@@ -112,9 +98,7 @@ export function registerRoutes(app: Express): Server {
     clearInterval(pingInterval);
   });
 
-  // WebSocket upgrade handling
   httpServer.on('upgrade', (request, socket, head) => {
-    // Skip vite HMR requests
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
@@ -124,7 +108,6 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
-  // WebSocket connection handling
   wss.on('connection', (ws: ExtendedWebSocket) => {
     ws.isAlive = true;
 
@@ -138,7 +121,6 @@ export function registerRoutes(app: Express): Server {
 
         switch (message.type) {
           case 'message': {
-            // Handle new message
             const [newMessage] = await db.insert(messages)
               .values({
                 content: message.content,
@@ -147,7 +129,6 @@ export function registerRoutes(app: Express): Server {
               })
               .returning();
 
-            // Fetch full message with user details for broadcasting
             const fullMessage = await db.query.messages.findFirst({
               where: eq(messages.id, newMessage.id),
               with: {
@@ -172,10 +153,18 @@ export function registerRoutes(app: Express): Server {
               }
             });
 
-            // Broadcast to all connected clients
+            const channelMembers = await db.query.channelMembers.findMany({
+              where: eq(channelMembers.channelId, message.channelId),
+              columns: {
+                userId: true
+              }
+            });
+
             const broadcastMessage = JSON.stringify({
               type: 'new_message',
               message: fullMessage,
+              channelId: message.channelId,
+              senderId: message.userId,
             });
 
             wss.clients.forEach((client) => {
@@ -187,7 +176,6 @@ export function registerRoutes(app: Express): Server {
           }
 
           case 'status_update': {
-            // Broadcast status update to all connected clients
             const statusUpdate = JSON.stringify({
               type: 'status_update',
               userId: message.userId,
@@ -204,7 +192,6 @@ export function registerRoutes(app: Express): Server {
           }
 
           case 'typing': {
-            // Broadcast typing status to all clients in the same channel
             const typingUpdate = JSON.stringify({
               type: 'typing',
               channelId: message.channelId,
@@ -221,7 +208,6 @@ export function registerRoutes(app: Express): Server {
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
-        // Send error message back to the client
         ws.send(JSON.stringify({
           type: 'error',
           message: 'Failed to process message',
@@ -230,7 +216,6 @@ export function registerRoutes(app: Express): Server {
     });
 
     ws.on('close', () => {
-      // Handle disconnection
       ws.isAlive = false;
     });
 
@@ -240,7 +225,6 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
-  // Get user data
   app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -270,7 +254,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update user profile route
   app.put("/api/user/profile", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -296,7 +279,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this route after the existing /api/user endpoint
   app.put("/api/user/status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -320,7 +302,6 @@ export function registerRoutes(app: Express): Server {
 
       res.json(updatedUser);
 
-      // Broadcast status change to all connected WebSocket clients
       const statusUpdate = {
         type: 'status_update',
         userId: updatedUser.id,
@@ -339,7 +320,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the search users endpoint to include friend status
   app.get("/api/users/search", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -351,7 +331,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // First get the user's friends
       const userFriends = await db
         .select({
           friendId: users.id
@@ -374,7 +353,6 @@ export function registerRoutes(app: Express): Server {
 
       const friendIds = new Set(userFriends.map(f => f.friendId));
 
-      // Then search for users and include whether they are friends
       const searchResults = await db
         .select({
           id: users.id,
@@ -400,7 +378,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Channel invites
   app.post("/api/channels/:channelId/invites", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -414,7 +391,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Check if user is a member of the channel
       const [membership] = await db
         .select()
         .from(channelMembers)
@@ -428,7 +404,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("You are not a member of this channel");
       }
 
-      // Check if invite already exists
       const [existingInvite] = await db
         .select()
         .from(channelInvites)
@@ -443,7 +418,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invite already sent");
       }
 
-      // Create invite
       const [invite] = await db
         .insert(channelInvites)
         .values({
@@ -518,13 +492,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Invite not found");
       }
 
-      // Update invite status
       await db
         .update(channelInvites)
         .set({ status })
         .where(eq(channelInvites.id, inviteId));
 
-      // If accepted, add user to channel
       if (status === 'accepted') {
         await db
           .insert(channelMembers)
@@ -541,7 +513,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Channels
   app.get("/api/channels", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -580,7 +551,6 @@ export function registerRoutes(app: Express): Server {
     res.json(channel);
   });
 
-  // Messages
   app.get("/api/channels/:channelId/messages", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -631,7 +601,6 @@ export function registerRoutes(app: Express): Server {
     res.json(channelMessages);
   });
 
-  // Add message search endpoint after the messages endpoints
   app.get("/api/messages/search", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -645,7 +614,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Get all channels the user is a member of
       const userChannels = await db
         .select({ channelId: channelMembers.channelId })
         .from(channelMembers)
@@ -653,7 +621,6 @@ export function registerRoutes(app: Express): Server {
 
       const channelIds = userChannels.map(uc => uc.channelId);
 
-      // Search messages in user's channels
       const searchResults = await db.query.messages.findMany({
         where: and(
           ilike(messages.content, `%${query}%`),
@@ -682,7 +649,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add message reactions endpoint after the messages endpoints
   app.post("/api/messages/:messageId/reactions", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -696,7 +662,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Check if reaction already exists
       const [existingReaction] = await db
         .select()
         .from(messageReactions)
@@ -708,12 +673,10 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (existingReaction) {
-        // Remove reaction if it exists
         await db
           .delete(messageReactions)
           .where(eq(messageReactions.id, existingReaction.id));
       } else {
-        // Add new reaction
         await db
           .insert(messageReactions)
           .values({
@@ -723,7 +686,6 @@ export function registerRoutes(app: Express): Server {
           });
       }
 
-      // Get updated message with reactions
       const updatedMessage = await db.query.messages.findFirst({
         where: eq(messages.id, messageId),
         with: {
@@ -743,7 +705,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Friend requests
   app.post("/api/friend-requests", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -756,7 +717,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Check if friend request already exists
       const [existingRequest] = await db
         .select()
         .from(friendRequests)
@@ -771,7 +731,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Friend request already sent");
       }
 
-      // Create friend request
       const [request] = await db
         .insert(friendRequests)
         .values({
@@ -817,7 +776,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the direct messages endpoint
   app.get("/api/direct-messages", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -853,7 +811,6 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      // Get unread counts for each direct message channel
       const unreadCounts = await Promise.all(
         directChannels.map(async (dc) => {
           const latestRead = await db
@@ -888,7 +845,6 @@ export function registerRoutes(app: Express): Server {
         })
       );
 
-      // Transform the data to include the other user's info and unread counts
       const formattedChannels = directChannels.map(dc => ({
         ...dc.channel,
         otherUser: dc.user1.id === userId ? dc.user2 : dc.user1,
@@ -929,15 +885,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Friend request not found");
       }
 
-      // Update request status
       await db
         .update(friendRequests)
         .set({ status })
         .where(eq(friendRequests.id, requestId));
 
-      // If accepted, create friend relationship and direct message channel
       if (status === 'accepted') {
-        // Create friend relationship
         await db
           .insert(friends)
           .values({
@@ -945,7 +898,6 @@ export function registerRoutes(app: Express): Server {
             user2Id: req.user.id
           });
 
-        // Get both users' data for the response
         const [sender] = await db
           .select({
             id: users.id,
@@ -966,7 +918,6 @@ export function registerRoutes(app: Express): Server {
           .where(eq(users.id, req.user.id))
           .limit(1);
 
-        // Create a new channel for direct messages
         const [dmChannel] = await db
           .insert(channels)
           .values({
@@ -975,7 +926,6 @@ export function registerRoutes(app: Express): Server {
           })
           .returning();
 
-        // Add both users to the channel
         await db.insert(channelMembers).values([
           {
             userId: request.senderId,
@@ -987,7 +937,6 @@ export function registerRoutes(app: Express): Server {
           }
         ]);
 
-        // Create direct message channel relationship
         await db
           .insert(directMessageChannels)
           .values({
@@ -1011,7 +960,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the friends endpoint to include more user information
   app.get("/api/friends", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1052,8 +1000,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-
-  // Update DELETE /api/friends/:friendId endpoint after the existing friend routes
   app.delete("/api/friends/:friendId", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1065,11 +1011,11 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Find the direct message channel first
       const [dmChannel] = await db
         .select({
           channelId: directMessageChannels.channelId
-        })        .from(directMessageChannels)
+        })
+        .from(directMessageChannels)
         .where(or(
           and(
             eq(directMessageChannels.user1Id, req.user.id),
@@ -1083,7 +1029,6 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (dmChannel) {
-        // Get all messages in this channel
         const channelMessages = await db
           .select({ id: messages.id })
           .from(messages)
@@ -1091,39 +1036,33 @@ export function registerRoutes(app: Express): Server {
 
         const messageIds = channelMessages.map(m => m.id);
 
-        // Delete message reactions
         if (messageIds.length > 0) {
           await db
             .delete(messageReactions)
             .where(inArray(messageReactions.messageId, messageIds));
 
-          // Delete message reads
           await db
             .delete(messageReads)
             .where(inArray(messageReads.messageId, messageIds));
         }
 
-        // Delete the messages
         await db
           .delete(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
 
-        // Remove channel members
         await db
-          .delete(channelMembers)          .where(eq(channelMembers.channelId, dmChannel.channelId));
+          .delete(channelMembers)
+          .where(eq(channelMembers.channelId, dmChannel.channelId));
 
-        // Remove direct message channel relation
         await db
           .delete(directMessageChannels)
           .where(eq(directMessageChannels.channelId, dmChannel.channelId));
 
-        // Remove the channel itself
         await db
           .delete(channels)
           .where(eq(channels.id, dmChannel.channelId));
       }
 
-      // Remove from friends table
       await db
         .delete(friends)
         .where(or(
@@ -1144,10 +1083,9 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add endpoint for creating direct message channels
   app.post("/api/direct-messages/create", async (req, res) => {
     if (!req.isAuthenticated()) {
-            return res.status(401).send("Not authenticated");
+      return res.status(401).send("Not authenticated");
     }
 
     const { friendId } = req.body;
@@ -1155,9 +1093,7 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).send("Friend ID is required");
     }
 
-    try {
-      // Check if they are friends
-      const [friendship] = await db
+    try {      const [friendship] = await db
         .select()
         .from(friends)
         .where(or(
@@ -1176,7 +1112,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("You are not friends with this user");
       }
 
-      // Check if direct message channel already exists
       const [existingDM] = await db
         .select()
         .from(directMessageChannels)
@@ -1196,7 +1131,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Direct message channel already exists");
       }
 
-      // Create a new channel
       const [dmChannel] = await db
         .insert(channels)
         .values({
@@ -1205,7 +1139,6 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
-      // Add both users to the channel
       await db.insert(channelMembers).values([
         {
           userId: req.user.id,
@@ -1217,7 +1150,6 @@ export function registerRoutes(app: Express): Server {
         }
       ]);
 
-      // Create direct message channel relationship
       await db
         .insert(directMessageChannels)
         .values({
@@ -1233,7 +1165,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add message read status endpoint
   app.post("/api/messages/:messageId/read", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1245,7 +1176,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Check if read receipt already exists
       const [existingRead] = await db
         .select()
         .from(messageReads)
@@ -1256,14 +1186,12 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!existingRead) {
-        // Create new read receipt
         await db.insert(messageReads).values({
           messageId,
           userId: req.user.id,
         });
       }
 
-      // Get updated message with read receipts
       const updatedMessage = await db.query.messages.findFirst({
         where: eq(messages.id, messageId),
         with: {
@@ -1285,7 +1213,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Message not found");
       }
 
-      // Send WebSocket notification about the read status
       wss.clients.forEach((client: any) => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({
@@ -1303,7 +1230,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error marking message as read");
     }
   });
-  // Mark messages as read endpoint
   app.post("/api/channels/:channelId/read", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1315,7 +1241,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Get all unread messages in the channel
       const unreadMessages = await db
         .select({ id: messages.id })
         .from(messages)
@@ -1332,7 +1257,6 @@ export function registerRoutes(app: Express): Server {
           sql`${messageReads.id} IS NULL`
         ));
 
-      // Mark all messages as read
       if (unreadMessages.length > 0) {
         await db.insert(messageReads)
           .values(
@@ -1351,7 +1275,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add file upload route
   app.post("/api/upload", upload.array("files"), async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1373,10 +1296,8 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Serve uploaded files
   app.use("/uploads", express.static("uploads"));
 
-  // Update messages route to handle attachments
   app.post("/api/channels/:channelId/messages", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1390,7 +1311,6 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Create message
       const [message] = await db
         .insert(messages)
         .values({
@@ -1400,7 +1320,6 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
-      // Add attachments if any
       if (attachments?.length) {
         await db.insert(messageAttachments).values(
           attachments.map((att: any) => ({
@@ -1413,7 +1332,6 @@ export function registerRoutes(app: Express): Server {
         );
       }
 
-      // Fetch full message with all relations
       const fullMessage = await db.query.messages.findFirst({
         where: eq(messages.id, message.id),
         with: {
@@ -1441,7 +1359,6 @@ export function registerRoutes(app: Express): Server {
 
       res.json(fullMessage);
 
-      // Broadcast to WebSocket clients
       const messageUpdate = JSON.stringify({
         type: 'new_message',
         message: fullMessage,
