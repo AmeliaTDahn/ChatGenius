@@ -1,4 +1,4 @@
-import { useState, QueryClient } from "react";
+import { useState } from "react";
 import { useUser } from "@/hooks/use-user";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { UserHeader } from "@/components/chat/UserHeader";
@@ -21,8 +21,6 @@ import { UserPlus, Loader2, Search } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserSettings } from "@/components/chat/UserSettings";
-
 
 export default function ChatPage() {
   const queryClient = useQueryClient();
@@ -121,25 +119,22 @@ export default function ChatPage() {
             onSelectChannel={setSelectedChannel}
           />
 
-          {/* Bottom left logout and settings buttons */}
-          <div className="mt-auto border-t">
-            <UserSettings user={user} />
-            <Button 
-              variant="ghost" 
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="w-64 py-4 rounded-none hover:bg-destructive/10 text-sm font-medium transition-colors relative"
-            >
-              {isLoggingOut ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Logging out...
-                </>
-              ) : (
-                'Logout'
-              )}
-            </Button>
-          </div>
+          {/* Bottom left logout button */}
+          <Button 
+            variant="ghost" 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-64 py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors relative"
+          >
+            {isLoggingOut ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Logging out...
+              </>
+            ) : (
+              'Logout'
+            )}
+          </Button>
         </div>
         <div className="flex-1 flex flex-col">
           {selectedChannel ? (
