@@ -1,6 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, UserPlus, Bell, Users } from "lucide-react";
+import { UserPlus, Bell, Users } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,58 +39,60 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background">
-      {/* Left side: User info and action buttons */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-3">
-          <Avatar>
-            {user?.avatarUrl ? (
-              <AvatarImage src={user.avatarUrl} alt={displayName} />
-            ) : (
-              <AvatarFallback>{fallbackInitial}</AvatarFallback>
-            )}
-          </Avatar>
-          <div>
-            <p className="font-medium text-sm">{displayName}</p>
-            <p className="text-xs text-muted-foreground">Online</p>
-          </div>
-        </div>
-        <div className="flex gap-2 ml-4">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onViewFriends}
-            title="Friends"
-          >
-            <Users className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onViewRequests}
-            title="Friend Requests"
-          >
-            <Bell className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onAddFriend}
-            title="Add Friend"
-          >
-            <UserPlus className="h-4 w-4" />
-          </Button>
+      {/* Left side: User info */}
+      <div className="flex items-center gap-3">
+        <Avatar>
+          {user?.avatarUrl ? (
+            <AvatarImage src={user.avatarUrl} alt={displayName} />
+          ) : (
+            <AvatarFallback>{fallbackInitial}</AvatarFallback>
+          )}
+        </Avatar>
+        <div>
+          <p className="font-medium text-sm">{displayName}</p>
+          <p className="text-xs text-muted-foreground">Online</p>
         </div>
       </div>
 
-      {/* Right side: Logout button */}
+      {/* Center: Action buttons */}
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={onViewFriends}
+          title="Friends"
+          className="w-9 h-9"
+        >
+          <Users className="h-5 w-5" />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={onViewRequests}
+          title="Friend Requests"
+          className="w-9 h-9"
+        >
+          <Bell className="h-5 w-5" />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={onAddFriend}
+          title="Add Friend"
+          className="w-9 h-9"
+        >
+          <UserPlus className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Right side: Logout text button */}
       <Button 
         variant="ghost" 
-        size="icon"
+        size="sm"
         onClick={handleLogout}
-        title="Logout"
-        className="hover:bg-destructive/10"
+        className="text-sm font-medium hover:bg-destructive/10"
       >
-        <LogOut className="h-4 w-4" />
+        Logout
       </Button>
     </div>
   );
