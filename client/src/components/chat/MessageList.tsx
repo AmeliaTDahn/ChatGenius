@@ -29,7 +29,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
   const MessageComponent = ({ message }: { message: Message }) => {
     const handleReaction = async (emoji: string) => {
-      await addReaction(message.id, emoji);
+      await addReaction({ messageId: message.id, emoji });
     };
 
     // Group reactions by emoji

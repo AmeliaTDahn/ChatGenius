@@ -14,6 +14,30 @@ export function useMessages(channelId: number) {
     refetchOnWindowFocus: true
   });
 
+  const addReaction = useMutation({
+    mutationFn: async (params: { messageId: number, emoji: string }) => {
+      const res = await fetch(`/api/messages/${params.messageId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji: params.emoji }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json() as Promise<Message>;
+    },
+    onSuccess: (updatedMessage) => {
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        return oldMessages.map((msg) =>
+          msg.id === updatedMessage.id ? updatedMessage : msg
+        );
+      });
+    },
+  });
+
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
       const res = await fetch(`/api/channels/${channelId}/messages`, {
@@ -29,44 +53,10 @@ export function useMessages(channelId: number) {
 
       return res.json() as Promise<Message>;
     },
-    onMutate: async (content) => {
-      // Cancel outgoing fetches
-      await queryClient.cancelQueries({ queryKey });
-
-      // Get current messages
-      const previousMessages = queryClient.getQueryData<Message[]>(queryKey) || [];
-
-      // Create optimistic message
-      const optimisticMessage: Message = {
-        id: Date.now(),
-        content,
-        channelId,
-        userId: user?.id || 0,
-        createdAt: new Date().toISOString(),
-        user: {
-          id: user?.id || 0,
-          username: user?.username || '',
-          avatarUrl: user?.avatarUrl,
-        },
-        reactions: []
-      };
-
-      // Add optimistic message to end of messages
-      queryClient.setQueryData<Message[]>(queryKey, (old = []) => {
-        return [...old, optimisticMessage];
+    onSuccess: (newMessage) => {
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        return [...oldMessages, newMessage];
       });
-
-      return { previousMessages };
-    },
-    onError: (err, variables, context) => {
-      // Revert to previous messages on error
-      if (context?.previousMessages) {
-        queryClient.setQueryData(queryKey, context.previousMessages);
-      }
-    },
-    onSettled: () => {
-      // Refetch after error or success to ensure consistency
-      queryClient.invalidateQueries({ queryKey });
     },
   });
 
@@ -96,6 +86,7 @@ export function useMessages(channelId: number) {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
+    addReaction: addReaction.mutateAsync,
     markAsRead: markAsRead.mutateAsync,
   };
 }
