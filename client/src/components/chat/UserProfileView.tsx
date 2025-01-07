@@ -73,11 +73,6 @@ export function UserProfileView({ user, isOpen, onClose }: UserProfileViewProps)
               </div>
             )}
 
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-1">Member since</h4>
-              <p>{formatDate(user.createdAt)}</p>
-            </div>
-
             {user.lastActive && (
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-1">Last active</h4>
