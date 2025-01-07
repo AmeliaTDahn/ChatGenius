@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -6,14 +6,51 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import type { Message } from "@db/schema";
+import { useUser } from "@/hooks/use-user";
 
 type MessageListProps = {
   channelId: number;
 };
 
 export function MessageList({ channelId }: MessageListProps) {
-  const { messages, isLoading, addReaction } = useMessages(channelId);
+  const { messages, isLoading, addReaction, addMessage } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const { user } = useUser();
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Initialize WebSocket connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.addEventListener('open', () => {
+      // Send authentication message
+      ws.send(JSON.stringify({
+        type: 'auth',
+        userId: user.id
+      }));
+    });
+
+    ws.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'new_message' && data.message.channelId === channelId) {
+        addMessage(data.message);
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [user, channelId, addMessage]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

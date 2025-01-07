@@ -92,10 +92,22 @@ export function useMessages(channelId: number) {
     },
   });
 
+  // Function to add a new message from WebSocket
+  const addMessage = (newMessage: Message) => {
+    queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+      // Check if message already exists to prevent duplicates
+      if (oldMessages.some(msg => msg.id === newMessage.id)) {
+        return oldMessages;
+      }
+      return [...oldMessages, newMessage];
+    });
+  };
+
   return {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
     markAsRead: markAsRead.mutateAsync,
+    addMessage, // Export addMessage function for WebSocket updates
   };
 }
