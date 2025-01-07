@@ -57,7 +57,7 @@ const TIMEZONES = [
 ];
 
 const formSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
+  displayName: z.string().min(3, "Display name must be at least 3 characters"),
   age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
   city: z.string().min(2, "City must be at least 2 characters").nullable(),
   hideActivity: z.boolean(),
@@ -81,7 +81,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
   const form = useForm<UserSettingsFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: user.username,
+      displayName: user.displayName || user.username,
       age: user.age,
       city: user.city || "",
       hideActivity: user.hideActivity,
@@ -170,9 +170,22 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
         <Form {...form}>
           <form onChange={handleFormChange} className="space-y-4">
+            {/* Read-only username field */}
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl>
+                <Input 
+                  value={user.username} 
+                  disabled 
+                  className="bg-muted"
+                />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">Username cannot be changed</p>
+            </FormItem>
+
             <FormField
               control={form.control}
-              name="username"
+              name="displayName"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Display Name</FormLabel>

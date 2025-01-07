@@ -51,7 +51,7 @@ export function UserProfileView({ user, isOpen, onClose }: UserProfileViewProps)
               />
             </div>
             <div className="text-center">
-              <h3 className="font-semibold text-lg">{user.username}</h3>
+              <h3 className="font-semibold text-lg">{user.displayName || user.username}</h3>
               <p className="text-sm text-muted-foreground">
                 {user.isOnline ? user.status : 'offline'}
               </p>

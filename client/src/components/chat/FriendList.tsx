@@ -10,6 +10,7 @@ import { UserProfileView } from "./UserProfileView";
 type Friend = {
   id: number;
   username: string;
+  displayName?: string; // Added displayName
   avatarUrl?: string;
   isOnline: boolean;
   hideActivity: boolean;
@@ -130,7 +131,7 @@ export function FriendList() {
                 <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${getStatusColor(friend.isOnline, friend.hideActivity)}`} />
               </div>
               <div>
-                <p className="font-medium">{friend.username}</p>
+                <p className="font-medium">{friend.displayName || friend.username}</p>
                 <p className="text-xs text-muted-foreground">
                   {friend.hideActivity || !friend.isOnline ? 'offline' : 'online'}
                 </p>

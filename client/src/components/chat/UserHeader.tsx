@@ -90,7 +90,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   // Safe fallback for username display
-  const displayName = user?.username || 'User';
+  const displayName = user.displayName || user.username;
   const fallbackInitial = displayName.charAt(0).toUpperCase();
 
   // Query for pending notifications
@@ -125,7 +125,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
               <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${getStatusColor(user.isOnline, user.hideActivity)}`} />
             </div>
             <div>
-              <p className="font-medium text-sm">{displayName}</p>
+              <p className="font-medium text-sm">{user.displayName || user.username}</p>
               <DropdownMenu>
                 <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
                   {user.hideActivity ? 'Activity Hidden' : 'Online'}
@@ -151,8 +151,8 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
         {/* Right side: Action buttons */}
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => setShowSettings(true)}
             title="Settings"
@@ -161,8 +161,8 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
             <UserIcon className="h-5 w-5" />
           </Button>
           <div className="relative">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={onViewRequests}
               title="Friend Requests"
@@ -179,7 +179,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
       {/* Action buttons section */}
       <div className="flex flex-col border-t">
-        <Button 
+        <Button
           variant="ghost"
           onClick={onViewFriends}
           className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none"
@@ -188,7 +188,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           <span className="text-sm font-medium">Friends</span>
         </Button>
 
-        <Button 
+        <Button
           variant="ghost"
           onClick={onAddFriend}
           className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t"

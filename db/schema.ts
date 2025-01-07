@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
+  displayName: text("display_name"),  // New field for display name
   avatarUrl: text("avatar_url"),
   age: integer("age"),  // Optional field
   city: text("city"),   // Optional field

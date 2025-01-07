@@ -109,11 +109,11 @@ export function registerRoutes(app: Express): Server {
       const [updatedUser] = await db
         .update(users)
         .set({
-          username: req.body.username,
+          displayName: req.body.displayName,
           avatarUrl: req.body.avatarUrl,
           age: req.body.age,
           city: req.body.city,
-          status: req.body.status,
+          timezone: req.body.timezone,
         })
         .where(eq(users.id, req.user.id))
         .returning();
