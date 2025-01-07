@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -136,7 +135,6 @@ export function UserSettings({ user }: UserSettingsProps) {
         onClick={() => setIsOpen(true)}
         className="w-64 py-4 rounded-none border-t hover:bg-accent/10 text-sm font-medium transition-colors relative"
       >
-        <Settings className="h-4 w-4 mr-2" />
         Settings
       </Button>
 
