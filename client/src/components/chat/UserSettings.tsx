@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import type { User } from "@db/schema";
 
 const avatarOptions = [
   "/avatars/cat.svg",
@@ -52,7 +53,11 @@ const formSchema = z.object({
 
 type UserSettingsFormData = z.infer<typeof formSchema>;
 
-export function UserSettings({ user }: { user: any }) {
+type UserSettingsProps = {
+  user: User;
+};
+
+export function UserSettings({ user }: UserSettingsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -84,8 +89,10 @@ export function UserSettings({ user }: { user: any }) {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+    onSuccess: (updatedUser) => {
+      // Update the user data in the cache
+      queryClient.setQueryData(['user'], updatedUser);
+
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -145,7 +152,7 @@ export function UserSettings({ user }: { user: any }) {
                   <FormItem>
                     <FormLabel>Age</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="Enter age" {...field} />
+                      <Input type="text" placeholder="Enter age" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -159,7 +166,7 @@ export function UserSettings({ user }: { user: any }) {
                   <FormItem>
                     <FormLabel>City</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter city" {...field} />
+                      <Input placeholder="Enter city" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
