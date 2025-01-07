@@ -95,22 +95,11 @@ export function UserSettings({ user }: UserSettingsProps) {
       // Update the user data in the cache
       queryClient.setQueryData(['user'], updatedUser);
 
-      // Show success message only for manual saves
-      if (!isAutoSaving) {
-        toast({
-          title: "Profile updated",
-          description: "Your profile has been updated successfully.",
-        });
-        // Close the dialog only for manual saves
-        setIsOpen(false);
-      } else {
-        // Show a subtle toast for auto-save
-        toast({
-          title: "Changes saved",
-          description: "Your changes have been saved automatically.",
-          duration: 2000,
-        });
-      }
+      toast({
+        title: "Changes saved",
+        description: "Your changes have been saved automatically.",
+        duration: 2000,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -140,12 +129,6 @@ export function UserSettings({ user }: UserSettingsProps) {
     }
   }, [form, debouncedSave]);
 
-  // Manual save handler
-  const onSubmit = (data: UserSettingsFormData) => {
-    setIsAutoSaving(false);
-    updateProfile.mutate(data);
-  };
-
   return (
     <>
       <Button
@@ -164,7 +147,7 @@ export function UserSettings({ user }: UserSettingsProps) {
           </DialogHeader>
 
           <Form {...form}>
-            <form onChange={handleFormChange} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onChange={handleFormChange} className="space-y-4">
               <FormField
                 control={form.control}
                 name="username"
@@ -250,10 +233,6 @@ export function UserSettings({ user }: UserSettingsProps) {
                   ))}
                 </div>
               </div>
-
-              <Button type="submit" className="w-full" disabled={updateProfile.isPending}>
-                {updateProfile.isPending ? "Saving..." : "Save Changes"}
-              </Button>
             </form>
           </Form>
         </DialogContent>

@@ -8,10 +8,12 @@ interface LogoProps {
 
 export function Logo({ className, showText = true }: LogoProps) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <MessageSquare className="h-6 w-6 text-primary" />
+    <div className={cn("flex items-center gap-3", className)}>
+      <div className="relative flex items-center justify-center w-8 h-8 bg-gradient-to-br from-primary/90 to-primary/40 rounded-lg shadow-lg">
+        <MessageSquare className="h-5 w-5 text-background absolute" />
+      </div>
       {showText && (
-        <span className="font-bold text-xl bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent">
+        <span className="font-bold text-xl tracking-tight bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">
           Chat Genius
         </span>
       )}
