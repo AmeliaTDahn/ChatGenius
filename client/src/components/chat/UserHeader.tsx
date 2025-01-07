@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 type UserHeaderProps = {
   user: User;
@@ -26,6 +26,19 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   // Safe fallback for username display
   const displayName = user?.username || 'User';
   const fallbackInitial = displayName.charAt(0).toUpperCase();
+
+  // Query for pending notifications
+  const { data: friendRequests = [] } = useQuery({
+    queryKey: ['/api/friend-requests'],
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const { data: channelInvites = [] } = useQuery({
+    queryKey: ['/api/channel-invites'],
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const hasNotifications = friendRequests.length > 0 || channelInvites.length > 0;
 
   const updateStatus = useMutation({
     mutationFn: async (status: string) => {
@@ -137,15 +150,20 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
         >
           <Users className="h-5 w-5" />
         </Button>
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={onViewRequests}
-          title="Friend Requests"
-          className="w-9 h-9"
-        >
-          <Bell className="h-5 w-5" />
-        </Button>
+        <div className="relative">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={onViewRequests}
+            title="Friend Requests"
+            className="w-9 h-9"
+          >
+            <Bell className="h-5 w-5" />
+            {hasNotifications && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+            )}
+          </Button>
+        </div>
         <Button 
           variant="ghost" 
           size="icon"
