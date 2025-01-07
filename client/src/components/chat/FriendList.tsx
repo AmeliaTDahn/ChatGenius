@@ -9,6 +9,8 @@ type Friend = {
   id: number;
   username: string;
   avatarUrl?: string;
+  isOnline: boolean;
+  status: string;
 };
 
 export function FriendList() {
@@ -83,6 +85,19 @@ export function FriendList() {
     }
   });
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'bg-green-500';
+      case 'away':
+        return 'bg-yellow-500';
+      case 'busy':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading friends...</div>;
   }
@@ -98,17 +113,23 @@ export function FriendList() {
         {friends.map((friend) => (
           <div key={friend.id} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Avatar>
-                {friend.avatarUrl ? (
-                  <AvatarImage src={friend.avatarUrl} alt={friend.username} />
-                ) : (
-                  <AvatarFallback>
-                    {friend.username[0].toUpperCase()}
-                  </AvatarFallback>
-                )}
-              </Avatar>
+              <div className="relative">
+                <Avatar>
+                  {friend.avatarUrl ? (
+                    <AvatarImage src={friend.avatarUrl} alt={friend.username} />
+                  ) : (
+                    <AvatarFallback>
+                      {friend.username[0].toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${friend.isOnline ? getStatusColor(friend.status) : 'bg-gray-500'}`} />
+              </div>
               <div>
                 <p className="font-medium">{friend.username}</p>
+                <p className="text-xs text-muted-foreground">
+                  {friend.isOnline ? friend.status : 'offline'}
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
