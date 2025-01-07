@@ -1,6 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Bell, Users } from "lucide-react";
+import { UserPlus, Bell, Users, User as UserIcon } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/ui/logo";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { UserSettings } from "./UserSettings";
+import { UserProfileView } from "./UserProfileView";
 import { useState } from "react";
 
 type UserHeaderProps = {
@@ -26,6 +27,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   // Safe fallback for username display
   const displayName = user?.username || 'User';
@@ -92,7 +94,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
             <Button 
               variant="ghost" 
               className="p-0 hover:bg-transparent relative"
-              onClick={() => setShowSettings(true)}
+              onClick={() => setShowProfile(true)}
             >
               <div className="relative">
                 <Avatar>
@@ -102,7 +104,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
                     <AvatarFallback>{fallbackInitial}</AvatarFallback>
                   )}
                 </Avatar>
-                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
+                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${getStatusColor(user.status)}`} />
               </div>
             </Button>
             <div>
@@ -161,6 +163,15 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
               )}
             </Button>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSettings(true)}
+            title="Settings"
+            className="w-9 h-9"
+          >
+            <UserIcon className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
@@ -178,6 +189,13 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
       {showSettings && (
         <UserSettings user={user} onClose={() => setShowSettings(false)} />
       )}
+
+      {/* Profile View Dialog */}
+      <UserProfileView 
+        user={user} 
+        isOpen={showProfile} 
+        onClose={() => setShowProfile(false)} 
+      />
     </div>
   );
 }
