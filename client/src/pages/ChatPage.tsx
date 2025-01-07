@@ -18,9 +18,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
 import type { Channel } from "@db/schema";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ChatPage() {
   const { user, logout } = useUser();
+  const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const { sendMessage } = useWebSocket(user);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -41,13 +43,30 @@ export default function ChatPage() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged out successfully",
+        description: "Redirecting to login page...",
+      });
+    } catch (error: any) {
+      console.error('Logout failed:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to logout",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <div className="flex flex-1 overflow-hidden">
         <div className="w-64 flex flex-col border-r">
           <UserHeader 
             user={user} 
-            onLogout={logout} 
+            onLogout={handleLogout} 
             onAddFriend={() => setIsSearchOpen(true)}
             onViewRequests={() => setIsRequestsOpen(true)}
             onViewFriends={() => setIsFriendsOpen(true)}
@@ -94,7 +113,7 @@ export default function ChatPage() {
       {/* Fixed logout button at the bottom */}
       <Button 
         variant="ghost" 
-        onClick={logout}
+        onClick={handleLogout}
         className="w-full py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors"
       >
         Logout
