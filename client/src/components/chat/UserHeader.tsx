@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Bell, Users } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
+import { Logo } from "@/components/ui/logo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,49 +98,52 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background">
-      {/* Left side: User info */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <Avatar>
-            {user?.avatarUrl ? (
-              <AvatarImage src={user.avatarUrl} alt={displayName} />
-            ) : (
-              <AvatarFallback>{fallbackInitial}</AvatarFallback>
-            )}
-          </Avatar>
-          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
-        </div>
-        <div>
-          <p className="font-medium text-sm">{displayName}</p>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
-              {user.status}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => updateStatus.mutate('online')}>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  Online
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => updateStatus.mutate('away')}>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  Away
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => updateStatus.mutate('busy')}>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
-                  Busy
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      {/* Left side: Logo and User info */}
+      <div className="flex items-center gap-4">
+        <Logo showText={false} />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Avatar>
+              {user?.avatarUrl ? (
+                <AvatarImage src={user.avatarUrl} alt={displayName} />
+              ) : (
+                <AvatarFallback>{fallbackInitial}</AvatarFallback>
+              )}
+            </Avatar>
+            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
+          </div>
+          <div>
+            <p className="font-medium text-sm">{displayName}</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
+                {user.status}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => updateStatus.mutate('online')}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    Online
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => updateStatus.mutate('away')}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                    Away
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => updateStatus.mutate('busy')}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    Busy
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
-      {/* Center: Action buttons */}
+      {/* Right side: Action buttons */}
       <div className="flex items-center gap-2">
         <Button 
           variant="ghost" 
