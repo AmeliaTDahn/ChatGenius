@@ -42,6 +42,8 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
 
   const handleChannelSelect = async (channel: Channel) => {
     try {
+      onSelectChannel(channel);
+
       // Mark messages as read when selecting the channel
       await fetch(`/api/channels/${channel.id}/read`, {
         method: 'POST',
@@ -49,10 +51,11 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
       });
 
       // Invalidate both queries to refresh the unread status
-      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
-
-      onSelectChannel(channel);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/channels'] }),
+        queryClient.invalidateQueries({ queryKey: [`/api/channels/${channel.id}/messages`] })
+      ]);
     } catch (error) {
       toast({
         title: "Error",

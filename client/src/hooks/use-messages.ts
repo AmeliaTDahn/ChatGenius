@@ -12,6 +12,11 @@ export function useMessages(channelId: number) {
     enabled: !!channelId,
     refetchInterval: false,
     refetchOnWindowFocus: true,
+    onSuccess: () => {
+      // Invalidate unread status queries when messages are loaded
+      queryClient.invalidateQueries(['/api/direct-messages']);
+      queryClient.invalidateQueries(['/api/channels']);
+    }
   });
 
   const sendMessage = useMutation({
