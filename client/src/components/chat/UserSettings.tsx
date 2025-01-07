@@ -32,12 +32,20 @@ const avatarOptions = [
   "/avatars/penguin.svg",
   "/avatars/rabbit.svg",
   "/avatars/tiger.svg",
+  "/avatars/koala.svg",
+  "/avatars/bear.svg",
+  "/avatars/lion.svg",
+  "/avatars/elephant.svg",
+  "/avatars/monkey.svg",
+  "/avatars/giraffe.svg",
+  "/avatars/unicorn.svg",
+  "/avatars/dragon.svg"
 ];
 
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
-  age: z.string().regex(/^\d+$/, "Age must be a number").optional(),
-  city: z.string().min(2, "City must be at least 2 characters").optional(),
+  age: z.string().regex(/^\d*$/, "Age must be a number").optional().transform(val => val === "" ? null : parseInt(val, 10)),
+  city: z.string().min(2, "City must be at least 2 characters").optional().nullable(),
   status: z.enum(["online", "away", "busy"]),
   avatarUrl: z.string().url("Invalid avatar URL"),
 });
@@ -65,7 +73,11 @@ export function UserSettings({ user }: { user: any }) {
       const res = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          age: data.age || null,
+          city: data.city || null
+        }),
         credentials: 'include'
       });
 
@@ -177,7 +189,7 @@ export function UserSettings({ user }: { user: any }) {
 
               <div>
                 <FormLabel>Avatar</FormLabel>
-                <div className="grid grid-cols-4 gap-4 mt-2">
+                <div className="grid grid-cols-4 gap-4 mt-2 max-h-64 overflow-y-auto">
                   {avatarOptions.map((avatar) => (
                     <Button
                       key={avatar}
