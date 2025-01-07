@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,6 +29,7 @@ export default function ChatPage() {
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isFriendsOpen, setIsFriendsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   if (!user) return null;
 
@@ -44,7 +45,10 @@ export default function ChatPage() {
   };
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+
     try {
+      setIsLoggingOut(true);
       await logout();
       toast({
         title: "Logged out successfully",
@@ -57,6 +61,8 @@ export default function ChatPage() {
         description: error.message || "Failed to logout",
         variant: "destructive",
       });
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -66,7 +72,7 @@ export default function ChatPage() {
         <div className="w-64 flex flex-col border-r">
           <UserHeader 
             user={user} 
-            onLogout={handleLogout} 
+            onLogout={handleLogout}
             onAddFriend={() => setIsSearchOpen(true)}
             onViewRequests={() => setIsRequestsOpen(true)}
             onViewFriends={() => setIsFriendsOpen(true)}
@@ -114,9 +120,17 @@ export default function ChatPage() {
       <Button 
         variant="ghost" 
         onClick={handleLogout}
-        className="w-full py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors"
+        disabled={isLoggingOut}
+        className="w-full py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors relative"
       >
-        Logout
+        {isLoggingOut ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Logging out...
+          </>
+        ) : (
+          'Logout'
+        )}
       </Button>
 
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
