@@ -141,6 +141,7 @@ export function registerRoutes(app: Express): Server {
         .update(users)
         .set({
           hideActivity,
+          isOnline: true,
           lastActive: new Date()
         })
         .where(eq(users.id, req.user.id))
@@ -153,7 +154,7 @@ export function registerRoutes(app: Express): Server {
         type: 'status_update',
         userId: updatedUser.id,
         hideActivity: updatedUser.hideActivity,
-        isOnline: true
+        isOnline: updatedUser.isOnline
       };
 
       wss.clients.forEach((client) => {

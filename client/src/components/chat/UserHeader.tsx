@@ -57,6 +57,38 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
     };
   }, [user.id, queryClient]);
 
+  const updateStatus = useMutation({
+    mutationFn: async (hideActivity: boolean) => {
+      const res = await fetch('/api/user/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hideActivity }),
+        credentials: 'include'
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['user'], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
+    if (hideActivity) {
+      return 'bg-gray-500';
+    }
+    return isOnline ? 'bg-green-500' : 'bg-gray-500';
+  };
+
   // Safe fallback for username display
   const displayName = user?.username || 'User';
   const fallbackInitial = displayName.charAt(0).toUpperCase();
@@ -73,37 +105,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   });
 
   const hasNotifications = friendRequests.length > 0 || channelInvites.length > 0;
-
-  const updateStatus = useMutation({
-    mutationFn: async (hideActivity: boolean) => {
-      const res = await fetch('/api/user/status', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hideActivity }),
-        credentials: 'include'
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
-  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
-    if (hideActivity || !isOnline) {
-      return 'bg-gray-500';
-    }
-    return 'bg-green-500';
-  };
 
   return (
     <div className="flex flex-col border-b bg-background">
