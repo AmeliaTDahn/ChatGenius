@@ -70,6 +70,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
 
   const handleChannelSelect = async (channel: Channel) => {
     try {
+      // First, update the selected channel in the parent component
       onSelectChannel(channel);
 
       // Immediately update the UI to remove the unread indicator
@@ -80,17 +81,15 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         );
       });
 
-      // Mark messages as read
+      // Then mark messages as read on the server
       await fetch(`/api/channels/${channel.id}/read`, {
         method: 'POST',
         credentials: 'include'
       });
 
-      // Then invalidate queries to refresh the data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] }),
-        queryClient.invalidateQueries({ queryKey: ['/api/channels'] }),
-      ]);
+      // Finally, invalidate queries to ensure data consistency
+      await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      await queryClient.invalidateQueries({ queryKey: ['direct-messages'] });
     } catch (error) {
       toast({
         title: "Error",
