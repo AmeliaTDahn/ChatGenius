@@ -106,6 +106,61 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
+  // Get messages for a channel
+  app.get("/api/channels/:channelId/messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      const channelMessages = await db.query.messages.findMany({
+        where: eq(messages.channelId, channelId),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            }
+          },
+          reactions: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                }
+              }
+            }
+          },
+          reads: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                }
+              }
+            }
+          }
+        },
+        orderBy: (messages, { asc }) => [asc(messages.createdAt)]
+      });
+
+      res.json(channelMessages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).send("Error fetching messages");
+    }
+  });
+
   // Get user data
   app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -440,54 +495,8 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages
-  app.get("/api/channels/:channelId/messages", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
+  //This route is replaced by the edited code above.
 
-    const channelId = parseInt(req.params.channelId);
-    if (isNaN(channelId)) {
-      return res.status(400).send("Invalid channel ID");
-    }
-
-    const channelMessages = await db.query.messages.findMany({
-      where: eq(messages.channelId, channelId),
-      with: {
-        user: {
-          columns: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          }
-        },
-        reactions: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                username: true,
-                avatarUrl: true,
-              }
-            }
-          }
-        },
-        reads: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                username: true,
-                avatarUrl: true,
-              }
-            }
-          }
-        }
-      },
-      orderBy: (messages, { asc }) => [asc(messages.createdAt)]
-    });
-
-    res.json(channelMessages);
-  });
 
   // Add message search endpoint after the messages endpoints
   app.get("/api/messages/search", async (req, res) => {
