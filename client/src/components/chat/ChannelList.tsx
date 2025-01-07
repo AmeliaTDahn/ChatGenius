@@ -113,7 +113,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
-              {channel.unreadCount > 0 && (
+              {channel.unreadCount! > 0 && (
                 <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
               )}
             </Button>
