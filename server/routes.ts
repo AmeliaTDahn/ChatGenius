@@ -36,6 +36,7 @@ async function getUnreadMessageCounts(userId: number) {
       const latestRead = await db
         .select({ messageId: messageReads.messageId })
         .from(messageReads)
+        .join(messages, eq(messages.channelId, channel.id))
         .where(and(
           eq(messageReads.userId, userId),
           eq(messages.channelId, channel.id)
