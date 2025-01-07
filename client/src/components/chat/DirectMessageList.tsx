@@ -41,7 +41,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
   };
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground p-4">Loading direct messages...</div>;
+    return <div className="text-sm text-muted-foreground">Loading direct messages...</div>;
   }
 
   if (!directMessages?.length) {
@@ -82,9 +82,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
             <span className="text-sm truncate">{dm.otherUser.username}</span>
           </div>
           {dm.unreadCount > 0 && (
-            <div className="bg-red-500 text-white text-xs rounded-full min-w-[1.25rem] h-5 flex items-center justify-center px-1">
-              {dm.unreadCount}
-            </div>
+            <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
           )}
         </Button>
       ))}
