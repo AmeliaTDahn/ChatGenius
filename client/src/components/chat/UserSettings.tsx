@@ -57,7 +57,7 @@ const TIMEZONES = [
 ];
 
 const formSchema = z.object({
-  displayName: z.string().min(3, "Display name must be at least 3 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
   age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
   city: z.string().min(2, "City must be at least 2 characters").nullable(),
   hideActivity: z.boolean(),
@@ -81,7 +81,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
   const form = useForm<UserSettingsFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      displayName: user.displayName || user.username,
+      username: user.username || user.loginUsername,
       age: user.age,
       city: user.city || "",
       hideActivity: user.hideActivity,
@@ -170,27 +170,27 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
         <Form {...form}>
           <form onChange={handleFormChange} className="space-y-4">
-            {/* Read-only username field */}
+            {/* Read-only login username field */}
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Login Username</FormLabel>
               <FormControl>
                 <Input 
-                  value={user.username} 
+                  value={user.loginUsername} 
                   disabled 
                   className="bg-muted"
                 />
               </FormControl>
-              <p className="text-xs text-muted-foreground">Username cannot be changed</p>
+              <p className="text-xs text-muted-foreground">Login username cannot be changed</p>
             </FormItem>
 
             <FormField
               control={form.control}
-              name="displayName"
+              name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Display Name</FormLabel>
+                  <FormLabel>Display Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter display name" {...field} />
+                    <Input placeholder="Enter username" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

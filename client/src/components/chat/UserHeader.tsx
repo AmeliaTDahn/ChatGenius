@@ -90,7 +90,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   // Safe fallback for username display
-  const displayName = user.displayName || user.username;
+  const displayName = user.username || user.loginUsername;
   const fallbackInitial = displayName.charAt(0).toUpperCase();
 
   // Query for pending notifications
@@ -125,7 +125,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
               <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${getStatusColor(user.isOnline, user.hideActivity)}`} />
             </div>
             <div>
-              <p className="font-medium text-sm">{user.displayName || user.username}</p>
+              <p className="font-medium text-sm">{displayName}</p>
               <DropdownMenu>
                 <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
                   {user.hideActivity ? 'Activity Hidden' : 'Online'}

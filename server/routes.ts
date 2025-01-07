@@ -99,7 +99,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this route after the existing /api/user endpoint
+  // Update user profile route
   app.put("/api/user/profile", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -109,7 +109,7 @@ export function registerRoutes(app: Express): Server {
       const [updatedUser] = await db
         .update(users)
         .set({
-          displayName: req.body.displayName,
+          username: req.body.username,
           avatarUrl: req.body.avatarUrl,
           age: req.body.age,
           city: req.body.city,
@@ -125,7 +125,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the status endpoint to handle hideActivity
+  // Add this route after the existing /api/user endpoint
   app.put("/api/user/status", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1086,7 +1086,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error marking message as read");
     }
   });
-
   return server;
 }
 
