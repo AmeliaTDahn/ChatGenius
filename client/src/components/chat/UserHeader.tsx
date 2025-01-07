@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { LogOut, UserPlus, Bell, Users } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
-import { useCallback } from "react";
 
 type UserHeaderProps = {
   user: User;
@@ -20,28 +19,23 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   const displayName = user?.username || 'User';
   const fallbackInitial = displayName.charAt(0).toUpperCase();
 
-  const handleLogout = useCallback(async () => {
+  const handleLogout = async () => {
     try {
       await onLogout();
-
       toast({
         title: "Logged out successfully",
         description: "Redirecting to login page...",
       });
-
-      // Set a small timeout to allow the toast to show
-      setTimeout(() => {
-        window.location.reload(); // Force a reload to clear all state
-      }, 500);
-    } catch (error) {
+      window.location.reload();
+    } catch (error: any) {
       console.error('Logout failed:', error);
       toast({
-        title: "Logout failed",
-        description: "Please try again",
+        title: "Error",
+        description: error.message || "Failed to logout",
         variant: "destructive",
       });
     }
-  }, [onLogout, toast]);
+  };
 
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background">
@@ -93,8 +87,8 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
         variant="ghost" 
         size="icon"
         onClick={handleLogout}
-        className="hover:bg-destructive/10"
         title="Logout"
+        className="hover:bg-destructive/10"
       >
         <LogOut className="h-4 w-4" />
       </Button>

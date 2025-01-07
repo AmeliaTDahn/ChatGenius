@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import type { Channel } from "@db/schema";
 
 export default function ChatPage() {
@@ -31,11 +31,12 @@ export default function ChatPage() {
   if (!user) return null;
 
   const handleSendMessage = (content: string) => {
-    if (selectedChannel && content.trim()) {
+    if (selectedChannel && content.trim() && user) {
       sendMessage({
         type: "message",
         channelId: selectedChannel.id,
-        content: content.trim()
+        content: content.trim(),
+        userId: user.id
       });
     }
   };

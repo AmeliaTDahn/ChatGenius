@@ -58,7 +58,7 @@ export function useWebSocket(user: User | null) {
     };
   }, [user, queryClient]);
 
-  const sendMessage = useCallback((message: WSMessage) => {
+  const sendMessage = useCallback((message: WSMessage & { userId: number }) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(message));
     }
