@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq, and, ne, ilike, or } from "drizzle-orm";
+import { eq, and, ne, ilike, or, inArray } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads } from "@db/schema";
 import { WebSocketServer } from "ws";
@@ -777,18 +777,27 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (dmChannel) {
-        // First delete message reactions for this channel's messages
-        await db
-          .delete(messageReactions)
-          .where(
-            eq(messageReactions.messageId,
-              db.select({ id: messages.id })
-                .from(messages)
-                .where(eq(messages.channelId, dmChannel.channelId))
-            )
-          );
+        // Get all messages in this channel
+        const channelMessages = await db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(eq(messages.channelId, dmChannel.channelId));
 
-        // Then delete the messages
+        const messageIds = channelMessages.map(m => m.id);
+
+        // Delete message reactions
+        if (messageIds.length > 0) {
+          await db
+            .delete(messageReactions)
+            .where(inArray(messageReactions.messageId, messageIds));
+
+          // Delete message reads
+          await db
+            .delete(messageReads)
+            .where(inArray(messageReads.messageId, messageIds));
+        }
+
+        // Delete the messages
         await db
           .delete(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
