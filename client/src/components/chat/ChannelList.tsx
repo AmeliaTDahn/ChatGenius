@@ -20,7 +20,7 @@ import { useUser } from "@/hooks/use-user";
 
 type ChannelListProps = {
   selectedChannel: Channel | null;
-  onSelectChannel: (channel: Channel) => void;
+  onSelectChannel: (channel: Channel | null) => void;
 };
 
 export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListProps) {
@@ -68,24 +68,35 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
     }
   };
 
-  const handleChannelSelect = async (channel: Channel) => {
+  const handleChannelSelect = async (channel: Channel | null) => {
     try {
-      // First, update the selected channel in the parent component
+      // First, if we're deselecting a channel or selecting a different one,
+      // mark the current channel's messages as read
+      if (selectedChannel && (!channel || channel.id !== selectedChannel.id)) {
+        await fetch(`/api/channels/${selectedChannel.id}/read`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+      }
+
+      // Update the selected channel in the parent component
       onSelectChannel(channel);
 
-      // Immediately update the UI to remove the unread indicator
-      queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
-        if (!oldData) return oldData;
-        return oldData.map(ch => 
-          ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
-        );
-      });
+      if (channel) {
+        // Immediately update the UI to remove the unread indicator
+        queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map(ch => 
+            ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
+          );
+        });
 
-      // Then mark messages as read on the server
-      await fetch(`/api/channels/${channel.id}/read`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+        // Then mark messages as read on the server
+        await fetch(`/api/channels/${channel.id}/read`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+      }
 
       // Finally, invalidate queries to ensure data consistency
       await queryClient.invalidateQueries({ queryKey: ['channels'] });
