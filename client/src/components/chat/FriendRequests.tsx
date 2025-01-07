@@ -59,15 +59,41 @@ export function FriendRequests() {
       return res.json();
     },
     onSuccess: (data, variables) => {
+      if (variables.status === 'accepted') {
+        // Update friends list cache immediately
+        queryClient.setQueryData<any[]>(['/api/friends'], (oldFriends = []) => {
+          const { sender } = data;
+          // Add the new friend to the list if not already present
+          if (!oldFriends.some(friend => friend.id === sender.id)) {
+            return [...oldFriends, sender];
+          }
+          return oldFriends;
+        });
+
+        // Update direct messages cache to include the new DM channel
+        queryClient.setQueryData<any[]>(['/api/direct-messages'], (oldDMs = []) => {
+          if (data.dmChannel) {
+            const newDM = {
+              ...data.dmChannel,
+              otherUser: data.sender
+            };
+            return [newDM, ...oldDMs];
+          }
+          return oldDMs;
+        });
+      }
+
       toast({
         title: variables.status === 'accepted' ? "Friend request accepted" : "Friend request rejected",
         description: variables.status === 'accepted' 
           ? "You are now friends!" 
           : "The friend request has been rejected.",
       });
-      // Invalidate friend requests and direct messages queries
-      queryClient.invalidateQueries({ queryKey: ['/api/friend-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
+
+      // Remove the request from the requests list
+      queryClient.setQueryData<FriendRequest[]>(['/api/friend-requests'], (oldRequests = []) => {
+        return oldRequests.filter(request => request.id !== variables.id);
+      });
     },
     onError: (error: Error) => {
       toast({

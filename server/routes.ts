@@ -631,6 +631,27 @@ export function registerRoutes(app: Express): Server {
             user2Id: req.user.id
           });
 
+        // Get both users' data for the response
+        const [sender] = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            avatarUrl: users.avatarUrl,
+          })
+          .from(users)
+          .where(eq(users.id, request.senderId))
+          .limit(1);
+
+        const [receiver] = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            avatarUrl: users.avatarUrl,
+          })
+          .from(users)
+          .where(eq(users.id, req.user.id))
+          .limit(1);
+
         // Create a new channel for direct messages
         const [dmChannel] = await db
           .insert(channels)
@@ -660,9 +681,16 @@ export function registerRoutes(app: Express): Server {
             user2Id: req.user.id,
             channelId: dmChannel.id
           });
-      }
 
-      res.json({ message: `Friend request ${status}` });
+        res.json({
+          message: `Friend request ${status}`,
+          sender,
+          receiver,
+          dmChannel
+        });
+      } else {
+        res.json({ message: `Friend request ${status}` });
+      }
     } catch (error) {
       console.error("Error handling friend request:", error);
       res.status(500).send("Error handling friend request");
