@@ -98,6 +98,43 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add status update endpoint
+  app.put("/api/user/status", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const { status } = req.body;
+    if (!['online', 'away', 'busy'].includes(status)) {
+      return res.status(400).send("Invalid status");
+    }
+
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          status,
+          lastActive: new Date()
+        })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json(updatedUser);
+
+      // Broadcast status change to all connected WebSocket clients
+      wss.clients.forEach((client) => {
+        client.send(JSON.stringify({
+          type: 'status_update',
+          userId: updatedUser.id,
+          status: updatedUser.status
+        }));
+      });
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).send("Error updating user status");
+    }
+  });
+
   // Update the search users endpoint to include friend status
   app.get("/api/users/search", async (req, res) => {
     if (!req.isAuthenticated()) {

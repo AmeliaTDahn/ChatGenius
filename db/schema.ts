@@ -8,6 +8,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   avatarUrl: text("avatar_url"),
   isOnline: boolean("is_online").default(false).notNull(),
+  status: text("status").default('online').notNull(), // Can be: 'online', 'away', 'busy'
+  statusMessage: text("status_message"), // Optional custom status message
+  lastActive: timestamp("last_active").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
