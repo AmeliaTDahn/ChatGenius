@@ -6,6 +6,11 @@ type LoginData = {
   password: string;
 };
 
+type RequestResult = {
+  message: string;
+  user?: User;
+};
+
 async function fetchUser(): Promise<User | null> {
   const response = await fetch('/api/user', {
     credentials: 'include'
@@ -32,7 +37,7 @@ export function useUser() {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (data: LoginData) => {
+    mutationFn: async (data: LoginData): Promise<RequestResult> => {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,19 +45,27 @@ export function useUser() {
         credentials: 'include'
       });
 
+      const result = await response.text();
+
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(result);
       }
 
-      return response.json();
+      try {
+        return JSON.parse(result);
+      } catch {
+        throw new Error('Invalid server response');
+      }
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(['user'], data.user);
+      if (data.user) {
+        queryClient.setQueryData(['user'], data.user);
+      }
     },
   });
 
   const logoutMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<RequestResult> => {
       const response = await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include'
@@ -61,6 +74,7 @@ export function useUser() {
       if (!response.ok) {
         throw new Error(await response.text());
       }
+
       // Clear all queries from the cache
       queryClient.clear();
       // Set user data to null
@@ -69,11 +83,40 @@ export function useUser() {
     }
   });
 
+  const registerMutation = useMutation({
+    mutationFn: async (data: LoginData): Promise<RequestResult> => {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include'
+      });
+
+      const result = await response.text();
+
+      if (!response.ok) {
+        throw new Error(result);
+      }
+
+      try {
+        return JSON.parse(result);
+      } catch {
+        throw new Error('Invalid server response');
+      }
+    },
+    onSuccess: (data) => {
+      if (data.user) {
+        queryClient.setQueryData(['user'], data.user);
+      }
+    },
+  });
+
   return {
     user,
     isLoading,
     error,
     login: loginMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
+    register: registerMutation.mutateAsync,
   };
 }
