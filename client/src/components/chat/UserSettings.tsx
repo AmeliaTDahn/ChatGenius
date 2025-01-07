@@ -81,7 +81,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
   const form = useForm<UserSettingsFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: user.username || user.loginUsername,
+      username: user.username,
       age: user.age,
       city: user.city || "",
       hideActivity: user.hideActivity,
@@ -170,25 +170,12 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
         <Form {...form}>
           <form onChange={handleFormChange} className="space-y-4">
-            {/* Read-only login username field */}
-            <FormItem>
-              <FormLabel>Login Username</FormLabel>
-              <FormControl>
-                <Input 
-                  value={user.loginUsername} 
-                  disabled 
-                  className="bg-muted"
-                />
-              </FormControl>
-              <p className="text-xs text-muted-foreground">Login username cannot be changed</p>
-            </FormItem>
-
             <FormField
               control={form.control}
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Display Username</FormLabel>
+                  <FormLabel>Username</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter username" {...field} />
                   </FormControl>
@@ -204,10 +191,10 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                 <FormItem>
                   <FormLabel>Age</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="Enter age" 
-                      {...field} 
+                    <Input
+                      type="number"
+                      placeholder="Enter age"
+                      {...field}
                       value={field.value || ""}
                       onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                     />

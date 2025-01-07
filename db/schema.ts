@@ -4,9 +4,8 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  loginUsername: text("login_username").unique().notNull(),
+  username: text("username").unique().notNull(),
   password: text("password").notNull(),
-  username: text("username"),  // For display purposes
   avatarUrl: text("avatar_url"),
   age: integer("age"),  // Optional field
   city: text("city"),   // Optional field

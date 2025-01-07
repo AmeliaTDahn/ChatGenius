@@ -90,7 +90,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   // Safe fallback for username display
-  const displayName = user.username || user.loginUsername;
+  const displayName = user.username;
   const fallbackInitial = displayName.charAt(0).toUpperCase();
 
   // Query for pending notifications

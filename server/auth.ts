@@ -57,7 +57,7 @@ export function setupAuth(app: Express) {
         const [user] = await db
           .select()
           .from(users)
-          .where(eq(users.loginUsername, username))
+          .where(eq(users.username, username))
           .limit(1);
 
         if (!user) {
@@ -107,7 +107,7 @@ export function setupAuth(app: Express) {
       const [existingUser] = await db
         .select()
         .from(users)
-        .where(eq(users.loginUsername, username))
+        .where(eq(users.username, username))
         .limit(1);
 
       if (existingUser) {
@@ -119,9 +119,8 @@ export function setupAuth(app: Express) {
       const [newUser] = await db
         .insert(users)
         .values({
-          loginUsername: username,
+          username,
           password: hashedPassword,
-          username: username, // Set initial display username same as login username
         })
         .returning();
 
