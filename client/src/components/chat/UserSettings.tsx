@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -59,7 +60,7 @@ const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
   city: z.string().min(2, "City must be at least 2 characters").nullable(),
-  status: z.enum(["online", "away", "busy"]),
+  hideActivity: z.boolean(),
   avatarUrl: z.string().url("Invalid avatar URL"),
   timezone: z.string().min(1, "Please select a timezone"),
 });
@@ -83,7 +84,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       username: user.username,
       age: user.age,
       city: user.city || "",
-      status: user.status as "online" | "away" | "busy",
+      hideActivity: user.hideActivity,
       avatarUrl: user.avatarUrl || avatarOptions[0],
       timezone: user.timezone || "UTC",
     },
@@ -247,26 +248,21 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
             <FormField
               control={form.control}
-              name="status"
+              name="hideActivity"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="online">Online</SelectItem>
-                      <SelectItem value="away">Away</SelectItem>
-                      <SelectItem value="busy">Busy</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Hide Activity</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Hide your online status from other users
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

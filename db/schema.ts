@@ -10,8 +10,8 @@ export const users = pgTable("users", {
   age: integer("age"),  // Optional field
   city: text("city"),   // Optional field
   isOnline: boolean("is_online").default(false).notNull(),
-  status: text("status").default('online').notNull(), // Can be: 'online', 'away', 'busy'
-  statusMessage: text("status_message"), // Optional custom status message
+  hideActivity: boolean("hide_activity").default(false).notNull(),
+  timezone: text("timezone").default("UTC").notNull(),
   lastActive: timestamp("last_active").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

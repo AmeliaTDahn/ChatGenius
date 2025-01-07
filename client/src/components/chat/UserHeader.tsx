@@ -45,11 +45,11 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   const hasNotifications = friendRequests.length > 0 || channelInvites.length > 0;
 
   const updateStatus = useMutation({
-    mutationFn: async (status: string) => {
+    mutationFn: async (hideActivity: boolean) => {
       const res = await fetch('/api/user/status', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ hideActivity }),
         credentials: 'include'
       });
 
@@ -68,17 +68,11 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
     }
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'bg-green-500';
-      case 'away':
-        return 'bg-yellow-500';
-      case 'busy':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
+  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
+    if (hideActivity || !isOnline) {
+      return 'bg-gray-500';
     }
+    return 'bg-green-500';
   };
 
   return (
@@ -97,31 +91,25 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
                   <AvatarFallback>{fallbackInitial}</AvatarFallback>
                 )}
               </Avatar>
-              <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${getStatusColor(user.status)}`} />
+              <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${getStatusColor(user.isOnline, user.hideActivity)}`} />
             </div>
             <div>
               <p className="font-medium text-sm">{displayName}</p>
               <DropdownMenu>
                 <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
-                  {user.status}
+                  {user.hideActivity ? 'Activity Hidden' : 'Online'}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => updateStatus.mutate('online')}>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate(false)}>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-500" />
-                      Online
+                      Show Activity
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus.mutate('away')}>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate(true)}>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                      Away
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus.mutate('busy')}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-500" />
-                      Busy
+                      <div className="w-2 h-2 rounded-full bg-gray-500" />
+                      Hide Activity
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -135,11 +123,11 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           <Button 
             variant="ghost" 
             size="icon"
-            onClick={onViewFriends}
-            title="Friends"
+            onClick={() => setShowSettings(true)}
+            title="Settings"
             className="w-9 h-9"
           >
-            <Users className="h-5 w-5" />
+            <UserIcon className="h-5 w-5" />
           </Button>
           <div className="relative">
             <Button 
@@ -162,20 +150,20 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
       <div className="flex flex-col border-t">
         <Button 
           variant="ghost"
-          onClick={onAddFriend}
+          onClick={onViewFriends}
           className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none"
         >
-          <UserPlus className="h-4 w-4" />
-          <span className="text-sm font-medium">Add Friend</span>
+          <Users className="h-4 w-4" />
+          <span className="text-sm font-medium">Friends</span>
         </Button>
 
         <Button 
           variant="ghost"
-          onClick={() => setShowSettings(true)}
+          onClick={onAddFriend}
           className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t"
         >
-          <UserIcon className="h-4 w-4" />
-          <span className="text-sm font-medium">Settings</span>
+          <UserPlus className="h-4 w-4" />
+          <span className="text-sm font-medium">Add Friend</span>
         </Button>
       </div>
 
