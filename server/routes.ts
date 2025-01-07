@@ -149,13 +149,17 @@ export function registerRoutes(app: Express): Server {
       res.json(updatedUser);
 
       // Broadcast status change to all connected WebSocket clients
+      const statusUpdate = {
+        type: 'status_update',
+        userId: updatedUser.id,
+        hideActivity: updatedUser.hideActivity,
+        isOnline: true
+      };
+
       wss.clients.forEach((client) => {
-        client.send(JSON.stringify({
-          type: 'status_update',
-          userId: updatedUser.id,
-          hideActivity: updatedUser.hideActivity,
-          isOnline: true
-        }));
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(statusUpdate));
+        }
       });
     } catch (error) {
       console.error("Error updating user status:", error);

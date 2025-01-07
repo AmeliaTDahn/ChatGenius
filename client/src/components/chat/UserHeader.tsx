@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { UserSettings } from "./UserSettings";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type UserHeaderProps = {
   user: User;
@@ -26,6 +26,36 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showSettings, setShowSettings] = useState(false);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  // Initialize WebSocket connection
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'status_update') {
+        // Update local user data if it's the current user
+        if (data.userId === user.id) {
+          queryClient.setQueryData(['user'], (oldData: any) => ({
+            ...oldData,
+            hideActivity: data.hideActivity,
+            isOnline: data.isOnline
+          }));
+        }
+        // Invalidate friends query to update friend statuses
+        queryClient.invalidateQueries({ queryKey: ['/api/friends'] });
+      }
+    });
+
+    setWs(socket);
+
+    return () => {
+      socket.close();
+    };
+  }, [user.id, queryClient]);
 
   // Safe fallback for username display
   const displayName = user?.username || 'User';
