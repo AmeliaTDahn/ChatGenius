@@ -734,6 +734,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update DELETE /api/friends/:friendId endpoint to handle cascading deletes properly
   app.delete("/api/friends/:friendId", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -764,16 +765,21 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (dmChannel) {
-        // Delete all messages in the channel first
+        // First delete message reactions for this channel's messages
+        await db
+          .delete(messageReactions)
+          .where(
+            eq(messageReactions.messageId, 
+              db.select({ id: messages.id })
+                .from(messages)
+                .where(eq(messages.channelId, dmChannel.channelId))
+            )
+          );
+
+        // Then delete the messages
         await db
           .delete(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
-
-        // Delete message reactions for this channel's messages
-        await db
-          .delete(messageReactions)
-          .where(eq(messageReactions.messageId, dmChannel.channelId));
-
 
         // Remove channel members
         await db
