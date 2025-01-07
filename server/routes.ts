@@ -420,6 +420,57 @@ export function registerRoutes(app: Express): Server {
     res.json(channelMessages);
   });
 
+  // Add message search endpoint after the messages endpoints
+  app.get("/api/messages/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const query = req.query.q as string;
+    const channelId = req.query.channelId ? parseInt(req.query.channelId as string) : undefined;
+
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+
+    try {
+      // Get all channels the user is a member of
+      const userChannels = await db
+        .select({ channelId: channelMembers.channelId })
+        .from(channelMembers)
+        .where(eq(channelMembers.userId, req.user.id));
+
+      const channelIds = userChannels.map(uc => uc.channelId);
+
+      // Search messages in user's channels
+      const searchResults = await db.query.messages.findMany({
+        where: and(
+          ilike(messages.content, `%${query}%`),
+          channelId
+            ? eq(messages.channelId, channelId)
+            : inArray(messages.channelId, channelIds)
+        ),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            }
+          },
+          channel: true
+        },
+        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+        limit: 50
+      });
+
+      res.json(searchResults);
+    } catch (error) {
+      console.error("Error searching messages:", error);
+      res.status(500).send("Error searching messages");
+    }
+  });
+
   // Add message reactions endpoint after the messages endpoints
   app.post("/api/messages/:messageId/reactions", async (req, res) => {
     if (!req.isAuthenticated()) {
