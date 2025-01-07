@@ -55,9 +55,9 @@ export default function ChatPage() {
         reactions: []
       };
 
-      // Update local message cache optimistically
+      // Update local message cache optimistically - append to end
       queryClient.setQueryData<Message[]>(queryKey, (old = []) => {
-        return [optimisticMessage, ...old];
+        return [...old, optimisticMessage];
       });
 
       // Also send through WebSocket for real-time updates to other users

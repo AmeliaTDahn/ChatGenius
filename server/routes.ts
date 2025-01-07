@@ -414,7 +414,7 @@ export function registerRoutes(app: Express): Server {
           }
         }
       },
-      orderBy: (messages, { desc }) => [desc(messages.createdAt)]
+      orderBy: (messages, { asc }) => [asc(messages.createdAt)]
     });
 
     res.json(channelMessages);

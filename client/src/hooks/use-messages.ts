@@ -38,7 +38,7 @@ export function useMessages(channelId: number) {
 
       // Create optimistic message
       const optimisticMessage: Message = {
-        id: Date.now(), // Temporary ID
+        id: Date.now(),
         content,
         channelId,
         userId: user?.id || 0,
@@ -51,9 +51,9 @@ export function useMessages(channelId: number) {
         reactions: []
       };
 
-      // Add optimistic message to messages
+      // Add optimistic message to end of messages
       queryClient.setQueryData<Message[]>(queryKey, (old = []) => {
-        return [optimisticMessage, ...old];
+        return [...old, optimisticMessage];
       });
 
       return { previousMessages };
