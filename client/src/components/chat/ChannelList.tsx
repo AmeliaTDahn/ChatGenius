@@ -58,16 +58,6 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         credentials: 'include'
       });
 
-      // Set channel data again to ensure it stays at 0
-      queryClient.setQueryData(['/api/channels'], (oldData: Channel[] | undefined) => {
-        if (!oldData) return oldData;
-        return oldData.map(ch => 
-          ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
-        );
-      });
-      
-      // Only invalidate direct messages query
-      await queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
     } catch (error) {
       toast({
         title: "Error",
