@@ -97,7 +97,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border-b bg-background">
+    <div className="flex items-center justify-between px-6 py-4 border-b bg-background">
       {/* Left side: Logo and User info */}
       <div className="flex items-center gap-4">
         <Logo showText={false} />
@@ -144,7 +144,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
       </div>
 
       {/* Right side: Action buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <Button 
           variant="ghost" 
           size="icon"
