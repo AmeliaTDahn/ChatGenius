@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Message } from '@db/schema';
 import { useUser } from '@/hooks/use-user';
 
@@ -39,11 +39,19 @@ export function useMessages(channelId: number) {
   });
 
   const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, files }: { content: string, files?: File[] }) => {
+      const formData = new FormData();
+      formData.append('content', content);
+
+      if (files && files.length > 0) {
+        files.forEach(file => {
+          formData.append('files', file);
+        });
+      }
+
       const res = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: formData,
         credentials: 'include',
       });
 

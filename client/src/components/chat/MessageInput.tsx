@@ -3,6 +3,7 @@ import { SendHorizontal, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 type MessageInputProps = {
   onSendMessage: (content: string, files?: File[]) => void;
@@ -13,6 +14,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
   const [files, setFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -42,7 +44,21 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+      // Check file size limits
+      const maxFileSize = 5 * 1024 * 1024; // 5MB
+      const newFiles = Array.from(e.target.files).filter(file => {
+        if (file.size > maxFileSize) {
+          toast({
+            title: "File too large",
+            description: `${file.name} exceeds the 5MB limit`,
+            variant: "destructive"
+          });
+          return false;
+        }
+        return true;
+      });
+
+      setFiles(prev => [...prev, ...newFiles]);
     }
   };
 
@@ -82,6 +98,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
           onChange={handleFileSelect}
           className="hidden"
           multiple
+          accept="image/*,application/pdf,.doc,.docx,.txt"
         />
         <Button
           type="button"

@@ -37,36 +37,27 @@ export default function ChatPage() {
 
   if (!user) return null;
 
-  const handleSendMessage = (content: string) => {
-    if (selectedChannel && content.trim() && user) {
-      // Send message optimistically through React Query
-      const queryKey = [`/api/channels/${selectedChannel.id}/messages`];
-      const optimisticMessage = {
-        id: Date.now(),
-        content: content.trim(),
-        channelId: selectedChannel.id,
-        userId: user.id,
-        createdAt: new Date().toISOString(),
-        user: {
-          id: user.id,
-          username: user.username,
-          avatarUrl: user.avatarUrl,
-        },
-        reactions: []
-      };
+  const handleSendMessage = async (content: string, files?: File[]) => {
+    if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
+      try {
+        // Send message through React Query (this will handle file uploads)
+        await sendMessage({ content: content.trim(), files });
 
-      // Update local message cache optimistically - append to end
-      queryClient.setQueryData(queryKey, (old = []) => {
-        return [...old, optimisticMessage];
-      });
-
-      // Also send through WebSocket for real-time updates to other users
-      sendMessage({
-        type: "message",
-        channelId: selectedChannel.id,
-        content: content.trim(),
-        userId: user.id
-      });
+        // Also notify other users through WebSocket
+        sendMessage({
+          type: "message",
+          channelId: selectedChannel.id,
+          content: content.trim(),
+          userId: user.id
+        });
+      } catch (error: any) {
+        console.error('Failed to send message:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to send message",
+          variant: "destructive",
+        });
+      }
     }
   };
 
