@@ -1298,19 +1298,36 @@ export function registerRoutes(app: Express): Server {
 
   app.use("/uploads", express.static("uploads"));
 
-  app.post("/api/channels/:channelId/messages", async (req, res) => {
+  // Add the route for direct message file uploads
+  app.post("/api/channels/:channelId/messages", upload.array('files'), async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
     const channelId = parseInt(req.params.channelId);
-    const { content, attachments } = req.body;
+    const content = req.body.content || '';
+    const files = req.files as Express.Multer.File[];
 
-    if (isNaN(channelId)) {
+    if (!channelId) {
       return res.status(400).send("Invalid channel ID");
     }
 
     try {
+      // Check if user is a member of this channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      // Create the message first
       const [message] = await db
         .insert(messages)
         .values({
@@ -1320,18 +1337,22 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
-      if (attachments?.length) {
-        await db.insert(messageAttachments).values(
-          attachments.map((att: any) => ({
-            messageId: message.id,
-            filename: att.filename,
-            fileUrl: att.fileUrl,
-            fileSize: att.fileSize,
-            mimeType: att.mimeType,
-          }))
-        );
+      // If there are files, create attachments
+      if (files && files.length > 0) {
+        const attachmentValues = files.map(file => ({
+          messageId: message.id,
+          filename: file.originalname,
+          fileUrl: `/uploads/${file.filename}`,
+          fileSize: file.size,
+          mimeType: file.mimetype
+        }));
+
+        await db
+          .insert(messageAttachments)
+          .values(attachmentValues);
       }
 
+      // Fetch the complete message with attachments
       const fullMessage = await db.query.messages.findFirst({
         where: eq(messages.id, message.id),
         with: {
@@ -1342,6 +1363,7 @@ export function registerRoutes(app: Express): Server {
               avatarUrl: true,
             }
           },
+          attachments: true,
           reactions: {
             with: {
               user: {
@@ -1353,27 +1375,18 @@ export function registerRoutes(app: Express): Server {
               }
             }
           },
-          attachments: true,
         }
       });
 
       res.json(fullMessage);
-
-      const messageUpdate = JSON.stringify({
-        type: 'new_message',
-        message: fullMessage,
-      });
-
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(messageUpdate);
-        }
-      });
     } catch (error) {
       console.error("Error creating message:", error);
       res.status(500).send("Error creating message");
     }
   });
+
+  // Serve uploaded files
+  app.use('/uploads', express.static('uploads'));
 
   return httpServer;
 }
