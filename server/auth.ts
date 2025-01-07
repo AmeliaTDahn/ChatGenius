@@ -57,7 +57,7 @@ export function setupAuth(app: Express) {
         const [user] = await db
           .select()
           .from(users)
-          .where(eq(users.username, username))
+          .where(eq(users.loginUsername, username))
           .limit(1);
 
         if (!user) {
@@ -68,9 +68,7 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Incorrect password." });
         }
 
-        // Don't send password in the user object
-        const { password: _, ...userWithoutPassword } = user;
-        return done(null, userWithoutPassword);
+        return done(null, user);
       } catch (err) {
         return done(err);
       }
@@ -84,13 +82,7 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const [user] = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          avatarUrl: users.avatarUrl,
-          isOnline: users.isOnline,
-          createdAt: users.createdAt
-        })
+        .select()
         .from(users)
         .where(eq(users.id, id))
         .limit(1);
@@ -115,7 +107,7 @@ export function setupAuth(app: Express) {
       const [existingUser] = await db
         .select()
         .from(users)
-        .where(eq(users.username, username))
+        .where(eq(users.loginUsername, username))
         .limit(1);
 
       if (existingUser) {
@@ -127,20 +119,19 @@ export function setupAuth(app: Express) {
       const [newUser] = await db
         .insert(users)
         .values({
-          username,
+          loginUsername: username,
           password: hashedPassword,
+          username: username, // Set initial display username same as login username
         })
         .returning();
 
-      const { password: _, ...userWithoutPassword } = newUser;
-
-      req.login(userWithoutPassword, (err) => {
+      req.login(newUser, (err) => {
         if (err) {
           return next(err);
         }
         return res.json({
           message: "Registration successful",
-          user: userWithoutPassword,
+          user: newUser,
         });
       });
     } catch (error) {
