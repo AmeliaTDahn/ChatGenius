@@ -81,17 +81,38 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
+    onMutate: async (newData) => {
+      // Cancel any outgoing refetches 
+      await queryClient.cancelQueries({ queryKey: ['user'] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['user']);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(['user'], old => ({
+        ...old,
+        ...newData
+      }));
+
+      // Return a context object with the snapshotted value
+      return { previousData };
+    },
     onSuccess: (updatedUser) => {
       // Update the user data in the cache
       queryClient.setQueryData(['user'], updatedUser);
 
       toast({
         title: "Changes saved",
-        description: "Your changes have been saved automatically.",
+        description: "Your profile has been updated successfully.",
         duration: 2000,
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _newData, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousData) {
+        queryClient.setQueryData(['user'], context.previousData);
+      }
+
       toast({
         title: "Error",
         description: error.message,
@@ -100,6 +121,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     },
     onSettled: () => {
       setIsAutoSaving(false);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
     }
   });
 
@@ -169,6 +191,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                         type="number" 
                         placeholder="Enter age" 
                         {...field} 
+                        value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                       />
                     </FormControl>

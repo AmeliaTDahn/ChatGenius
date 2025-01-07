@@ -99,6 +99,32 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add this route after the existing /api/user endpoint
+  app.put("/api/user/profile", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          username: req.body.username,
+          avatarUrl: req.body.avatarUrl,
+          age: req.body.age,
+          city: req.body.city,
+          status: req.body.status,
+        })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).send("Error updating user profile");
+    }
+  });
+
   // Add status update endpoint
   app.put("/api/user/status", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -760,8 +786,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add these endpoints after the existing friend-related endpoints
-
+  // Update the friends endpoint to include more user information
   app.get("/api/friends", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -773,6 +798,12 @@ export function registerRoutes(app: Express): Server {
           id: users.id,
           username: users.username,
           avatarUrl: users.avatarUrl,
+          age: users.age,
+          city: users.city,
+          isOnline: users.isOnline,
+          status: users.status,
+          statusMessage: users.statusMessage,
+          lastActive: users.lastActive,
         })
         .from(friends)
         .leftJoin(users, or(
@@ -796,6 +827,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error fetching friends");
     }
   });
+
 
   // Update DELETE /api/friends/:friendId endpoint to handle cascading deletes properly
   app.delete("/api/friends/:friendId", async (req, res) => {
