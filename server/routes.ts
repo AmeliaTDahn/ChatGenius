@@ -34,9 +34,12 @@ async function getUnreadMessageCounts(userId: number) {
     userChannels.map(async ({ channel }) => {
       // Get the latest message read by the user in this channel
       const latestRead = await db
-        .select({ messageId: messageReads.messageId })
+        .select({
+          messageId: messageReads.messageId,
+          channelId: messages.channelId
+        })
         .from(messageReads)
-        .join(messages, eq(messages.channelId, channel.id))
+        .innerJoin(messages, eq(messageReads.messageId, messages.id))
         .where(and(
           eq(messageReads.userId, userId),
           eq(messages.channelId, channel.id)
@@ -790,7 +793,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add direct messages endpoint
+  // Update the direct messages endpoint
   app.get("/api/direct-messages", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -830,8 +833,12 @@ export function registerRoutes(app: Express): Server {
       const unreadCounts = await Promise.all(
         directChannels.map(async (dc) => {
           const latestRead = await db
-            .select({ messageId: messageReads.messageId })
+            .select({
+              messageId: messageReads.messageId,
+              channelId: messages.channelId
+            })
             .from(messageReads)
+            .innerJoin(messages, eq(messageReads.messageId, messages.id))
             .where(and(
               eq(messageReads.userId, userId),
               eq(messages.channelId, dc.channelId)
