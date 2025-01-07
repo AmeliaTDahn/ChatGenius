@@ -13,11 +13,8 @@ type ThreadViewProps = {
 };
 
 export function ThreadView({ message, onClose }: ThreadViewProps) {
-  const { messages, sendMessage, isLoading } = useMessages(message.channelId);
+  const { messages, sendMessage, isLoading } = useMessages(message.channelId, message.id);
   const [replying, setReplying] = useState(true);
-  
-  // Filter replies to this message
-  const replies = messages.filter(m => m.parentId === message.id);
 
   const handleSendReply = async (content: string, files?: File[]) => {
     try {
@@ -66,7 +63,7 @@ export function ThreadView({ message, onClose }: ThreadViewProps) {
 
         {/* Replies */}
         <div className="space-y-4">
-          {replies.map((reply) => (
+          {messages.map((reply) => (
             <div key={reply.id} className="flex items-start gap-3">
               <Avatar className="h-8 w-8">
                 {reply.user.avatarUrl ? (
