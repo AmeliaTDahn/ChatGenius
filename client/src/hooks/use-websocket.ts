@@ -57,8 +57,7 @@ export function useWebSocket(user: User | null) {
                 return [message.message, ...oldMessages];
               }
             );
-            // Invalidate the query to ensure consistency
-            queryClient.invalidateQueries([`/api/channels/${message.channelId}/messages`]);
+            // Don't invalidate the query as we've already updated the cache
           }
           break;
         case 'presence':
