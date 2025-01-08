@@ -1516,23 +1516,18 @@ export function registerRoutes(app: Express): Server {
           )
         );
 
-      // Delete child messages (replies) first
+      // Delete all replies to user's messages first
       await db.delete(messages)
-        .where(
-          and(
-            eq(messages.userId, userId),
-            sql`${messages.parentId} IS NOT NULL`
-          )
-        );
+        .where(inArray(
+          messages.parentId,
+          db.select({ id: messages.id })
+            .from(messages)
+            .where(eq(messages.userId, userId))
+        ));
 
-      // Then delete parent messages
+      // Delete all user's messages
       await db.delete(messages)
-        .where(
-          and(
-            eq(messages.userId, userId),
-            sql`${messages.parentId} IS NULL`
-          )
-        );
+        .where(eq(messages.userId, userId));
 
       // Delete user's friend requests
       await db.delete(friendRequests)
