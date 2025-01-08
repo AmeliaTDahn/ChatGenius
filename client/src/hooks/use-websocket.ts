@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import type { User, Message } from '@db/schema';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,9 +19,8 @@ type WSMessage = {
   };
 };
 
-export function useWebSocket(user: User | null) {
+export function useWebSocket(user: User | null, onMessage?: (message: Message) => void) {
   const ws = useRef<WebSocket | null>(null);
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -32,7 +30,7 @@ export function useWebSocket(user: User | null) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}`;
     ws.current = new WebSocket(wsUrl);
-    
+
     // Attempt to reconnect on connection close
     ws.current.onclose = () => {
       setTimeout(() => {
@@ -43,43 +41,22 @@ export function useWebSocket(user: User | null) {
     };
 
     ws.current.onmessage = (event) => {
-      const message: WSMessage = JSON.parse(event.data);
+      const data: WSMessage = JSON.parse(event.data);
 
-      switch (message.type) {
+      switch (data.type) {
         case 'message':
-          if (message.channelId && message.message) {
-            queryClient.setQueryData<Message[]>(
-              [`/api/channels/${message.channelId}/messages`],
-              (oldMessages = []) => {
-                // Avoid duplicate messages
-                const exists = oldMessages.some(m => m.id === message.message!.id);
-                if (exists) return oldMessages;
-                return [message.message, ...oldMessages];
-              }
-            );
-            // Don't invalidate the query as we've already updated the cache
+          if (data.message && onMessage) {
+            onMessage(data.message);
           }
           break;
         case 'presence':
-          if (message.userId) {
-            queryClient.setQueryData(['users', message.userId], (oldData: any) => ({
-              ...oldData,
-              isOnline: message.isOnline,
-            }));
-          }
+          // Handle presence updates...
           break;
         case 'friend_request':
-          if (message.friendRequest) {
-            // Update friend requests cache
-            queryClient.setQueryData<any[]>(
-              ['/api/friend-requests'],
-              (oldRequests = []) => [message.friendRequest, ...oldRequests]
-            );
-
-            // Show notification toast
+          if (data.friendRequest) {
             toast({
               title: "New Friend Request",
-              description: `${message.friendRequest.sender.username} sent you a friend request!`,
+              description: `${data.friendRequest.sender.username} sent you a friend request!`,
               duration: 5000,
             });
           }
@@ -97,7 +74,7 @@ export function useWebSocket(user: User | null) {
       clearInterval(pingInterval);
       ws.current?.close();
     };
-  }, [user, queryClient, toast]);
+  }, [user, onMessage, toast]);
 
   const sendMessage = useCallback((message: WSMessage & { userId: number }) => {
     if (ws.current?.readyState === WebSocket.OPEN) {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useUser } from "@/hooks/use-user";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useMessages } from "@/hooks/use-messages";
 import { UserHeader } from "@/components/chat/UserHeader";
 import { ChannelList } from "@/components/chat/ChannelList";
 import { MessageList } from "@/components/chat/MessageList";
@@ -20,14 +21,13 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Loader2, Search } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatPage() {
-  const queryClient = useQueryClient();
   const { user, logout } = useUser();
   const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
-  const { sendMessage } = useWebSocket(user);
+  const { handleWebSocketMessage, sendMessage: sendWebSocketMessage } = useMessages(selectedChannel?.id || 0);
+  const { sendMessage: sendWsMessage } = useWebSocket(user, handleWebSocketMessage);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
@@ -40,38 +40,11 @@ export default function ChatPage() {
   const handleSendMessage = async (content: string, files?: File[]) => {
     if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
       try {
-        const formData = new FormData();
-        formData.append('content', content.trim());
-
-        if (files && files.length > 0) {
-          files.forEach(file => {
-            formData.append('files', file);
-          });
-        }
-
-        const response = await fetch(`/api/channels/${selectedChannel.id}/messages`, {
-          method: 'POST',
-          body: formData,
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-
-        const newMessage = await response.json();
-
-        // Update the local cache immediately with our message
-        const queryKey = [`/api/channels/${selectedChannel.id}/messages`];
-        queryClient.setQueryData(queryKey, (oldMessages: any[] = []) => {
-          if (!oldMessages.some(m => m.id === newMessage.id)) {
-            return [...oldMessages, newMessage];
-          }
-          return oldMessages;
-        });
+        // Send message and update UI immediately via mutation
+        await sendWebSocketMessage({ content: content.trim(), files });
 
         // Notify other users through WebSocket
-        sendMessage({
+        sendWsMessage({
           type: "message",
           channelId: selectedChannel.id,
           content: content.trim(),

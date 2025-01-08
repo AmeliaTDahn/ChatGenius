@@ -80,6 +80,36 @@ export function useMessages(channelId: number, parentId?: number) {
       }
 
       return res.json() as Promise<Message>;
+    },
+    onSuccess: (newMessage) => {
+      // Immediately update UI with our own message
+      if (newMessage.parentId) {
+        // If it's a reply, add it to the thread
+        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+          if (!oldMessages.some(m => m.id === newMessage.id)) {
+            return [...oldMessages, newMessage];
+          }
+          return oldMessages;
+        });
+
+        // Update reply count in main chat
+        const mainQueryKey = [`/api/channels/${channelId}/messages`];
+        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
+          return oldMessages.map(msg => 
+            msg.id === newMessage.parentId
+              ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
+              : msg
+          );
+        });
+      } else {
+        // If it's a main message, add it to the main chat
+        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+          if (!oldMessages.some(m => m.id === newMessage.id)) {
+            return [...oldMessages, newMessage];
+          }
+          return oldMessages;
+        });
+      }
     }
   });
 
@@ -107,6 +137,7 @@ export function useMessages(channelId: number, parentId?: number) {
 
   const handleWebSocketMessage = (newMessage: Message) => {
     // Only handle messages from other users via WebSocket
+    // Our own messages are handled by the mutation's onSuccess
     if (newMessage.userId !== user?.id) {
       if (newMessage.parentId) {
         // If we're viewing the thread that received a reply
