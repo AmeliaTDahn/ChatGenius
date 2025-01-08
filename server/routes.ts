@@ -254,21 +254,28 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.put("/api/user/profile", async (req, res) => {
+  app.put("/api/user/profile", upload.single('avatar'), async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
     try {
+      const updateData = {
+        username: req.body.username,
+        age: req.body.age,
+        city: req.body.city,
+        timezone: req.body.timezone,
+      };
+
+      if (req.file) {
+        updateData.avatarUrl = `/uploads/${req.file.filename}`;
+      } else if (req.body.avatarUrl) {
+        updateData.avatarUrl = req.body.avatarUrl;
+      }
+
       const [updatedUser] = await db
         .update(users)
-        .set({
-          username: req.body.username,
-          avatarUrl: req.body.avatarUrl,
-          age: req.body.age,
-          city: req.body.city,
-          timezone: req.body.timezone,
-        })
+        .set(updateData)
         .where(eq(users.id, req.user.id))
         .returning();
 
@@ -1109,7 +1116,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/direct-messages/create", async (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
+      return res.status(401).send("Friend ID is required");
     }
 
     const { friendId } = req.body;

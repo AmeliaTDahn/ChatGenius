@@ -267,9 +267,54 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
               )}
             />
 
-            <div>
+            <div className="space-y-4">
               <FormLabel>Avatar</FormLabel>
-              <div className="grid grid-cols-3 gap-4 mt-2">
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const formData = new FormData();
+                      formData.append('avatar', file);
+                      formData.append('username', form.getValues('username'));
+                      formData.append('age', form.getValues('age')?.toString() || '');
+                      formData.append('city', form.getValues('city') || '');
+                      formData.append('timezone', form.getValues('timezone') || '');
+                      
+                      setIsAutoSaving(true);
+                      try {
+                        const response = await fetch('/api/user/profile', {
+                          method: 'PUT',
+                          body: formData,
+                          credentials: 'include'
+                        });
+                        
+                        if (!response.ok) throw new Error(await response.text());
+                        const updatedUser = await response.json();
+                        queryClient.setQueryData(['user'], updatedUser);
+                        toast({
+                          title: "Avatar updated",
+                          description: "Your profile photo has been updated successfully.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsAutoSaving(false);
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Or choose from preset avatars:
+              </div>
+              <div className="grid grid-cols-3 gap-4">
                 {avatarOptions.map((avatar) => (
                   <Button
                     key={avatar}
