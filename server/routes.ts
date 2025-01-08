@@ -261,11 +261,11 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const updateData: any = {};
-      
+
       if (req.file) {
         updateData.avatarUrl = `/uploads/${req.file.filename}`;
       }
-      
+
       // Handle other fields if they exist
       const fields = ['username', 'age', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
       fields.forEach(field => {
@@ -279,7 +279,7 @@ export function registerRoutes(app: Express): Server {
           }
         }
       });
-      
+
       if (Object.keys(updateData).length === 0) {
         return res.status(400).send("No valid update data provided");
       }
@@ -1085,8 +1085,7 @@ export function registerRoutes(app: Express): Server {
             .where(inArray(messageReactions.messageId, messageIds));
 
           await db
-            .delete(messageReads)
-            .where(inArray(messageReads.messageId, messageIds));
+            .delete(messageReads)            .where(inArray(messageReads.messageId, messageIds));
         }
 
         await db
@@ -1498,7 +1497,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const userId = req.user.id;
 
-      // Delete all user's message reactions
+      // First delete all user's message reactions
       await db.delete(messageReactions)
         .where(eq(messageReactions.userId, userId));
 
@@ -1506,9 +1505,34 @@ export function registerRoutes(app: Express): Server {
       await db.delete(messageReads)
         .where(eq(messageReads.userId, userId));
 
-      // Delete all user's messages and their attachments
+      // Delete message attachments
+      await db.delete(messageAttachments)
+        .where(
+          inArray(
+            messageAttachments.messageId,
+            db.select({ id: messages.id })
+              .from(messages)
+              .where(eq(messages.userId, userId))
+          )
+        );
+
+      // Delete child messages (replies) first
       await db.delete(messages)
-        .where(eq(messages.userId, userId));
+        .where(
+          and(
+            eq(messages.userId, userId),
+            sql`${messages.parentId} IS NOT NULL`
+          )
+        );
+
+      // Then delete parent messages
+      await db.delete(messages)
+        .where(
+          and(
+            eq(messages.userId, userId),
+            sql`${messages.parentId} IS NULL`
+          )
+        );
 
       // Delete user's friend requests
       await db.delete(friendRequests)
@@ -1535,7 +1559,7 @@ export function registerRoutes(app: Express): Server {
           eq(channelInvites.receiverId, userId)
         ));
 
-      // Delete direct message channels
+      // Get and delete direct message channels
       const userDirectChannels = await db.query.directMessageChannels.findMany({
         where: or(
           eq(directMessageChannels.user1Id, userId),

@@ -157,16 +157,23 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       toast({
         title: "Account Deleted",
         description: "Your account has been permanently deleted.",
+        duration: 3000,
       });
+      // Clear all cached data
       queryClient.clear();
-      window.location.href = '/';
+      // Redirect to login page
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Error Deleting Account",
+        description: error.message || "There was a problem deleting your account. Please try again.",
         variant: "destructive",
+        duration: 5000,
       });
+      setShowDeleteConfirm(false);
     }
   });
 
