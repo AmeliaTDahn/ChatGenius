@@ -385,45 +385,9 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
               {isAutoSaving && (
                 <p className="text-sm text-muted-foreground">Saving changes...</p>
               )}
-
-              <div className="border-t pt-4">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setShowDeleteConfirm(true)}
-                >
-                  Delete Account
-                </Button>
-              </div>
             </form>
           </Form>
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Account</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data, including messages, friends, and settings.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteConfirm(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteAccount}
-              disabled={deleteAccount.isPending}
-            >
-              {deleteAccount.isPending ? "Deleting..." : "Delete Account"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
