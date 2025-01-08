@@ -83,28 +83,15 @@ export function useMessages(channelId: number, parentId?: number) {
       return res.json() as Promise<Message>;
     },
     onSuccess: (newMessage) => {
-      // Update the appropriate query based on whether it's a reply or main message
-      const mainQueryKey = [`/api/channels/${channelId}/messages`];
-      const threadQueryKey = [`/api/channels/${channelId}/messages`, newMessage.parentId];
-
-      // If it's a reply, update the thread messages
+      // Only update the reply count for thread messages
       if (newMessage.parentId) {
-        queryClient.setQueryData<Message[]>(threadQueryKey, (oldMessages = []) => {
-          return [...oldMessages, newMessage];
-        });
-
-        // Also update the reply count in the main chat
+        const mainQueryKey = [`/api/channels/${channelId}/messages`];
         queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
           return oldMessages.map(msg => 
             msg.id === newMessage.parentId
               ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
               : msg
           );
-        });
-      } else {
-        // If it's a main message, update the main chat
-        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-          return [...oldMessages, newMessage];
         });
       }
     },
