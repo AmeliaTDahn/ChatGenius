@@ -404,6 +404,20 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).send("You are not a member of this channel");
       }
 
+      // Check if the user is already a member of the channel
+      const [existingMembership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, userId)
+        ))
+        .limit(1);
+
+      if (existingMembership) {
+        return res.status(400).send("User is already a member of this channel");
+      }
+
       const [existingInvite] = await db
         .select()
         .from(channelInvites)
