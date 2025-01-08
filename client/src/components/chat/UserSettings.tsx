@@ -122,6 +122,14 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     },
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['user'], updatedUser);
+      form.reset({
+        username: updatedUser.username,
+        age: updatedUser.age,
+        city: updatedUser.city || "",
+        hideActivity: updatedUser.hideActivity,
+        avatarUrl: updatedUser.avatarUrl || avatarOptions[0],
+        timezone: updatedUser.timezone || "UTC",
+      });
       setIsAutoSaving(false);
       toast({
         title: "Settings Saved",
