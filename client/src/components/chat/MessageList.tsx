@@ -54,6 +54,11 @@ export function MessageList({ channelId }: MessageListProps) {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const isImageFile = (filename: string) => {
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+    };
+
     return (
       <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
         <Avatar className="h-8 w-8 flex-shrink-0">
@@ -81,27 +86,50 @@ export function MessageList({ channelId }: MessageListProps) {
               {message.attachments.map((attachment: MessageAttachment) => (
                 <div
                   key={attachment.id}
-                  className="flex items-center gap-2 p-2 rounded-md bg-secondary/50"
+                  className="flex flex-col gap-2"
                 >
-                  <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {attachment.filename}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(attachment.fileSize)}
-                    </p>
-                  </div>
-                  <a
-                    href={attachment.fileUrl}
-                    download={attachment.filename}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </a>
+                  {isImageFile(attachment.filename) ? (
+                    <div className="relative group">
+                      <img
+                        src={attachment.fileUrl}
+                        alt={attachment.filename}
+                        className="max-w-[300px] max-h-[300px] rounded-md object-cover"
+                      />
+                      <a
+                        href={attachment.fileUrl}
+                        download={attachment.filename}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Button variant="secondary" size="icon" className="h-8 w-8">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-secondary/50">
+                      <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {attachment.filename}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(attachment.fileSize)}
+                        </p>
+                      </div>
+                      <a
+                        href={attachment.fileUrl}
+                        download={attachment.filename}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </a>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
