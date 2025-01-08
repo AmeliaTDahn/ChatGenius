@@ -37,7 +37,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   useEffect(() => {
     // Use secure WebSocket (wss://) when the page is loaded over HTTPS
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws?userId=${user?.id}`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -70,16 +70,8 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
 
   const handleChannelSelect = async (channel: Channel | null) => {
     try {
-      // First, if we're deselecting a channel or selecting a different one,
-      // mark the current channel's messages as read
-      if (selectedChannel && (!channel || channel.id !== selectedChannel.id)) {
-        await fetch(`/api/channels/${selectedChannel.id}/read`, {
-          method: 'POST',
-          credentials: 'include'
-        });
-      }
-
-      // Update the selected channel in the parent component
+      // Update the selected channel in the parent component first
+      // This ensures immediate UI feedback
       onSelectChannel(channel);
 
       if (channel) {
@@ -96,11 +88,10 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
           method: 'POST',
           credentials: 'include'
         });
-      }
 
-      // Finally, invalidate queries to ensure data consistency
-      await queryClient.invalidateQueries({ queryKey: ['channels'] });
-      await queryClient.invalidateQueries({ queryKey: ['direct-messages'] });
+        // Finally, invalidate queries to ensure data consistency
+        await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      }
     } catch (error) {
       toast({
         title: "Error",
