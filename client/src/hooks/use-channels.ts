@@ -28,9 +28,29 @@ export function useChannels() {
     },
   });
 
+  const leaveChannel = useMutation({
+    mutationFn: async (channelId: number) => {
+      const res = await fetch(`/api/channels/${channelId}/leave`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json();
+    },
+    onSuccess: (data) => {
+      // Update channels cache with the new list
+      queryClient.setQueryData<Channel[]>(['/api/channels'], data.channels);
+    },
+  });
+
   return {
     channels: channels || [],
     isLoading,
     createChannel: createChannel.mutateAsync,
+    leaveChannel: leaveChannel.mutateAsync,
   };
 }

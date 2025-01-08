@@ -22,6 +22,7 @@ import { UserPlus, Loader2, Search, LogOut } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useChannels } from "@/hooks/use-channels";
 
 export default function ChatPage() {
   const queryClient = useQueryClient();
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isFriendsOpen, setIsFriendsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { leaveChannel } = useChannels();
 
   if (!user) return null;
 
@@ -43,21 +45,7 @@ export default function ChatPage() {
     if (!selectedChannel || selectedChannel.isDirectMessage) return;
 
     try {
-      const res = await fetch(`/api/channels/${selectedChannel.id}/leave`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      const data = await res.json();
-
-      // Update the channels cache with the new list
-      queryClient.setQueryData(['channels'], data.channels);
-
-      // Clear selected channel
+      await leaveChannel(selectedChannel.id);
       setSelectedChannel(null);
 
       toast({
@@ -77,10 +65,7 @@ export default function ChatPage() {
   const handleSendMessage = async (content: string, files?: File[]) => {
     if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
       try {
-        // Send message and update UI immediately via mutation
         await sendWebSocketMessage({ content: content.trim(), files });
-
-        // Notify other users through WebSocket
         sendWsMessage({
           type: "message",
           channelId: selectedChannel.id,
@@ -133,7 +118,6 @@ export default function ChatPage() {
   return (
     <div className="h-screen flex flex-col">
       <div className="flex-1 flex overflow-hidden">
-        {/* Fixed width sidebar with scrollable content */}
         <div className="w-64 flex flex-col border-r">
           <UserHeader 
             user={user} 
@@ -149,7 +133,6 @@ export default function ChatPage() {
             />
           </div>
 
-          {/* Bottom left logout button */}
           <Button 
             variant="ghost" 
             onClick={handleLogout}
@@ -167,7 +150,6 @@ export default function ChatPage() {
           </Button>
         </div>
 
-        {/* Main content area with fixed header and scrollable messages */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedChannel ? (
             <>
