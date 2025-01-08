@@ -30,7 +30,7 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   }
 
-  const MessageComponent = ({ message, onReply }: { message: Message, onReply?: (message: Message) => void }) => {
+  const MessageComponent = ({ message }: { message: Message }) => {
     const handleReaction = async (emoji: string) => {
       await addReaction({ messageId: message.id, emoji });
     };
@@ -56,7 +56,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
     return (
       <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
-        <Avatar className="h-8 w-8">
+        <Avatar className="h-8 w-8 flex-shrink-0">
           {message.user.avatarUrl ? (
             <AvatarImage src={message.user.avatarUrl} alt={message.user.username} />
           ) : (
@@ -65,7 +65,7 @@ export function MessageList({ channelId }: MessageListProps) {
             </AvatarFallback>
           )}
         </Avatar>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="font-medium text-sm">
               {message.user.username}
@@ -74,7 +74,7 @@ export function MessageList({ channelId }: MessageListProps) {
               {new Date(message.createdAt).toLocaleTimeString()}
             </span>
           </div>
-          <p className="text-sm mt-1">{message.content}</p>
+          <p className="text-sm mt-1 break-words">{message.content}</p>
 
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 space-y-2">
@@ -83,7 +83,7 @@ export function MessageList({ channelId }: MessageListProps) {
                   key={attachment.id}
                   className="flex items-center gap-2 p-2 rounded-md bg-secondary/50"
                 >
-                  <FileIcon className="h-4 w-4 text-muted-foreground" />
+                  <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       {attachment.filename}
@@ -98,7 +98,7 @@ export function MessageList({ channelId }: MessageListProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                       <Download className="h-4 w-4" />
                     </Button>
                   </a>
@@ -107,7 +107,7 @@ export function MessageList({ channelId }: MessageListProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <Button
               variant="ghost"
               size="sm"
@@ -127,7 +127,7 @@ export function MessageList({ channelId }: MessageListProps) {
                 {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
               </Button>
             )}
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
               {Object.entries(reactionGroups).map(([emoji, count]) => (
                 <Button
                   key={emoji}
@@ -149,7 +149,7 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   return (
-    <div className="flex flex-1">
+    <div className="flex h-full overflow-hidden">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((message) => (
