@@ -223,7 +223,11 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
           <ScrollArea className="pr-4 h-[70vh]">
             <Form {...form}>
-            <form onChange={handleFormChange} className="space-y-4">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const data = form.getValues();
+              updateProfile.mutate(data);
+            }} className="space-y-4">
               <FormField
                 control={form.control}
                 name="username"
@@ -393,9 +397,11 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                 
               </div>
 
-              {isAutoSaving && (
-                <p className="text-sm text-muted-foreground">Saving changes...</p>
-              )}
+              <div className="flex justify-end pt-4 border-t">
+                <Button type="submit" disabled={updateProfile.isPending}>
+                  {updateProfile.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </form>
           </Form>
           </ScrollArea>
