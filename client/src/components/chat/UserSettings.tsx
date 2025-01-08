@@ -322,7 +322,29 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
               />
 
               <div className="space-y-4">
-                <FormLabel>Avatar</FormLabel>
+                <FormLabel>Choose an avatar or upload your own photo</FormLabel>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  {avatarOptions.map((avatar) => (
+                    <Button
+                      key={avatar}
+                      type="button"
+                      variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
+                      className="p-2 relative overflow-hidden transition-all hover:scale-105"
+                      onClick={() => {
+                        form.setValue("avatarUrl", avatar);
+                        handleFormChange();
+                      }}
+                    >
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={avatar} alt="Avatar option" />
+                        <AvatarFallback>A</AvatarFallback>
+                      </Avatar>
+                      {form.getValues("avatarUrl") === avatar && (
+                        <div className="absolute inset-0 bg-primary/10 rounded-md" />
+                      )}
+                    </Button>
+                  ))}
+                </div>
                 <div className="flex items-center gap-4">
                   <Input
                     type="file"
