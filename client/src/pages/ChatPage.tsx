@@ -52,8 +52,12 @@ export default function ChatPage() {
         throw new Error(await res.text());
       }
 
-      // Update the UI by invalidating the channels query
-      await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      const data = await res.json();
+
+      // Update the channels cache with the new list
+      queryClient.setQueryData(['channels'], data.channels);
+
+      // Clear selected channel
       setSelectedChannel(null);
 
       toast({

@@ -1088,9 +1088,8 @@ export function registerRoutes(app: Express): Server {
           .where(eq(channels.id, dmChannel.channelId));
       }
 
-      await db
-        .delete(friends)
-                .where(or(
+      await db        .delete(friends)
+        .where(or(
           and(
             eq(friends.user1Id, req.user.id),
             eq(friends.user2Id, friendId)
@@ -1448,7 +1447,25 @@ export function registerRoutes(app: Express): Server {
           eq(channelMembers.userId, req.user.id)
         ));
 
-      res.json({ message: "Successfully left the channel" });
+      // Fetch updated channel list
+      const updatedChannels = await db.query.channelMembers.findMany({
+        where: eq(channelMembers.userId, req.user.id),
+        with: {
+          channel: true
+        }
+      });
+
+      const unreadCounts = await getUnreadMessageCounts(req.user.id);
+
+      const channelsWithUnread = updatedChannels.map(uc => ({
+        ...uc.channel,
+        unreadCount: unreadCounts.find(c => c.channelId === uc.channel.id)?.unreadCount || 0
+      }));
+
+      res.json({ 
+        message: "Successfully left the channel",
+        channels: channelsWithUnread 
+      });
     } catch (error) {
       console.error("Error leaving channel:", error);
       res.status(500).send("Error leaving channel");
