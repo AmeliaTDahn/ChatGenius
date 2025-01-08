@@ -254,7 +254,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.put("/api/user/profile", upload.single('avatar'), async (req, res) => {
+  app.put("/api/user/profile", upload.single('files'), async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
