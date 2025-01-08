@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -205,12 +206,13 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>User Settings</DialogTitle>
           </DialogHeader>
 
-          <Form {...form}>
+          <ScrollArea className="pr-4">
+            <Form {...form}>
             <form onChange={handleFormChange} className="space-y-4">
               <FormField
                 control={form.control}
@@ -395,6 +397,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
               </div>
             </form>
           </Form>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
