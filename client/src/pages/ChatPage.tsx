@@ -64,11 +64,6 @@ export default function ChatPage() {
 
         const newMessage = await response.json();
 
-        // Update local cache with the new message
-        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-          return [...oldMessages, newMessage];
-        });
-
         // Notify other users through WebSocket
         sendMessage({
           type: "message",
