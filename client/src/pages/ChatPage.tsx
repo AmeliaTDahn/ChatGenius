@@ -18,11 +18,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Loader2, Search } from "lucide-react";
+import { UserPlus, Loader2, Search, LogOut } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatPage() {
+  const queryClient = useQueryClient();
   const { user, logout } = useUser();
   const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -36,6 +38,37 @@ export default function ChatPage() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   if (!user) return null;
+
+  const handleLeaveChannel = async () => {
+    if (!selectedChannel || selectedChannel.isDirectMessage) return;
+
+    try {
+      const res = await fetch(`/api/channels/${selectedChannel.id}/leave`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      // Update the UI by invalidating the channels query
+      await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      setSelectedChannel(null);
+
+      toast({
+        title: "Success",
+        description: `Left channel ${selectedChannel.name}`,
+      });
+    } catch (error: any) {
+      console.error('Failed to leave channel:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to leave channel",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSendMessage = async (content: string, files?: File[]) => {
     if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
@@ -153,14 +186,24 @@ export default function ChatPage() {
                     <Search className="h-4 w-4" />
                   </Button>
                   {!selectedChannel.isDirectMessage && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsInviteOpen(true)}
-                      title="Invite to Channel"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsInviteOpen(true)}
+                        title="Invite to Channel"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleLeaveChannel}
+                        title="Leave Channel"
+                      >
+                        <LogOut className="h-4 w-4" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>

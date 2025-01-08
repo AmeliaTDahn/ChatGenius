@@ -1090,7 +1090,7 @@ export function registerRoutes(app: Express): Server {
 
       await db
         .delete(friends)
-        .where(or(
+                .where(or(
           and(
             eq(friends.user1Id, req.user.id),
             eq(friends.user2Id, friendId)
@@ -1414,6 +1414,46 @@ export function registerRoutes(app: Express): Server {
 
   // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
+
+  app.post("/api/channels/:channelId/leave", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      // Check if channel exists and user is a member
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(404).send("Channel membership not found");
+      }
+
+      // Delete the membership
+      await db
+        .delete(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ));
+
+      res.json({ message: "Successfully left the channel" });
+    } catch (error) {
+      console.error("Error leaving channel:", error);
+      res.status(500).send("Error leaving channel");
+    }
+  });
 
   return httpServer;
 }
