@@ -277,7 +277,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                     const file = e.target.files?.[0];
                     if (file) {
                       const formData = new FormData();
-                      formData.append('avatar', file);
+                      formData.append('files', file);
                       formData.append('username', form.getValues('username'));
                       formData.append('age', form.getValues('age')?.toString() || '');
                       formData.append('city', form.getValues('city') || '');
