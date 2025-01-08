@@ -354,10 +354,13 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                       if (file) {
                         const formData = new FormData();
                         formData.append('files', file);
-                        formData.append('username', form.getValues('username'));
-                        formData.append('age', form.getValues('age')?.toString() || '');
-                        formData.append('city', form.getValues('city') || '');
-                        formData.append('timezone', form.getValues('timezone') || '');
+                        const formValues = form.getValues();
+                        Object.entries(formValues).forEach(([key, value]) => {
+                          if (key !== 'files') {
+                            formData.append(key, value?.toString() || '');
+                          }
+                        });
+                        formData.append('hideActivity', form.getValues('hideActivity').toString());
 
                         setIsAutoSaving(true);
                         try {
