@@ -1593,10 +1593,17 @@ export function registerRoutes(app: Express): Server {
       req.logout((err) => {
         if (err) {
           console.error("Error logging out user:", err);
+          return res.status(500).send("Error during logout after deletion");
         }
+        req.session.destroy((err) => {
+          if (err) {
+            console.error("Error destroying session:", err);
+            return res.status(500).send("Error destroying session");
+          }
+          res.clearCookie('connect.sid');
+          res.json({ message: "Account deleted successfully" });
+        });
       });
-
-      res.json({ message: "Account deleted successfully" });
     } catch (error) {
       console.error("Error deleting user account:", error);
       res.status(500).send("Error deleting user account");
