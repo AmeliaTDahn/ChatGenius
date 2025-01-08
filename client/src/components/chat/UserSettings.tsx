@@ -390,31 +390,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                     }}
                   />
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Or choose from preset avatars:
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  {avatarOptions.map((avatar) => (
-                    <Button
-                      key={avatar}
-                      type="button"
-                      variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
-                      className="p-2 relative overflow-hidden transition-all hover:scale-105"
-                      onClick={() => {
-                        form.setValue("avatarUrl", avatar);
-                        handleFormChange();
-                      }}
-                    >
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={avatar} alt="Avatar option" />
-                        <AvatarFallback>A</AvatarFallback>
-                      </Avatar>
-                      {form.getValues("avatarUrl") === avatar && (
-                        <div className="absolute inset-0 bg-primary/10 rounded-md" />
-                      )}
-                    </Button>
-                  ))}
-                </div>
+                
               </div>
 
               {isAutoSaving && (
