@@ -81,36 +81,7 @@ export function useMessages(channelId: number, parentId?: number) {
       }
 
       return res.json() as Promise<Message>;
-    },
-    onSuccess: (newMessage) => {
-      // Only update local cache if it's our own message
-      if (newMessage.userId === user?.id) {
-        // Update the appropriate query based on whether it's a reply or main message
-        const mainQueryKey = [`/api/channels/${channelId}/messages`];
-        const threadQueryKey = [`/api/channels/${channelId}/messages`, newMessage.parentId];
-
-        // If it's a reply, update the thread messages
-        if (newMessage.parentId) {
-          queryClient.setQueryData<Message[]>(threadQueryKey, (oldMessages = []) => {
-            return [...oldMessages, newMessage];
-          });
-
-          // Also update the reply count in the main chat
-          queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-            return oldMessages.map(msg => 
-              msg.id === newMessage.parentId
-                ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
-                : msg
-            );
-          });
-        } else {
-          // If it's a main message, update the main chat
-          queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-            return [...oldMessages, newMessage];
-          });
-        }
-      }
-    },
+    }
   });
 
   const markAsRead = useMutation({
@@ -135,34 +106,36 @@ export function useMessages(channelId: number, parentId?: number) {
     },
   });
 
-  // Function to handle incoming WebSocket messages
   const handleWebSocketMessage = (newMessage: Message) => {
-    // Only update cache if it's not our own message
-    if (newMessage.userId !== user?.id) {
-      const mainQueryKey = [`/api/channels/${channelId}/messages`];
-      const threadQueryKey = [`/api/channels/${channelId}/messages`, newMessage.parentId];
-
-      if (newMessage.parentId) {
-        // Update thread if we're viewing it
-        if (parentId === newMessage.parentId) {
-          queryClient.setQueryData<Message[]>(threadQueryKey, (oldMessages = []) => {
+    if (newMessage.parentId) {
+      // If we're viewing the thread that received a reply
+      if (parentId === newMessage.parentId) {
+        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+          if (!oldMessages.some(m => m.id === newMessage.id)) {
             return [...oldMessages, newMessage];
-          });
-        }
-
-        // Update reply count in main chat
-        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-          return oldMessages.map(msg => 
-            msg.id === newMessage.parentId
-              ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
-              : msg
-          );
-        });
-      } else {
-        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-          return [...oldMessages, newMessage];
+          }
+          return oldMessages;
         });
       }
+
+      // Update reply count in main chat
+      const mainQueryKey = [`/api/channels/${channelId}/messages`];
+      queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
+        return oldMessages.map(msg => 
+          msg.id === newMessage.parentId
+            ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
+            : msg
+        );
+      });
+    } else if (newMessage.userId !== user?.id) {
+      // Only handle main chat messages from other users via WebSocket
+      // Our own messages are handled by the mutation
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        if (!oldMessages.some(m => m.id === newMessage.id)) {
+          return [...oldMessages, newMessage];
+        }
+        return oldMessages;
+      });
     }
   };
 
