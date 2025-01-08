@@ -136,9 +136,7 @@ export function useMessages(channelId: number, parentId?: number) {
   });
 
   const handleWebSocketMessage = (newMessage: Message) => {
-    // Only handle messages from other users via WebSocket
-    // Our own messages are handled by the mutation's onSuccess
-    if (newMessage.userId !== user?.id) {
+    // Handle all incoming messages via WebSocket
       if (newMessage.parentId) {
         // If we're viewing the thread that received a reply
         if (parentId === newMessage.parentId) {

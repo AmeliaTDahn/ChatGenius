@@ -101,9 +101,12 @@ export function setupWebSocket(server: Server) {
           throw new Error('Failed to fetch message with user');
         }
 
+        // Don't send to sender, only to other channel members
         wss.clients.forEach((ws) => {
           const client = ws as AuthenticatedWebSocket;
-          if (client.readyState === WebSocket.OPEN && (client.userId === messageWithUser.userId || messageWithUser.channel?.memberIds?.includes(client.userId))) {
+          if (client.readyState === WebSocket.OPEN && 
+              client.userId !== messageWithUser.userId && 
+              messageWithUser.channel?.memberIds?.includes(client.userId)) {
             client.send(JSON.stringify({
               type: 'message',
               channelId,
