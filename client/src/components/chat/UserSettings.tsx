@@ -122,9 +122,10 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     },
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['user'], updatedUser);
+      setIsAutoSaving(false);
       toast({
-        title: "Changes saved",
-        description: "Your profile has been updated successfully.",
+        title: "Settings Saved",
+        description: "Your changes have been saved successfully.",
         duration: 2000,
       });
     },
