@@ -262,20 +262,24 @@ export function registerRoutes(app: Express): Server {
     try {
       const updateData: any = {};
       
-      // Only include defined values
-      if (req.body.username) updateData.username = req.body.username;
-      if (req.body.age) updateData.age = parseInt(req.body.age);
-      if (req.body.city) updateData.city = req.body.city;
-      if (req.body.timezone) updateData.timezone = req.body.timezone;
-      if (req.body.hideActivity !== undefined) updateData.hideActivity = req.body.hideActivity === 'true';
-      
       if (req.file) {
         updateData.avatarUrl = `/uploads/${req.file.filename}`;
-      } else if (req.body.avatarUrl) {
-        updateData.avatarUrl = req.body.avatarUrl;
       }
-
-      // Only proceed if there are values to update
+      
+      // Handle other fields if they exist
+      const fields = ['username', 'age', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
+      fields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          if (field === 'age') {
+            updateData[field] = parseInt(req.body[field]);
+          } else if (field === 'hideActivity') {
+            updateData[field] = req.body[field] === 'true';
+          } else {
+            updateData[field] = req.body[field];
+          }
+        }
+      });
+      
       if (Object.keys(updateData).length === 0) {
         return res.status(400).send("No valid update data provided");
       }
