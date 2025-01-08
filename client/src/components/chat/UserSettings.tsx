@@ -4,6 +4,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +77,7 @@ type UserSettingsProps = {
 export function UserSettings({ user, onClose }: UserSettingsProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -140,6 +143,33 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     }
   });
 
+  const deleteAccount = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/user/account', {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been permanently deleted.",
+      });
+      queryClient.clear();
+      window.location.href = '/';
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
     setIsAutoSaving(true);
     updateProfile.mutate(data);
@@ -161,189 +191,231 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     }
   };
 
+  const handleDeleteAccount = () => {
+    deleteAccount.mutate();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>User Settings</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>User Settings</DialogTitle>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onChange={handleFormChange} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter username" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="age"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Age</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter age"
-                      {...field}
-                      value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="city"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>City</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter city" {...field} value={field.value || ""} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="timezone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Timezone</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
+          <Form {...form}>
+            <form onChange={handleFormChange} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your timezone" />
-                      </SelectTrigger>
+                      <Input placeholder="Enter username" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {TIMEZONES.map((tz) => (
-                        <SelectItem key={tz.value} value={tz.value}>
-                          {tz.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="hideActivity"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Hide Activity</FormLabel>
-                    <div className="text-sm text-muted-foreground">
-                      Hide your online status from other users
+              <FormField
+                control={form.control}
+                name="age"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Age</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Enter age"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter city" {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="timezone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Timezone</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your timezone" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {TIMEZONES.map((tz) => (
+                          <SelectItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="hideActivity"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Hide Activity</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Hide your online status from other users
+                      </div>
                     </div>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-4">
-              <FormLabel>Avatar</FormLabel>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const formData = new FormData();
-                      formData.append('files', file);
-                      formData.append('username', form.getValues('username'));
-                      formData.append('age', form.getValues('age')?.toString() || '');
-                      formData.append('city', form.getValues('city') || '');
-                      formData.append('timezone', form.getValues('timezone') || '');
-                      
-                      setIsAutoSaving(true);
-                      try {
-                        const response = await fetch('/api/user/profile', {
-                          method: 'PUT',
-                          body: formData,
-                          credentials: 'include'
-                        });
-                        
-                        if (!response.ok) throw new Error(await response.text());
-                        const updatedUser = await response.json();
-                        queryClient.setQueryData(['user'], updatedUser);
-                        toast({
-                          title: "Avatar updated",
-                          description: "Your profile photo has been updated successfully.",
-                        });
-                      } catch (error) {
-                        toast({
-                          title: "Error",
-                          description: error.message,
-                          variant: "destructive",
-                        });
-                      } finally {
-                        setIsAutoSaving(false);
+              <div className="space-y-4">
+                <FormLabel>Avatar</FormLabel>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const formData = new FormData();
+                        formData.append('files', file);
+                        formData.append('username', form.getValues('username'));
+                        formData.append('age', form.getValues('age')?.toString() || '');
+                        formData.append('city', form.getValues('city') || '');
+                        formData.append('timezone', form.getValues('timezone') || '');
+
+                        setIsAutoSaving(true);
+                        try {
+                          const response = await fetch('/api/user/profile', {
+                            method: 'PUT',
+                            body: formData,
+                            credentials: 'include'
+                          });
+
+                          if (!response.ok) throw new Error(await response.text());
+                          const updatedUser = await response.json();
+                          queryClient.setQueryData(['user'], updatedUser);
+                          toast({
+                            title: "Avatar updated",
+                            description: "Your profile photo has been updated successfully.",
+                          });
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setIsAutoSaving(false);
+                        }
                       }
-                    }
-                  }}
-                />
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Or choose from preset avatars:
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                {avatarOptions.map((avatar) => (
-                  <Button
-                    key={avatar}
-                    type="button"
-                    variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
-                    className="p-2 relative overflow-hidden transition-all hover:scale-105"
-                    onClick={() => {
-                      form.setValue("avatarUrl", avatar);
-                      handleFormChange();
                     }}
-                  >
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={avatar} alt="Avatar option" />
-                      <AvatarFallback>A</AvatarFallback>
-                    </Avatar>
-                    {form.getValues("avatarUrl") === avatar && (
-                      <div className="absolute inset-0 bg-primary/10 rounded-md" />
-                    )}
-                  </Button>
-                ))}
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Or choose from preset avatars:
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  {avatarOptions.map((avatar) => (
+                    <Button
+                      key={avatar}
+                      type="button"
+                      variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
+                      className="p-2 relative overflow-hidden transition-all hover:scale-105"
+                      onClick={() => {
+                        form.setValue("avatarUrl", avatar);
+                        handleFormChange();
+                      }}
+                    >
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={avatar} alt="Avatar option" />
+                        <AvatarFallback>A</AvatarFallback>
+                      </Avatar>
+                      {form.getValues("avatarUrl") === avatar && (
+                        <div className="absolute inset-0 bg-primary/10 rounded-md" />
+                      )}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {isAutoSaving && (
-              <p className="text-sm text-muted-foreground">Saving changes...</p>
-            )}
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              {isAutoSaving && (
+                <p className="text-sm text-muted-foreground">Saving changes...</p>
+              )}
+
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete Account
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Account</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data, including messages, friends, and settings.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteAccount.isPending}
+            >
+              {deleteAccount.isPending ? "Deleting..." : "Delete Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

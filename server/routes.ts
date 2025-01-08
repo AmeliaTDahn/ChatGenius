@@ -1490,5 +1490,94 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete("/api/user/account", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const userId = req.user.id;
+
+      // Delete all user's message reactions
+      await db.delete(messageReactions)
+        .where(eq(messageReactions.userId, userId));
+
+      // Delete all user's message reads
+      await db.delete(messageReads)
+        .where(eq(messageReads.userId, userId));
+
+      // Delete all user's messages and their attachments
+      await db.delete(messages)
+        .where(eq(messages.userId, userId));
+
+      // Delete user's friend requests
+      await db.delete(friendRequests)
+        .where(or(
+          eq(friendRequests.senderId, userId),
+          eq(friendRequests.receiverId, userId)
+        ));
+
+      // Delete user's friends
+      await db.delete(friends)
+        .where(or(
+          eq(friends.user1Id, userId),
+          eq(friends.user2Id, userId)
+        ));
+
+      // Delete user's channel memberships
+      await db.delete(channelMembers)
+        .where(eq(channelMembers.userId, userId));
+
+      // Delete user's channel invites
+      await db.delete(channelInvites)
+        .where(or(
+          eq(channelInvites.senderId, userId),
+          eq(channelInvites.receiverId, userId)
+        ));
+
+      // Delete direct message channels
+      const userDirectChannels = await db.query.directMessageChannels.findMany({
+        where: or(
+          eq(directMessageChannels.user1Id, userId),
+          eq(directMessageChannels.user2Id, userId)
+        ),
+        columns: {
+          channelId: true
+        }
+      });
+
+      const channelIds = userDirectChannels.map(dc => dc.channelId);
+
+      // Delete the direct message channels entries
+      await db.delete(directMessageChannels)
+        .where(or(
+          eq(directMessageChannels.user1Id, userId),
+          eq(directMessageChannels.user2Id, userId)
+        ));
+
+      // Delete the channels
+      if (channelIds.length > 0) {
+        await db.delete(channels)
+          .where(inArray(channels.id, channelIds));
+      }
+
+      // Finally, delete the user
+      await db.delete(users)
+        .where(eq(users.id, userId));
+
+      // Logout the user
+      req.logout((err) => {
+        if (err) {
+          console.error("Error logging out user:", err);
+        }
+      });
+
+      res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user account:", error);
+      res.status(500).send("Error deleting user account");
+    }
+  });
+
   return httpServer;
 }
