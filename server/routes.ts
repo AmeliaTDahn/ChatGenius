@@ -266,6 +266,19 @@ export function registerRoutes(app: Express): Server {
         updateData.avatarUrl = `/uploads/${req.file.filename}`;
       }
 
+      // Check if username exists when updating username
+      if (req.body.username && req.body.username !== req.user.username) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, req.body.username))
+          .limit(1);
+
+        if (existingUser) {
+          return res.status(400).send("Username already exists");
+        }
+      }
+
       // Handle other fields if they exist
       const fields = ['username', 'age', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
       fields.forEach(field => {
