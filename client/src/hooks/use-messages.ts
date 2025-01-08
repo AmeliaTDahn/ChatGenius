@@ -136,31 +136,14 @@ export function useMessages(channelId: number, parentId?: number) {
   });
 
   const handleWebSocketMessage = (newMessage: Message) => {
-    // Only handle messages from other users via WebSocket
-    // Our own messages are handled by the mutation's onSuccess
-    if (newMessage.userId !== user?.id) {
-      if (newMessage.parentId) {
-        // If we're viewing the thread that received a reply
-        if (parentId === newMessage.parentId) {
-          queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-            if (!oldMessages.some(m => m.id === newMessage.id)) {
-              return [...oldMessages, newMessage];
-            }
-            return oldMessages;
-          });
-        }
+    // Skip processing if it's our own message since mutation handles that
+    if (newMessage.userId === user?.id) {
+      return;
+    }
 
-        // Update reply count in main chat
-        const mainQueryKey = [`/api/channels/${channelId}/messages`];
-        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-          return oldMessages.map(msg => 
-            msg.id === newMessage.parentId
-              ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
-              : msg
-          );
-        });
-      } else {
-        // Handle main chat messages from other users
+    if (newMessage.parentId) {
+      // If we're viewing the thread that received a reply
+      if (parentId === newMessage.parentId) {
         queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
           if (!oldMessages.some(m => m.id === newMessage.id)) {
             return [...oldMessages, newMessage];
@@ -168,6 +151,24 @@ export function useMessages(channelId: number, parentId?: number) {
           return oldMessages;
         });
       }
+
+      // Update reply count in main chat
+      const mainQueryKey = [`/api/channels/${channelId}/messages`];
+      queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
+        return oldMessages.map(msg => 
+          msg.id === newMessage.parentId
+            ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
+            : msg
+        );
+      });
+    } else {
+      // Handle main chat messages from other users
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        if (!oldMessages.some(m => m.id === newMessage.id)) {
+          return [...oldMessages, newMessage];
+        }
+        return oldMessages;
+      });
     }
   };
 
