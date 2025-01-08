@@ -11,10 +11,10 @@ type UserProfileViewProps = {
 
 export function UserProfileView({ user, isOpen, onClose, asChild = false }: UserProfileViewProps) {
   const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
-    if (hideActivity) {
+    if (hideActivity || !isOnline) {
       return 'bg-gray-500';
     }
-    return isOnline ? 'bg-green-500' : 'bg-gray-500';
+    return 'bg-green-500';
   };
 
   const formatDate = (date: Date | string) => {
@@ -43,7 +43,7 @@ export function UserProfileView({ user, isOpen, onClose, asChild = false }: User
         <div className="text-center">
           <h3 className="font-semibold text-lg">{user.username}</h3>
           <p className="text-sm text-muted-foreground">
-            {user.hideActivity ? 'Activity Hidden' : (user.isOnline ? 'Online' : 'Offline')}
+            {user.hideActivity || !user.isOnline ? 'offline' : 'online'}
           </p>
         </div>
       </div>
