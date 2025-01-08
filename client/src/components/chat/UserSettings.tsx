@@ -211,7 +211,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
             <DialogTitle>User Settings</DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="pr-4">
+          <ScrollArea className="pr-4 h-[70vh]">
             <Form {...form}>
             <form onChange={handleFormChange} className="space-y-4">
               <FormField
