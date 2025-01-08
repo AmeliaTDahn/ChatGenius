@@ -2,6 +2,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { UserProfileView } from "./UserProfileView";
 import type { Channel, User } from "@db/schema";
 
 type DirectMessage = Channel & {
@@ -69,22 +75,29 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
           onClick={() => handleSelectChannel(dm)}
         >
           <div className="flex items-center gap-2 flex-1">
-            <div className="relative">
-              <Avatar className="h-6 w-6">
-                {dm.otherUser.avatarUrl ? (
-                  <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
-                ) : (
-                  <AvatarFallback>
-                    {dm.otherUser.username[0].toUpperCase()}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div 
-                className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${
-                  getStatusColor(dm.otherUser.isOnline, dm.otherUser.hideActivity)
-                }`} 
-              />
-            </div>
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <div className="relative">
+                  <Avatar className="h-6 w-6">
+                    {dm.otherUser.avatarUrl ? (
+                      <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
+                    ) : (
+                      <AvatarFallback>
+                        {dm.otherUser.username[0].toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div 
+                    className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${
+                      getStatusColor(dm.otherUser.isOnline, dm.otherUser.hideActivity)
+                    }`} 
+                  />
+                </div>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80" align="start">
+                <UserProfileView user={dm.otherUser} asChild />
+              </HoverCardContent>
+            </HoverCard>
             <span className="text-sm truncate">{dm.otherUser.username}</span>
           </div>
           {dm.unreadCount! > 0 && (
