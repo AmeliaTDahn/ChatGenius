@@ -122,6 +122,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     },
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['user'], updatedUser);
+      queryClient.invalidateQueries(['user']);
       form.reset({
         username: updatedUser.username,
         age: updatedUser.age,
@@ -129,7 +130,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
         hideActivity: updatedUser.hideActivity,
         avatarUrl: updatedUser.avatarUrl || avatarOptions[0],
         timezone: updatedUser.timezone || "UTC",
-      });
+      }, { keepValues: true });
       setIsAutoSaving(false);
       toast({
         title: "Settings Saved",
