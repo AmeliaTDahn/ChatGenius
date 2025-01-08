@@ -20,8 +20,10 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Loader2, Search } from "lucide-react";
 import type { Channel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ChatPage() {
+  const queryClient = useQueryClient();
   const { user, logout } = useUser();
   const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -56,6 +58,17 @@ export default function ChatPage() {
         if (!response.ok) {
           throw new Error(await response.text());
         }
+
+        const newMessage = await response.json();
+
+        // Update the local cache immediately with our message
+        const queryKey = [`/api/channels/${selectedChannel.id}/messages`];
+        queryClient.setQueryData(queryKey, (oldMessages: any[] = []) => {
+          if (!oldMessages.some(m => m.id === newMessage.id)) {
+            return [...oldMessages, newMessage];
+          }
+          return oldMessages;
+        });
 
         // Notify other users through WebSocket
         sendMessage({
@@ -99,7 +112,6 @@ export default function ChatPage() {
   };
 
   const handleMessageSelect = (messageId: number) => {
-    // Scroll to message or highlight it
     const element = document.getElementById(`message-${messageId}`);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });

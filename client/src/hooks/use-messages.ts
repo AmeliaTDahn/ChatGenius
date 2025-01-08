@@ -5,7 +5,6 @@ import { useUser } from '@/hooks/use-user';
 export function useMessages(channelId: number, parentId?: number) {
   const queryClient = useQueryClient();
   const { user } = useUser();
-  // Different query key for thread replies vs main chat
   const queryKey = parentId 
     ? [`/api/channels/${channelId}/messages`, parentId] 
     : [`/api/channels/${channelId}/messages`];
@@ -81,36 +80,6 @@ export function useMessages(channelId: number, parentId?: number) {
       }
 
       return res.json() as Promise<Message>;
-    },
-    onSuccess: (newMessage) => {
-      // Handle our own messages via mutation
-      if (newMessage.parentId) {
-        // If it's a reply, add it to the thread
-        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-          if (!oldMessages.some(m => m.id === newMessage.id)) {
-            return [...oldMessages, newMessage];
-          }
-          return oldMessages;
-        });
-
-        // Update reply count in main chat
-        const mainQueryKey = [`/api/channels/${channelId}/messages`];
-        queryClient.setQueryData<Message[]>(mainQueryKey, (oldMessages = []) => {
-          return oldMessages.map(msg => 
-            msg.id === newMessage.parentId
-              ? { ...msg, replyCount: (msg.replyCount || 0) + 1 }
-              : msg
-          );
-        });
-      } else {
-        // If it's a main message, add it to the main chat
-        queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-          if (!oldMessages.some(m => m.id === newMessage.id)) {
-            return [...oldMessages, newMessage];
-          }
-          return oldMessages;
-        });
-      }
     }
   });
 
