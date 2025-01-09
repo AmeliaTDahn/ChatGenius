@@ -196,6 +196,9 @@ export function setupAuth(app: Express) {
   });
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const APP_URL = 'https://57d3de03-df16-4860-bd5f-242abda85e1e-00-uzdqlt8ev74r.spock.replit.dev';
+
 export const insertUserSchema = createInsertSchema(users, {
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email format"),
