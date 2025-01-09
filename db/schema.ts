@@ -16,6 +16,8 @@ export const users = pgTable("users", {
   timezone: text("timezone").default("UTC").notNull(),
   lastActive: timestamp("last_active").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
 });
 
 // Base types

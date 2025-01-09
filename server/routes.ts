@@ -12,6 +12,8 @@ import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import express from "express";
+import crypto from 'crypto'; //Import crypto library for password hashing.
+import { sendPasswordResetEmail, generateResetToken } from './utils/email';
 
 
 async function getUnreadMessageCounts(userId: number) {
@@ -1077,8 +1079,7 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user1Id, req.user.id),
             eq(directMessageChannels.user2Id, friendId)
           ),
-          and(
-            eq(directMessageChannels.user1Id, friendId),
+          and(            eq(directMessageChannels.user1Id, friendId),
             eq(directMessageChannels.user2Id, req.user.id)
           )
         ))
@@ -1098,7 +1099,8 @@ export function registerRoutes(app: Express): Server {
             .where(inArray(messageReactions.messageId, messageIds));
 
           await db
-            .delete(messageReads)            .where(inArray(messageReads.messageId, messageIds));
+            .delete(messageReads)
+            .where(inArray(messageReads.messageId, messageIds));
         }
 
         await db
@@ -1118,7 +1120,8 @@ export function registerRoutes(app: Express): Server {
           .where(eq(channels.id, dmChannel.channelId));
       }
 
-      await db        .delete(friends)
+      await db
+        .delete(friends)
         .where(or(
           and(
             eq(friends.user1Id, req.user.id),
@@ -1147,7 +1150,8 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).send("Friend ID is required");
     }
 
-    try {      const [friendship] = await db
+    try {
+      const [friendship] = await db
         .select()
         .from(friends)
         .where(or(
@@ -1492,9 +1496,9 @@ export function registerRoutes(app: Express): Server {
         unreadCount: unreadCounts.find(c => c.channelId === uc.channel.id)?.unreadCount || 0
       }));
 
-      res.json({ 
+      res.json({
         message: "Successfully left the channel",
-        channels: channelsWithUnread 
+        channels: channelsWithUnread
       });
     } catch (error) {
       console.error("Error leaving channel:", error);
@@ -1615,6 +1619,100 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error deleting user account:", error);
       res.status(500).send("Error deleting user account");
+    }
+  });
+
+  // Password reset request endpoint
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      // Find user by email
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (!user) {
+        // Don't reveal whether a user exists
+        return res.json({ message: "If an account exists with that email, you will receive password reset instructions." });
+      }
+
+      // Generate reset token
+      const resetToken = generateResetToken();
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+      // Update user with reset token
+      await db
+        .update(users)
+        .set({
+          resetToken,
+          resetTokenExpiry
+        })
+        .where(eq(users.id, user.id));
+
+      // Send reset email
+      await sendPasswordResetEmail(
+        email,
+        resetToken,
+        `${req.protocol}://${req.get('host')}`
+      );
+
+      res.json({
+        message: "If an account exists with that email, you will receive password reset instructions."
+      });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ error: "Error processing password reset request" });
+    }
+  });
+
+  // Reset password with token endpoint
+  app.post("/api/auth/reset-password/:token", async (req, res) => {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: "Token and new password are required" });
+    }
+
+    try {
+      // Find user with valid reset token
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(and(
+          eq(users.resetToken, token),
+          gt(users.resetTokenExpiry, new Date())
+        ))
+        .limit(1);
+
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await crypto.hash(newPassword);
+
+      // Update user's password and clear reset token
+      await db
+        .update(users)
+        .set({
+          password: hashedPassword,
+          resetToken: null,
+          resetTokenExpiry: null
+        })
+        .where(eq(users.id, user.id));
+
+      res.json({ message: "Password has been reset successfully" });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ error: "Error resetting password" });
     }
   });
 

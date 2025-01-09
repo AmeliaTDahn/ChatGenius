@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,12 +35,21 @@ export default function ResetPasswordPage() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      await fetch('/api/auth/reset-password', {
+      const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
       setEmailSent(true);
+      toast({
+        title: "Reset instructions sent",
+        description: "If an account exists with that email, you will receive password reset instructions.",
+      });
     } catch (error: any) {
       toast({
         title: "Error",
