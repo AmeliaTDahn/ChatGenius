@@ -1080,7 +1080,7 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user2Id, friendId)
           ),
           and(            eq(directMessageChannels.user1Id, friendId),
-            eq(directMessageChannels.useruser2Id, req.user.id)
+            eq(directMessageChannels.user2Id, req.user.id)
           )
         ))
         .limit(1);
@@ -1639,11 +1639,13 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!user) {
-        // Don't reveal whether a user exists
-        return res.json({ message: "If an account exists with that email, you will receive password reset instructions." });
+        // Don't reveal if user exists
+        return res.json({
+          message: "If an account exists with that email, you will receive password reset instructions."
+        });
       }
 
-      // Generate reset token
+      // Generate reset token and expiry
       const resetToken = generateResetToken();
       const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
@@ -1656,8 +1658,8 @@ export function registerRoutes(app: Express): Server {
         })
         .where(eq(users.id, user.id));
 
-      // Send reset email
-      const resetUrl = `${req.protocol}://${req.get('host')}`;
+      // Send reset email with the correct domain
+      const resetUrl = "https://57d3de03-df16-4860-bd5f-242abda85e1e-00-uzdqlt8ev74r.spock.replit.dev";
       await sendPasswordResetEmail(email, resetToken, resetUrl);
 
       res.json({ message: "If an account exists with that email, you will receive password reset instructions." });
