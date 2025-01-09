@@ -15,7 +15,6 @@ import express from "express";
 import crypto from 'crypto'; //Import crypto library for password hashing.
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
 
-
 async function getUnreadMessageCounts(userId: number) {
   const userChannels = await db.query.channelMembers.findMany({
     where: eq(channelMembers.userId, userId),
@@ -1724,26 +1723,19 @@ export function registerRoutes(app: Express): Server {
 
       const { username, email, password } = result.data;
 
-      // Check if user already exists with the same username
-      const [existingUserWithUsername] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username))
-        .limit(1);
+      // Check if user already exists with the same username or email
+      const existingUser = await db.query.users.findFirst({
+        where: or(
+          eq(users.username, username),
+          eq(users.email, email)
+        ),
+      });
 
-      if (existingUserWithUsername) {
+      if (existingUser) {
+        if (existingUser.email === email) {
+          return res.status(400).send("A user with this email is already registered");
+        }
         return res.status(400).send("Username already exists");
-      }
-
-      // Check if user already exists with the same email
-      const [existingUserWithEmail] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-
-      if (existingUserWithEmail) {
-        return res.status(400).send("A user with this email is already registered");
       }
 
       // Hash the password
