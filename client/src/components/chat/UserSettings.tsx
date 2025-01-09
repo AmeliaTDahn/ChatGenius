@@ -82,6 +82,32 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const deleteAccount = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/user/account', {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been permanently deleted.",
+      });
+      queryClient.clear();
+      window.location.href = '/';
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const form = useForm<UserSettingsFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -404,6 +430,41 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
               </div>
             </form>
           </Form>
+
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-lg font-semibold text-red-600">Danger Zone</h3>
+            <p className="text-sm text-gray-500 mt-2">Once you delete your account, there is no going back.</p>
+            <Button 
+              variant="destructive" 
+              className="mt-4"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              Delete Account
+            </Button>
+
+            <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Account</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete your account? This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => deleteAccount.mutate()}
+                    disabled={deleteAccount.isPending}
+                  >
+                    {deleteAccount.isPending ? "Deleting..." : "Delete Account"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
