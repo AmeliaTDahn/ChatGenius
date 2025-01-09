@@ -1080,7 +1080,7 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user2Id, friendId)
           ),
           and(            eq(directMessageChannels.user1Id, friendId),
-            eq(directMessageChannels.user2Id, req.user.id)
+            eq(directMessageChannels.useruser2Id, req.user.id)
           )
         ))
         .limit(1);
@@ -1624,13 +1624,13 @@ export function registerRoutes(app: Express): Server {
 
   // Password reset request endpoint
   app.post("/api/auth/reset-password", async (req, res) => {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-
     try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).send("Email is required");
+      }
+
       // Find user by email
       const [user] = await db
         .select()
@@ -1652,20 +1652,15 @@ export function registerRoutes(app: Express): Server {
         .update(users)
         .set({
           resetToken,
-          resetTokenExpiry
+          resetTokenExpiry,
         })
         .where(eq(users.id, user.id));
 
       // Send reset email
-      await sendPasswordResetEmail(
-        email,
-        resetToken,
-        `${req.protocol}://${req.get('host')}`
-      );
+      const resetUrl = `${req.protocol}://${req.get('host')}`;
+      await sendPasswordResetEmail(email, resetToken, resetUrl);
 
-      res.json({
-        message: "If an account exists with that email, you will receive password reset instructions."
-      });
+      res.json({ message: "If an account exists with that email, you will receive password reset instructions." });
     } catch (error) {
       console.error("Password reset error:", error);
       res.status(500).json({ error: "Error processing password reset request" });
