@@ -8,6 +8,9 @@ import { promisify } from "util";
 import { users, type User, insertUserSchema } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
+import * as z from 'zod';
+import { createInsertSchema } from 'drizzle-zod';
+
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -114,7 +117,7 @@ export function setupAuth(app: Express) {
           .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
       }
 
-      const { username, password } = result.data;
+      const { username, password, email } = result.data;
 
       const [existingUser] = await db
         .select()
@@ -133,6 +136,7 @@ export function setupAuth(app: Express) {
         .values({
           username,
           password: hashedPassword,
+          email // Added email field
         })
         .returning();
 
@@ -191,3 +195,9 @@ export function setupAuth(app: Express) {
     res.status(401).send("Not logged in");
   });
 }
+
+export const insertUserSchema = createInsertSchema(users, {
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
