@@ -44,7 +44,7 @@ export default function AuthPage() {
     try {
       setIsLoading(true);
       await login(values);
-      // No need to show success toast as the app will redirect automatically
+      navigate("/"); // Explicitly navigate to home after successful login
     } catch (error: any) {
       toast({
         title: "Error",
