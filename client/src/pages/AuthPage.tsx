@@ -21,6 +21,7 @@ import { Logo } from "@/components/ui/logo";
 
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -35,6 +36,7 @@ export default function AuthPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
+      email: "",
       password: "",
     },
   });
@@ -42,7 +44,8 @@ export default function AuthPage() {
   const onLogin = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      const result = await login(values);
+      const { username, password } = values;
+      const result = await login({ username, password });
 
       if (result.user) {
         toast({
@@ -165,6 +168,23 @@ export default function AuthPage() {
                         <FormLabel>Username</FormLabel>
                         <FormControl>
                           <Input placeholder="Choose username" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="email" 
+                            placeholder="Enter your email"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
