@@ -19,7 +19,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/ui/logo";
 
-const formSchema = z.object({
+const loginSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const registerSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -32,8 +37,16 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
+
+  const registerForm = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       username: "",
       email: "",
@@ -41,20 +54,19 @@ export default function AuthPage() {
     },
   });
 
-  const onLogin = async (values: z.infer<typeof formSchema>) => {
+  const onLogin = async (values: z.infer<typeof loginSchema>) => {
     try {
       setIsLoading(true);
-      const { username, password } = values;
-      const result = await login({ username, password });
+      const result = await login(values);
 
-      if (result.user) {
+      if (result.ok) {
         toast({
           title: "Success",
           description: "Logged in successfully"
         });
         navigate("/");
       } else {
-        throw new Error("Login failed");
+        throw new Error(result.message);
       }
     } catch (error: any) {
       toast({
@@ -67,17 +79,19 @@ export default function AuthPage() {
     }
   };
 
-  const onRegister = async (values: z.infer<typeof formSchema>) => {
+  const onRegister = async (values: z.infer<typeof registerSchema>) => {
     try {
       setIsLoading(true);
       const result = await register(values);
 
-      if (result.user) {
+      if (result.ok) {
         toast({
           title: "Success",
           description: "Registered successfully"
         });
         navigate("/");
+      } else {
+        throw new Error(result.message);
       }
     } catch (error: any) {
       toast({
@@ -111,10 +125,10 @@ export default function AuthPage() {
               <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onLogin)} className="space-y-4">
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
                   <FormField
-                    control={form.control}
+                    control={loginForm.control}
                     name="username"
                     render={({ field }) => (
                       <FormItem>
@@ -127,7 +141,7 @@ export default function AuthPage() {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={loginForm.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>
@@ -158,10 +172,10 @@ export default function AuthPage() {
               </Form>
             </TabsContent>
             <TabsContent value="register">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onRegister)} className="space-y-4">
+              <Form {...registerForm}>
+                <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
                   <FormField
-                    control={form.control}
+                    control={registerForm.control}
                     name="username"
                     render={({ field }) => (
                       <FormItem>
@@ -174,7 +188,7 @@ export default function AuthPage() {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={registerForm.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
@@ -191,7 +205,7 @@ export default function AuthPage() {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={registerForm.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>

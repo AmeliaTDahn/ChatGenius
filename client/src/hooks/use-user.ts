@@ -1,14 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User } from "@db/schema";
+import { z } from "zod";
 
-type LoginData = {
-  username: string;
-  password: string;
-};
+const loginSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const registerSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type LoginData = z.infer<typeof loginSchema>;
+type RegisterData = z.infer<typeof registerSchema>;
 
 type RequestResult = {
-  message: string;
+  ok: true;
   user?: User;
+} | {
+  ok: false;
+  message: string;
 };
 
 async function fetchUser(): Promise<User | null> {
@@ -26,6 +39,31 @@ async function fetchUser(): Promise<User | null> {
   return response.json();
 }
 
+async function handleRequest(
+  url: string,
+  method: string,
+  body?: LoginData | RegisterData
+): Promise<RequestResult> {
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      return { ok: false, message };
+    }
+
+    const data = await response.json();
+    return { ok: true, user: data.user };
+  } catch (error: any) {
+    return { ok: false, message: error.toString() };
+  }
+}
+
 export function useUser() {
   const queryClient = useQueryClient();
 
@@ -36,66 +74,26 @@ export function useUser() {
     retry: false
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginData): Promise<RequestResult> => {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      const result = await response.json();
-      return result;
-    },
+  const loginMutation = useMutation<RequestResult, Error, LoginData>({
+    mutationFn: (data) => handleRequest('/api/login', 'POST', data),
     onSuccess: (data) => {
-      if (data.user) {
+      if (data.ok && data.user) {
         queryClient.setQueryData(['user'], data.user);
       }
     },
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: async (): Promise<RequestResult> => {
-      const response = await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      // Clear all queries from the cache
-      queryClient.clear();
-      // Set user data to null
+  const logoutMutation = useMutation<RequestResult, Error>({
+    mutationFn: () => handleRequest('/api/logout', 'POST'),
+    onSuccess: () => {
       queryClient.setQueryData(['user'], null);
-      return response.json();
-    }
+    },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: LoginData): Promise<RequestResult> => {
-      const response = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      const result = await response.json();
-      return result;
-    },
+  const registerMutation = useMutation<RequestResult, Error, RegisterData>({
+    mutationFn: (data) => handleRequest('/api/register', 'POST', data),
     onSuccess: (data) => {
-      if (data.user) {
+      if (data.ok && data.user) {
         queryClient.setQueryData(['user'], data.user);
       }
     },
