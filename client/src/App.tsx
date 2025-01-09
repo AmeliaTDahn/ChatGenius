@@ -3,6 +3,7 @@ import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 import AuthPage from "./pages/AuthPage";
 import ChatPage from "./pages/ChatPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 function App() {
   const { user, isLoading } = useUser();
@@ -15,13 +16,19 @@ function App() {
     );
   }
 
-  // If not logged in, show auth page
-  if (!user) {
-    return <AuthPage />;
-  }
-
-  // If logged in, show chat page
-  return <ChatPage />;
+  // Show reset password page regardless of auth status
+  return (
+    <Switch>
+      <Route path="/reset-password" component={ResetPasswordPage} />
+      {/* If not logged in, show auth page */}
+      {!user ? (
+        <Route path="*" component={AuthPage} />
+      ) : (
+        // If logged in, show chat page
+        <Route path="*" component={ChatPage} />
+      )}
+    </Switch>
+  );
 }
 
 export default App;

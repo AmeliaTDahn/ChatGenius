@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ export default function AuthPage() {
   const { login, register } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [, navigate] = useLocation();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -130,7 +132,7 @@ export default function AuthPage() {
                     type="button" 
                     variant="link" 
                     className="w-full text-sm text-muted-foreground"
-                    onClick={() => window.location.href = '/reset-password'}
+                    onClick={() => navigate("/reset-password")}
                   >
                     Forgot password?
                   </Button>
