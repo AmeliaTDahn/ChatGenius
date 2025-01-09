@@ -1713,5 +1713,66 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/register", async (req, res, next) => {
+    try {
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        return res
+          .status(400)
+          .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
+      }
+
+      const { username, email, password } = result.data;
+
+      // Check if user already exists with the same username
+      const [existingUserWithUsername] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (existingUserWithUsername) {
+        return res.status(400).send("Username already exists");
+      }
+
+      // Check if user already exists with the same email
+      const [existingUserWithEmail] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (existingUserWithEmail) {
+        return res.status(400).send("A user with this email is already registered");
+      }
+
+      // Hash the password
+      const hashedPassword = await crypto.hash(password);
+
+      // Create the new user
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          username,
+          email,
+          password: hashedPassword,
+        })
+        .returning();
+
+      // Log the user in after registration
+      req.login(newUser, (err) => {
+        if (err) {
+          return next(err);
+        }
+        return res.json({
+          message: "Registration successful",
+          user: { id: newUser.id, username: newUser.username },
+        });
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }

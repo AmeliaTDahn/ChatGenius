@@ -85,7 +85,7 @@ export default function AuthPage() {
         description: error.message,
         variant: "destructive",
       });
-      if (error.message.includes("already exists")) {
+      if (error.message.includes("already registered")) {
         setActiveTab("login");
       }
     } finally {
