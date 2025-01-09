@@ -18,16 +18,13 @@ function App() {
 
   return (
     <Switch>
-      {/* Public routes - accessible whether logged in or not */}
-      <Route path="/reset-password" component={ResetPasswordPage} />
-
-      {/* Protected routes - redirect to auth if not logged in */}
-      <Route path="/">
-        {user ? <ChatPage /> : <AuthPage />}
+      {/* Public routes */}
+      <Route path="/reset-password">
+        <ResetPasswordPage />
       </Route>
 
-      {/* Catch all other routes */}
-      <Route path="*">
+      {/* Protected routes */}
+      <Route path="/">
         {user ? <ChatPage /> : <AuthPage />}
       </Route>
     </Switch>

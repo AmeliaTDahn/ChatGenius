@@ -45,17 +45,12 @@ export function useUser() {
         credentials: 'include'
       });
 
-      const result = await response.text();
-
       if (!response.ok) {
-        throw new Error(result);
+        throw new Error(await response.text());
       }
 
-      try {
-        return JSON.parse(result);
-      } catch {
-        throw new Error('Invalid server response');
-      }
+      const result = await response.json();
+      return result;
     },
     onSuccess: (data) => {
       if (data.user) {
@@ -92,17 +87,12 @@ export function useUser() {
         credentials: 'include'
       });
 
-      const result = await response.text();
-
       if (!response.ok) {
-        throw new Error(result);
+        throw new Error(await response.text());
       }
 
-      try {
-        return JSON.parse(result);
-      } catch {
-        throw new Error('Invalid server response');
-      }
+      const result = await response.json();
+      return result;
     },
     onSuccess: (data) => {
       if (data.user) {

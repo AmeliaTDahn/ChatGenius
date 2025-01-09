@@ -21,7 +21,6 @@ import { Logo } from "@/components/ui/logo";
 
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -37,20 +36,22 @@ export default function AuthPage() {
     defaultValues: {
       username: "",
       password: "",
-      email: "",
     },
   });
 
   const onLogin = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      const response = await login(values);
-      if (response?.user) {
+      const result = await login(values);
+
+      if (result.user) {
         toast({
           title: "Success",
           description: "Logged in successfully"
         });
         navigate("/");
+      } else {
+        throw new Error("Login failed");
       }
     } catch (error: any) {
       toast({
@@ -66,14 +67,21 @@ export default function AuthPage() {
   const onRegister = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      await register(values);
+      const result = await register(values);
+
+      if (result.user) {
+        toast({
+          title: "Success",
+          description: "Registered successfully"
+        });
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      // If username already exists, switch to login tab
       if (error.message.includes("already exists")) {
         setActiveTab("login");
       }
@@ -149,19 +157,6 @@ export default function AuthPage() {
             <TabsContent value="register">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onRegister)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter email" type="email" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="username"
