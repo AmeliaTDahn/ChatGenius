@@ -16,17 +16,20 @@ function App() {
     );
   }
 
-  // Show reset password page regardless of auth status
   return (
     <Switch>
+      {/* Public routes - accessible whether logged in or not */}
       <Route path="/reset-password" component={ResetPasswordPage} />
-      {/* If not logged in, show auth page */}
-      {!user ? (
-        <Route path="*" component={AuthPage} />
-      ) : (
-        // If logged in, show chat page
-        <Route path="*" component={ChatPage} />
-      )}
+
+      {/* Protected routes - redirect to auth if not logged in */}
+      <Route path="/">
+        {user ? <ChatPage /> : <AuthPage />}
+      </Route>
+
+      {/* Catch all other routes */}
+      <Route path="*">
+        {user ? <ChatPage /> : <AuthPage />}
+      </Route>
     </Switch>
   );
 }
