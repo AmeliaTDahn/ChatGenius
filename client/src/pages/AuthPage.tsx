@@ -43,8 +43,14 @@ export default function AuthPage() {
   const onLogin = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      await login(values);
-      navigate("/"); // Explicitly navigate to home after successful login
+      const response = await login(values);
+      if (response?.user) {
+        toast({
+          title: "Success",
+          description: "Logged in successfully"
+        });
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
