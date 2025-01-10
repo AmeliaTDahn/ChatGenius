@@ -42,23 +42,14 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'new_message' && data.senderId !== user?.id) {
-        // Only update unread count if the message is not from the current user
-        // and the channel is not currently selected
-        if (selectedChannel?.id !== data.channelId) {
-          queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
-            if (!oldData) return oldData;
-            return oldData.map(ch => 
-              ch.id === data.channelId ? { ...ch, unreadCount: (ch.unreadCount || 0) + 1 } : ch
-            );
-          });
-        }
+        queryClient.invalidateQueries({ queryKey: ['channels'] });
       }
     };
 
     return () => {
       ws.close();
     };
-  }, [selectedChannel?.id, user?.id, queryClient]);
+  }, [user?.id, queryClient]);
 
   const handleCreateChannel = async () => {
     if (newChannelName.trim()) {
@@ -70,26 +61,13 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
 
   const handleChannelSelect = async (channel: Channel | null) => {
     try {
-      // Update the selected channel in the parent component first
-      // This ensures immediate UI feedback
       onSelectChannel(channel);
 
       if (channel) {
-        // Immediately update the UI to remove the unread indicator
-        queryClient.setQueryData(['channels'], (oldData: Channel[] | undefined) => {
-          if (!oldData) return oldData;
-          return oldData.map(ch => 
-            ch.id === channel.id ? { ...ch, unreadCount: 0 } : ch
-          );
-        });
-
-        // Then mark messages as read on the server
         await fetch(`/api/channels/${channel.id}/read`, {
           method: 'POST',
           credentials: 'include'
         });
-
-        // Finally, invalidate queries to ensure data consistency
         await queryClient.invalidateQueries({ queryKey: ['channels'] });
       }
     } catch (error) {
@@ -136,14 +114,11 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
             <Button
               key={channel.id}
               variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
-              className="w-full justify-start relative"
+              className="w-full justify-start"
               onClick={() => handleChannelSelect(channel)}
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
-              {channel.unreadCount > 0 && channel.id !== selectedChannel?.id && (
-                <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
-              )}
             </Button>
           ))}
         </div>

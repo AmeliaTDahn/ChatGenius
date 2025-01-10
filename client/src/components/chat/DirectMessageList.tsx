@@ -12,7 +12,6 @@ import type { Channel, User } from "@db/schema";
 
 type DirectMessage = Channel & {
   otherUser: User;
-  unreadCount?: number;
 };
 
 export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (channel: Channel) => void }) {
@@ -38,7 +37,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
         credentials: 'include'
       });
 
-      // Invalidate both queries to refresh the unread status
+      // Invalidate both queries to refresh the status
       queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
 
@@ -100,9 +99,6 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
             </HoverCard>
             <span className="text-sm truncate">{dm.otherUser.username}</span>
           </div>
-          {dm.unreadCount! > 0 && (
-            <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
-          )}
         </Button>
       ))}
     </div>
