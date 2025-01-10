@@ -45,71 +45,60 @@ const COLOR_PALETTES = {
 };
 
 export function ThemeCustomizer() {
-  const { theme, setTheme } = useTheme();
+  const { theme, updateTheme } = useTheme();
   const [selectedPalette, setSelectedPalette] = useState<string>("default");
 
   const handleSelectPalette = async (paletteKey: string) => {
     setSelectedPalette(paletteKey);
     const palette = COLOR_PALETTES[paletteKey as keyof typeof COLOR_PALETTES];
-    
-    // Update theme
-    await fetch("/api/theme", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+
+    try {
+      // Update theme
+      await updateTheme({
         primary: palette.primary,
         appearance: theme === "dark" ? "dark" : "light",
         variant: "professional",
         radius: 0.5,
-      }),
-    });
+      });
 
-    // Force reload to apply new theme
-    window.location.reload();
+      // The page will automatically reload after theme update
+    } catch (error) {
+      console.error("Failed to update theme:", error);
+    }
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline">Customize Theme</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Choose Theme</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4">
-          {Object.entries(COLOR_PALETTES).map(([key, palette]) => (
-            <Card
-              key={key}
-              className={cn(
-                "relative cursor-pointer transition-all hover:scale-105",
-                selectedPalette === key && "ring-2 ring-primary"
-              )}
-              onClick={() => handleSelectPalette(key)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex gap-2">
-                    <div
-                      className="h-8 w-8 rounded-full"
-                      style={{ backgroundColor: palette.primary }}
-                    />
-                    <div
-                      className="h-8 w-8 rounded-full"
-                      style={{ backgroundColor: palette.background }}
-                    />
-                    <div
-                      className="h-8 w-8 rounded-full"
-                      style={{ backgroundColor: palette.foreground }}
-                    />
-                  </div>
-                  <span className="font-medium">{palette.name}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="grid gap-4">
+      {Object.entries(COLOR_PALETTES).map(([key, palette]) => (
+        <Card
+          key={key}
+          className={cn(
+            "relative cursor-pointer transition-all hover:scale-105",
+            selectedPalette === key && "ring-2 ring-primary"
+          )}
+          onClick={() => handleSelectPalette(key)}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex gap-2">
+                <div
+                  className="h-8 w-8 rounded-full"
+                  style={{ backgroundColor: palette.primary }}
+                />
+                <div
+                  className="h-8 w-8 rounded-full"
+                  style={{ backgroundColor: palette.background }}
+                />
+                <div
+                  className="h-8 w-8 rounded-full"
+                  style={{ backgroundColor: palette.foreground }}
+                />
+              </div>
+              <span className="font-medium">{palette.name}</span>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
