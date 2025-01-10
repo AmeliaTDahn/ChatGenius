@@ -2063,7 +2063,73 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add new theme endpoint
+  // Add channel theme endpoint
+  app.put("/api/channels/:channelId/theme", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    const { backgroundColor, messageBackgroundColor } = req.body;
+
+    try {
+      // Validate the theme colors
+      const result = updateChannelThemeSchema.safeParse({
+        backgroundColor,
+        messageBackgroundColor
+      });
+
+      if (!result.success) {
+        return res.status(400).send("Invalid color format. Use hex colors (e.g., #ff0000)");
+      }
+
+      // Check if user is a member of the channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      // Update channel theme
+      const [updatedChannel] = await db
+        .update(channels)
+        .set({
+          backgroundColor,
+          messageBackgroundColor
+        })
+        .where(eq(channels.id, channelId))
+        .returning();
+
+      // Broadcast theme update to all connected clients
+      const themeUpdate = {
+        type: 'channel_theme_update',
+        channelId,
+        theme: {
+          backgroundColor: updatedChannel.backgroundColor,
+          messageBackgroundColor: updatedChannel.messageBackgroundColor
+        }
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(themeUpdate));
+        }
+      });
+
+      res.json(updatedChannel);
+    } catch (error) {
+      console.error("Error updating channel theme:", error);
+      res.status(500).send("Error updating channel theme");
+    }
+  });
+
   app.post("/api/theme", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");

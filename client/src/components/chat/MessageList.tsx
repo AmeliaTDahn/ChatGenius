@@ -6,11 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Loader2, FileIcon, Download, Reply } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
+import { ChannelThemeCustomizer } from "./ChannelThemeCustomizer";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 
 type MessageListProps = {
   channelId: number;
+  channelTheme: {
+    backgroundColor: string;
+    messageBackgroundColor: string;
+  };
 };
 
 function parseFormattedText(text: string) {
@@ -27,7 +32,7 @@ function parseFormattedText(text: string) {
   return text;
 }
 
-export function MessageList({ channelId }: MessageListProps) {
+export function MessageList({ channelId, channelTheme }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -75,7 +80,11 @@ export function MessageList({ channelId }: MessageListProps) {
     };
 
     return (
-      <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
+      <div 
+        id={`message-${message.id}`} 
+        className="flex items-start gap-3 transition-colors duration-200 p-3 rounded-lg"
+        style={{ backgroundColor: channelTheme.messageBackgroundColor }}
+      >
         <Avatar className="h-8 w-8 flex-shrink-0">
           {message.user.avatarUrl ? (
             <AvatarImage src={message.user.avatarUrl} alt={message.user.username} />
@@ -184,7 +193,7 @@ export function MessageList({ channelId }: MessageListProps) {
                   className="h-6 px-2 text-xs"
                   onClick={() => handleReaction(emoji)}
                 >
-                  <span>{emoji}</span>
+                  {emoji}
                   <span className="ml-1">{count}</span>
                 </Button>
               ))}
@@ -198,14 +207,22 @@ export function MessageList({ channelId }: MessageListProps) {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <MessageComponent key={message.id} message={message} />
-          ))}
-          <div ref={bottomRef} />
+      <div className="flex-1 flex flex-col">
+        <div className="p-2 border-b flex justify-end">
+          <ChannelThemeCustomizer channelId={channelId} currentTheme={channelTheme} />
         </div>
-      </ScrollArea>
+        <ScrollArea 
+          className="flex-1 p-4"
+          style={{ backgroundColor: channelTheme.backgroundColor }}
+        >
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <MessageComponent key={message.id} message={message} />
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        </ScrollArea>
+      </div>
       {showThread && selectedMessage && (
         <div className="w-80 border-l">
           <ThreadView 
