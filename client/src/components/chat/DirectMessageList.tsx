@@ -12,7 +12,6 @@ import type { Channel, User } from "@db/schema";
 
 type DirectMessage = Channel & {
   otherUser: User;
-  unreadCount?: number;
 };
 
 export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (channel: Channel) => void }) {
@@ -99,9 +98,6 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
               </HoverCardContent>
             </HoverCard>
             <span className="text-sm truncate">{dm.otherUser.username}</span>
-            {dm.unreadCount > 0 && (
-              <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
-            )}
           </div>
         </Button>
       ))}
