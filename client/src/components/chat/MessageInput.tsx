@@ -15,11 +15,6 @@ type MessageInputProps = {
   onSendMessage: (content: string, files?: File[]) => void;
 };
 
-type Format = {
-  type: 'bold' | 'italic' | 'color';
-  value?: string;
-};
-
 export function MessageInput({ onSendMessage }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -50,8 +45,20 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() || files.length > 0) {
-      const formattedMessage = formatMessageForSending(message);
-      onSendMessage(formattedMessage, files);
+      let finalMessage = message;
+
+      // Apply formatting in reverse order to handle nested formats
+      if (currentFormat.color) {
+        finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
+      }
+      if (currentFormat.italic) {
+        finalMessage = `*${finalMessage}*`;
+      }
+      if (currentFormat.bold) {
+        finalMessage = `**${finalMessage}**`;
+      }
+
+      onSendMessage(finalMessage, files);
       setMessage("");
       setFiles([]);
       setCurrentFormat({
@@ -60,23 +67,6 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
         color: null
       });
     }
-  };
-
-  const formatMessageForSending = (text: string) => {
-    let formattedText = text;
-
-    // Apply current formatting to the entire message if any format is active
-    if (currentFormat.bold) {
-      formattedText = `**${formattedText}**`;
-    }
-    if (currentFormat.italic) {
-      formattedText = `*${formattedText}*`;
-    }
-    if (currentFormat.color) {
-      formattedText = `[color=${currentFormat.color}]${formattedText}[/color]`;
-    }
-
-    return formattedText;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

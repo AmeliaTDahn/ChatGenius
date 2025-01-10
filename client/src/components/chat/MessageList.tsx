@@ -9,10 +9,6 @@ import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 
-type MessageListProps = {
-  channelId: number;
-};
-
 function parseFormattedText(text: string) {
   // Replace color tags with spans
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
@@ -26,6 +22,10 @@ function parseFormattedText(text: string) {
 
   return text;
 }
+
+type MessageListProps = {
+  channelId: number;
+};
 
 export function MessageList({ channelId }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
