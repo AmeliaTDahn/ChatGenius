@@ -67,33 +67,18 @@ export function FriendList() {
 
   const startDirectMessage = useMutation({
     mutationFn: async (friendId: number) => {
-      // First try to get existing channel
-      const res = await fetch(`/api/direct-messages/channel?friendId=${friendId}`, {
+      const createRes = await fetch('/api/direct-messages/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendId }),
         credentials: 'include'
       });
 
-      if (res.ok) {
-        return res.json();
-      }
-
-      // If no existing channel, create a new one
-      if (res.status === 404) {
-        const createRes = await fetch('/api/direct-messages/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ friendId }),
-          credentials: 'include'
-        });
-
-        if (!createRes.ok) throw new Error(await createRes.text());
-        return createRes.json();
-      }
-
-      throw new Error(await res.text());
+      if (!createRes.ok) throw new Error(await createRes.text());
+      return createRes.json();
     },
     onSuccess: (data) => {
-      // Navigate to the direct message channel immediately
-      setLocation(`/chat/dm/${data.channelId}`);
+      setLocation(`/channels/dm/${data.channelId}`);
     },
     onError: (error: Error) => {
       toast({

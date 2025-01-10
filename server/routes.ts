@@ -1215,8 +1215,8 @@ export function registerRoutes(app: Express): Server {
 
       res.json({ channelId: channel.id });
     } catch (error) {
-      console.error("Error creating direct message channel:", error);
-      res.status(500).send("Error creating direct message channel");
+      console.error("Error creating/fetching direct message channel:", error);
+      res.status(500).send("Error creating/fetching direct message channel");
     }
   });
 
