@@ -564,21 +564,26 @@ export function registerRoutes(app: Express): Server {
       return res.status(401).send("Not authenticated");
     }
 
-    const userChannels = await db.query.channelMembers.findMany({
-      where: eq(channelMembers.userId, req.user.id),
-      with: {
-        channel: true
-      }
-    });
+    try {
+      const userChannels = await db.query.channelMembers.findMany({
+        where: eq(channelMembers.userId, req.user.id),
+        with: {
+          channel: true
+        }
+      });
 
-    const unreadCounts = await getUnreadMessageCounts(req.user.id);
+      const unreadCounts = await getUnreadMessageCounts(req.user.id);
 
-    const channelsWithUnread = userChannels.map(uc => ({
-      ...uc.channel,
-      unreadCount: unreadCounts.find(c => c.channelId === uc.channel.id)?.unreadCount || 0
-    }));
+      const channelsWithUnread = userChannels.map(uc => ({
+        ...uc.channel,
+        unreadCount: unreadCounts.find(c => c.channelId === uc.channel.id)?.unreadCount || 0
+      }));
 
-    res.json(channelsWithUnread);
+      res.json(channelsWithUnread);
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+      res.status(500).send("Error fetching channels");
+    }
   });
 
   app.post("/api/channels", async (req, res) => {
@@ -1287,6 +1292,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error marking message as read");
     }
   });
+
   app.post("/api/channels/:channelId/read", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1862,6 +1868,153 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching friend recommendations:", error);
       res.status(500).send("Error fetching friend recommendations");
+    }
+  });
+
+  app.get("/api/channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const userChannels = await db.query.channelMembers.findMany({
+        where: eq(channelMembers.userId, req.user.id),
+        with: {
+          channel: true
+        }
+      });
+
+      const unreadCounts = await getUnreadMessageCounts(req.user.id);
+
+      const channelsWithUnread = userChannels.map(uc => ({
+        ...uc.channel,
+        unreadCount: unreadCounts.find(c => c.channelId === uc.channel.id)?.unreadCount || 0
+      }));
+
+      res.json(channelsWithUnread);
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+      res.status(500).send("Error fetching channels");
+    }
+  });
+
+  app.post("/api/channels/:channelId/read", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      // Get the latest message in the channel
+      const [latestMessage] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.channelId, channelId))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+
+      if (latestMessage) {
+        // Mark the latest message as read
+        await db.insert(messageReads).values({
+          messageId: latestMessage.id,
+          userId: req.user.id,
+          readAt: new Date()
+        }).onConflictDoUpdate({
+          target: [messageReads.messageId, messageReads.userId],
+          set: { readAt: new Date() }
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking channel as read:", error);
+      res.status(500).send("Error marking channel as read");
+    }
+  });
+
+  app.get("/api/direct-messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const userId = req.user.id;
+      const directChannels = await db.query.directMessageChannels.findMany({
+        where: or(
+          eq(directMessageChannels.user1Id, userId),
+          eq(directMessageChannels.user2Id, userId)
+        ),
+        with: {
+          channel: true,
+          user1: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+              isOnline: true,
+              hideActivity: true
+            }
+          },
+          user2: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+              isOnline: true,
+              hideActivity: true
+            }
+          }
+        }
+      });
+
+      const unreadCounts = await Promise.all(
+        directChannels.map(async (dc) => {
+          const latestRead = await db
+            .select({
+              messageId: messageReads.messageId,
+              channelId: messages.channelId
+            })
+            .from(messageReads)
+            .innerJoin(messages, eq(messageReads.messageId, messages.id))
+            .where(and(
+              eq(messageReads.userId, userId),
+              eq(messages.channelId, dc.channelId)
+            ))
+            .orderBy(desc(messageReads.readAt))
+            .limit(1);
+
+          const unreadCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(messages)
+            .where(and(
+              eq(messages.channelId, dc.channelId),
+              ne(messages.userId, userId),
+              latestRead.length > 0
+                ? gt(messages.id, latestRead[0].messageId)
+                : sql`TRUE`
+            ));
+
+          return {
+            channelId: dc.channelId,
+            unreadCount: Number(unreadCount[0]?.count || 0)
+          };
+        })
+      );
+
+      const formattedChannels = directChannels.map(dc => ({
+        ...dc.channel,
+        otherUser: dc.user1.id === userId ? dc.user2 : dc.user1,
+        unreadCount: unreadCounts.find(uc => uc.channelId === dc.channelId)?.unreadCount || 0
+      }));
+
+      res.json(formattedChannels);
+    } catch (error) {
+      console.error("Error fetching direct messages:", error);
+      res.status(500).send("Error fetching direct messages");
     }
   });
 
