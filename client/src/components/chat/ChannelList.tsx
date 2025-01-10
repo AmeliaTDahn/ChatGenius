@@ -119,11 +119,6 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
-              {channel.unreadCount > 0 && (
-                <span className="ml-auto bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs">
-                  {channel.unreadCount}
-                </span>
-              )}
             </Button>
           ))}
         </div>
