@@ -1,6 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Bell, Users, User as UserIcon } from "lucide-react";
+import { UserPlus, Bell, Users, Settings } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/ui/logo";
@@ -158,7 +158,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
             title="Settings"
             className="w-9 h-9"
           >
-            <UserIcon className="h-5 w-5" />
+            <Settings className="h-5 w-5" />
           </Button>
           <div className="relative">
             <Button
