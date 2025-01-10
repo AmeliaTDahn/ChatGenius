@@ -3,7 +3,6 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { UserProfileView } from "./UserProfileView";
 import { useLocation } from "wouter";
@@ -65,30 +64,6 @@ export function FriendList() {
     }
   });
 
-  const startDirectMessage = useMutation({
-    mutationFn: async (friendId: number) => {
-      const createRes = await fetch('/api/direct-messages/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ friendId }),
-        credentials: 'include'
-      });
-
-      if (!createRes.ok) throw new Error(await createRes.text());
-      return createRes.json();
-    },
-    onSuccess: (data) => {
-      setLocation(`/channels/dm/${data.channelId}`);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
   const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
     if (hideActivity || !isOnline) {
       return 'bg-gray-500';
@@ -133,24 +108,14 @@ export function FriendList() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => startDirectMessage.mutate(friend.id)}
-                disabled={startDirectMessage.isPending}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => removeFriend.mutate(friend.id)}
-                disabled={removeFriend.isPending}
-              >
-                Remove
-              </Button>
-            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => removeFriend.mutate(friend.id)}
+              disabled={removeFriend.isPending}
+            >
+              Remove
+            </Button>
           </div>
         ))}
       </div>
