@@ -115,6 +115,10 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
               key={channel.id}
               variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
               className="w-full justify-start"
+              style={{ 
+                backgroundColor: channel.backgroundColor || undefined,
+                transition: 'background-color 0.2s ease-in-out'
+              }}
               onClick={() => handleChannelSelect(channel)}
             >
               <Hash className="h-4 w-4 mr-2" />
