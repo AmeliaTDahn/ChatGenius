@@ -74,17 +74,23 @@ export function FriendList() {
         credentials: 'include'
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const error = await res.text();
+        // If DM already exists, fetch the existing channel
+        if (error.includes("Direct message channel already exists")) {
+          const dmRes = await fetch(`/api/direct-messages/channel?friendId=${friendId}`, {
+            credentials: 'include'
+          });
+          if (dmRes.ok) {
+            return dmRes.json();
+          }
+        }
+        throw new Error(error);
+      }
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
-      toast({
-        title: "Direct message channel created",
-        description: "You can now start chatting with your friend.",
-      });
-
-      // Navigate to the direct message channel
       setLocation(`/chat/dm/${data.channelId}`);
     },
     onError: (error: Error) => {
