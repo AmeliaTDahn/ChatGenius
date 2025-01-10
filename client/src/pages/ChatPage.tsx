@@ -11,6 +11,7 @@ import { FriendRequests } from "@/components/chat/FriendRequests";
 import { FriendList } from "@/components/chat/FriendList";
 import { InviteToChannel } from "@/components/chat/InviteToChannel";
 import { MessageSearch } from "@/components/chat/MessageSearch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -155,11 +156,30 @@ export default function ChatPage() {
             <>
               <div className="p-4 border-b flex items-center justify-between bg-background">
                 <div>
-                  <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
-                  {selectedChannel.description && (
-                    <p className="text-sm text-muted-foreground">
-                      {selectedChannel.description}
-                    </p>
+                  {selectedChannel?.isDirectMessage ? (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        {selectedChannel.otherUser?.avatarUrl ? (
+                          <AvatarImage src={selectedChannel.otherUser.avatarUrl} alt={selectedChannel.otherUser.username} />
+                        ) : (
+                          <AvatarFallback>
+                            {selectedChannel.otherUser?.username[0].toUpperCase()}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <h2 className="font-semibold text-lg">
+                        {selectedChannel.otherUser?.username}
+                      </h2>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
+                      {selectedChannel.description && (
+                        <p className="text-sm text-muted-foreground">
+                          {selectedChannel.description}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
