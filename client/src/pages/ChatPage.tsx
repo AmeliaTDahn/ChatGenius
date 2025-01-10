@@ -79,15 +79,15 @@ export default function ChatPage() {
     if (!selectedChannel || selectedChannel.isDirectMessage) return;
 
     try {
-      await updateChannelColor({
+      const updatedChannel = await updateChannelColor({
         channelId: selectedChannel.id,
         backgroundColor: color,
       });
 
-      // Update the selected channel's background color locally
+      // Update the selected channel state with the new color
       setSelectedChannel(prev => prev ? {
         ...prev,
-        backgroundColor: color
+        backgroundColor: updatedChannel.backgroundColor
       } : null);
 
       toast({

@@ -43,8 +43,14 @@ export function useChannels() {
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+    onSuccess: (updatedChannel) => {
+      // Update the channels cache with the new color
+      queryClient.setQueryData<Channel[]>(['/api/channels'], (oldChannels) => {
+        if (!oldChannels) return oldChannels;
+        return oldChannels.map(channel => 
+          channel.id === updatedChannel.id ? { ...channel, backgroundColor: updatedChannel.backgroundColor } : channel
+        );
+      });
     },
   });
 
@@ -62,7 +68,6 @@ export function useChannels() {
       return res.json();
     },
     onSuccess: (data) => {
-      // Update channels cache with the new list
       queryClient.setQueryData<Channel[]>(['/api/channels'], data.channels);
     },
   });
