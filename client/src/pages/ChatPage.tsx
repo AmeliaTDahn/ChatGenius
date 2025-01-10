@@ -76,7 +76,7 @@ export default function ChatPage() {
   };
 
   const handleColorChange = async (color: string) => {
-    if (!selectedChannel || selectedChannel.isDirectMessage) return;
+    if (!selectedChannel) return;
 
     try {
       const updatedChannel = await updateChannelColor({
@@ -224,46 +224,46 @@ export default function ChatPage() {
                     >
                       <Search className="h-4 w-4" />
                     </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Change Chat Color"
+                        >
+                          <Palette className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2">
+                        <div className="flex gap-1">
+                          {[
+                            "#FFB3B3", // Pastel Red
+                            "#FFDAB3", // Pastel Orange
+                            "#FFF2B3", // Pastel Yellow
+                            "#B3E6CC", // Pastel Green
+                            "#B3D9FF", // Pastel Blue
+                            "#D9B3FF", // Pastel Purple
+                            "#FFB3E6", // Pastel Pink
+                            "#ffffff", // White
+                          ].map((color) => (
+                            <Button
+                              key={color}
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className={cn(
+                                "w-6 h-6 p-0",
+                                selectedChannel?.backgroundColor === color && "ring-2 ring-primary"
+                              )}
+                              style={{ backgroundColor: color }}
+                              onClick={() => handleColorChange(color)}
+                            />
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     {!selectedChannel.isDirectMessage && (
                       <>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Change Channel Color"
-                            >
-                              <Palette className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-2">
-                            <div className="flex gap-1">
-                              {[
-                                "#FFB3B3", // Pastel Red
-                                "#FFDAB3", // Pastel Orange
-                                "#FFF2B3", // Pastel Yellow
-                                "#B3E6CC", // Pastel Green
-                                "#B3D9FF", // Pastel Blue
-                                "#D9B3FF", // Pastel Purple
-                                "#FFB3E6", // Pastel Pink
-                                "#ffffff", // White
-                              ].map((color) => (
-                                <Button
-                                  key={color}
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className={cn(
-                                    "w-6 h-6 p-0",
-                                    selectedChannel?.backgroundColor === color && "ring-2 ring-primary"
-                                  )}
-                                  style={{ backgroundColor: color }}
-                                  onClick={() => handleColorChange(color)}
-                                />
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
                         <Button
                           variant="ghost"
                           size="icon"
