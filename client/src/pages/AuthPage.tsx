@@ -60,10 +60,6 @@ export default function AuthPage() {
       const result = await login(values);
 
       if (result.ok) {
-        toast({
-          title: "Success",
-          description: "Logged in successfully"
-        });
         navigate("/");
       } else {
         throw new Error(result.message);
