@@ -19,15 +19,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Loader2, Search, LogOut } from "lucide-react";
+import { UserPlus, Loader2, Search, LogOut, Palette } from "lucide-react";
 import type { Channel, User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChannels } from "@/hooks/use-channels";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 // Extended Channel type to include otherUser for direct messages
 type ExtendedChannel = Channel & {
   otherUser?: User;
+  backgroundColor?: string;
 };
 
 export default function ChatPage() {
@@ -43,7 +50,7 @@ export default function ChatPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isFriendsOpen, setIsFriendsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { leaveChannel } = useChannels();
+  const { leaveChannel, updateChannelColor } = useChannels();
 
   if (!user) return null;
 
@@ -63,6 +70,34 @@ export default function ChatPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to leave channel",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleColorChange = async (color: string) => {
+    if (!selectedChannel || selectedChannel.isDirectMessage) return;
+
+    try {
+      await updateChannelColor({
+        channelId: selectedChannel.id,
+        backgroundColor: color,
+      });
+
+      // Update the selected channel's background color locally
+      setSelectedChannel(prev => prev ? {
+        ...prev,
+        backgroundColor: color
+      } : null);
+
+      toast({
+        title: "Success",
+        description: "Channel color updated",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update channel color",
         variant: "destructive",
       });
     }
@@ -125,8 +160,8 @@ export default function ChatPage() {
     <div className="h-screen flex flex-col">
       <div className="flex-1 flex overflow-hidden">
         <div className="w-64 flex flex-col border-r">
-          <UserHeader 
-            user={user} 
+          <UserHeader
+            user={user}
             onLogout={handleLogout}
             onAddFriend={() => setIsSearchOpen(true)}
             onViewRequests={() => setIsRequestsOpen(true)}
@@ -139,8 +174,8 @@ export default function ChatPage() {
             />
           </div>
 
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={handleLogout}
             disabled={isLoggingOut}
             className="w-full py-4 rounded-none border-t hover:bg-destructive/10 text-sm font-medium transition-colors relative"
@@ -195,6 +230,44 @@ export default function ChatPage() {
                   </Button>
                   {!selectedChannel.isDirectMessage && (
                     <>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Change Channel Color"
+                          >
+                            <Palette className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2">
+                          <div className="flex gap-1">
+                            {[
+                              "#ef4444", // Red
+                              "#f97316", // Orange
+                              "#eab308", // Yellow
+                              "#22c55e", // Green
+                              "#3b82f6", // Blue
+                              "#8b5cf6", // Purple
+                              "#ec4899", // Pink
+                              "#ffffff", // White
+                            ].map((color) => (
+                              <Button
+                                key={color}
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className={cn(
+                                  "w-6 h-6 p-0",
+                                  selectedChannel?.backgroundColor === color && "ring-2 ring-primary"
+                                )}
+                                style={{ backgroundColor: color }}
+                                onClick={() => handleColorChange(color)}
+                              />
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -268,8 +341,8 @@ export default function ChatPage() {
         </Dialog>
       )}
 
-      <MessageSearch 
-        isOpen={isMessageSearchOpen} 
+      <MessageSearch
+        isOpen={isMessageSearchOpen}
         onClose={() => setIsMessageSearchOpen(false)}
         channelId={selectedChannel?.id}
         onMessageSelect={handleMessageSelect}

@@ -1954,5 +1954,59 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.put("/api/channels/:channelId/color", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    const { backgroundColor } = req.body;
+
+    if (isNaN(channelId) || !backgroundColor) {
+      return res.status(400).send("Invalid channel ID or color");
+    }
+
+    try {
+      // Check if user is a member of the channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      // Update channel background color
+      const [updatedChannel] = await db
+        .update(channels)
+        .set({ backgroundColor })
+        .where(eq(channels.id, channelId))
+        .returning();
+
+      // Notify all clients about the color change via WebSocket
+      const colorUpdate = {
+        type: 'channel_color_update',
+        channelId,
+        backgroundColor,
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(colorUpdate));
+        }
+      });
+
+      res.json(updatedChannel);
+    } catch (error) {
+      console.error("Error updating channel color:", error);
+      res.status(500).send("Error updating channel color");
+    }
+  });
+
   return httpServer;
 }

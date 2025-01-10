@@ -28,6 +28,26 @@ export function useChannels() {
     },
   });
 
+  const updateChannelColor = useMutation({
+    mutationFn: async ({ channelId, backgroundColor }: { channelId: number; backgroundColor: string }) => {
+      const res = await fetch(`/api/channels/${channelId}/color`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ backgroundColor }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+    },
+  });
+
   const leaveChannel = useMutation({
     mutationFn: async (channelId: number) => {
       const res = await fetch(`/api/channels/${channelId}/leave`, {
@@ -52,5 +72,6 @@ export function useChannels() {
     isLoading,
     createChannel: createChannel.mutateAsync,
     leaveChannel: leaveChannel.mutateAsync,
+    updateChannelColor: updateChannelColor.mutateAsync,
   };
 }
