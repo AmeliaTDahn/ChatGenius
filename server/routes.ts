@@ -12,7 +12,7 @@ import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import express from "express";
-import crypto from 'crypto'; //Import crypto library for password hashing.
+import crypto from 'crypto';
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
 
 async function getUnreadMessageCounts(userId: number) {
@@ -1079,8 +1079,7 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user2Id, friendId)
           ),
           and(
-            eq(directMessageChannels.user1Id, friendId),
-            eq(directMessageChannels.user2Id, req.user.id)
+            eq(directMessageChannels.user1Id, friendId)
           )
         ))
         .limit(1);
@@ -1767,104 +1766,8 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friend-recommendations", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
 
-    try {
-      // Get current user's friends
-      const currentUserFriends = await db
-        .select({
-          friendId: sql<number>`CASE 
-            WHEN ${friends.user1Id} = ${req.user.id} THEN ${friends.user2Id}
-            ELSE ${friends.user1Id}
-          END`,
-        })
-        .from(friends)
-        .where(or(
-          eq(friends.user1Id, req.user.id),
-          eq(friends.user2Id, req.user.id)
-        ));
-
-      const friendIds = currentUserFriends.map(f => f.friendId);
-
-      // Find users who are friends with user's friends (potential recommendations)
-      const mutualFriendsQuery = await db
-        .select({
-          userId: sql<number>`CASE 
-            WHEN ${friends.user1Id} IN (${sql.join(friendIds)}) AND ${friends.user2Id} != ${req.user.id} THEN ${friends.user2Id}
-            WHEN ${friends.user2Id} IN (${sql.join(friendIds)}) AND ${friends.user1Id} != ${req.user.id} THEN ${friends.user1Id}
-          END`,
-          mutualFriendId: sql<number>`CASE 
-            WHEN ${friends.user1Id} IN (${sql.join(friendIds)}) THEN ${friends.user1Id}
-            ELSE ${friends.user2Id}
-          END`
-        })
-        .from(friends)
-        .where(and(
-          or(
-            inArray(friends.user1Id, friendIds),
-            inArray(friends.user2Id, friendIds)
-          ),
-          not(or(
-            eq(friends.user1Id, req.user.id),
-            eq(friends.user2Id, req.user.id)
-          ))
-        ));
-
-      // Group and count mutual friends
-      const userMutualFriends = mutualFriendsQuery.reduce((acc, { userId, mutualFriendId }) => {
-        if (!userId) return acc;
-        if (!acc[userId]) {
-          acc[userId] = new Set();
-        }
-        acc[userId].add(mutualFriendId);
-        return acc;
-      }, {} as Record<number, Set<number>>);
-
-      // Get recommended users with their details and mutual friend count
-      const recommendedUsers = await Promise.all(
-        Object.entries(userMutualFriends).map(async ([userId, mutualFriendIds]) => {
-          const [user] = await db
-            .select({
-              id: users.id,
-              username: users.username,
-              avatarUrl: users.avatarUrl,
-            })
-            .from(users)
-            .where(eq(users.id, parseInt(userId)))
-            .limit(1);
-
-          const mutualFriends = await db
-            .select({
-              id: users.id,
-              username: users.username,
-              avatarUrl: users.avatarUrl,
-            })
-            .from(users)
-            .where(inArray(users.id, Array.from(mutualFriendIds)));
-
-          return {
-            ...user,
-            mutualFriendCount: mutualFriendIds.size,
-            mutualFriends,
-          };
-        })
-      );
-
-      // Sort by number of mutual friends
-      recommendedUsers.sort((a, b) => b.mutualFriendCount - a.mutualFriendCount);
-
-      res.json(recommendedUsers.slice(0, 5)); // Limit to top 5 recommendations
-    } catch (error) {
-      console.error("Error getting friend recommendations:", error);
-      res.status(500).send("Error getting friend recommendations");
-    }
-  });
-
-  // Fix the direct message channel query
-  app.post("/api/direct-messages/channel", async (req, res) => {
+  app.get("/api/direct-messages/channel", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
