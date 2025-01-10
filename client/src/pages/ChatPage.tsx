@@ -243,13 +243,13 @@ export default function ChatPage() {
                           <PopoverContent className="w-auto p-2">
                             <div className="flex gap-1">
                               {[
-                                "#ef4444", // Red
-                                "#f97316", // Orange
-                                "#eab308", // Yellow
-                                "#22c55e", // Green
-                                "#3b82f6", // Blue
-                                "#8b5cf6", // Purple
-                                "#ec4899", // Pink
+                                "#FFB3B3", // Pastel Red
+                                "#FFDAB3", // Pastel Orange
+                                "#FFF2B3", // Pastel Yellow
+                                "#B3E6CC", // Pastel Green
+                                "#B3D9FF", // Pastel Blue
+                                "#D9B3FF", // Pastel Purple
+                                "#FFB3E6", // Pastel Pink
                                 "#ffffff", // White
                               ].map((color) => (
                                 <Button
