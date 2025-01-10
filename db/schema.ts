@@ -36,6 +36,7 @@ export const channels = pgTable("channels", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  backgroundColor: text("background_color").default("#ffffff"),
   isDirectMessage: boolean("is_direct_message").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
