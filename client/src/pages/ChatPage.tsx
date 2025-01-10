@@ -20,16 +20,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Loader2, Search, LogOut } from "lucide-react";
-import type { Channel } from "@db/schema";
+import type { Channel, User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChannels } from "@/hooks/use-channels";
+
+// Extended Channel type to include otherUser for direct messages
+type ExtendedChannel = Channel & {
+  otherUser?: User;
+};
 
 export default function ChatPage() {
   const queryClient = useQueryClient();
   const { user, logout } = useUser();
   const { toast } = useToast();
-  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<ExtendedChannel | null>(null);
   const { handleWebSocketMessage, sendMessage: sendWebSocketMessage } = useMessages(selectedChannel?.id || 0);
   const { sendMessage: sendWsMessage } = useWebSocket(user, handleWebSocketMessage);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -156,16 +161,13 @@ export default function ChatPage() {
             <>
               <div className="p-4 border-b flex items-center justify-between bg-background">
                 <div>
-                  {selectedChannel?.isDirectMessage ? (
+                  {selectedChannel.isDirectMessage ? (
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        {selectedChannel.otherUser?.avatarUrl ? (
-                          <AvatarImage src={selectedChannel.otherUser.avatarUrl} alt={selectedChannel.otherUser.username} />
-                        ) : (
-                          <AvatarFallback>
-                            {selectedChannel.otherUser?.username[0].toUpperCase()}
-                          </AvatarFallback>
-                        )}
+                        <AvatarImage src={selectedChannel.otherUser?.avatarUrl || ""} alt={selectedChannel.otherUser?.username} />
+                        <AvatarFallback>
+                          {selectedChannel.otherUser?.username?.[0].toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                       <h2 className="font-semibold text-lg">
                         {selectedChannel.otherUser?.username}

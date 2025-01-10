@@ -7,6 +7,22 @@ import { useMessageSearch } from "@/hooks/use-message-search";
 import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { Channel } from "@db/schema";
+
+type Message = {
+  id: number;
+  content: string;
+  createdAt: string;
+  user: {
+    username: string;
+    avatarUrl: string | null;
+  };
+  channelId: number;
+  channelInfo?: {
+    name: string;
+    isDirectMessage: boolean;
+  };
+};
 
 type MessageSearchProps = {
   isOpen: boolean;
@@ -24,9 +40,9 @@ export function MessageSearch({ isOpen, onClose, channelId, onMessageSelect }: M
     if (!searchQuery) return text;
 
     const parts = text.split(new RegExp(`(${searchQuery})`, 'gi'));
-    return parts.map((part, i) => 
-      part.toLowerCase() === searchQuery.toLowerCase() ? 
-        <span key={i} className="bg-yellow-200 dark:bg-yellow-900">{part}</span> : 
+    return parts.map((part, i) =>
+      part.toLowerCase() === searchQuery.toLowerCase() ?
+        <span key={i} className="bg-yellow-200 dark:bg-yellow-900">{part}</span> :
         part
     );
   };
@@ -86,9 +102,9 @@ export function MessageSearch({ isOpen, onClose, channelId, onMessageSelect }: M
                         <p className="text-sm text-muted-foreground line-clamp-2">
                           {highlightMatch(message.content, query)}
                         </p>
-                        {!channelId && message.channel && (
+                        {!channelId && message.channelInfo && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            in {message.channel.name}
+                            in {message.channelInfo.name}
                           </p>
                         )}
                       </div>

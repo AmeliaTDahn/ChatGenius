@@ -86,11 +86,6 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <div 
-                    className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${
-                      getStatusColor(dm.otherUser.isOnline, dm.otherUser.hideActivity)
-                    }`} 
-                  />
                 </div>
               </HoverCardTrigger>
               <HoverCardContent className="w-80" align="start">
