@@ -1078,7 +1078,8 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user1Id, req.user.id),
             eq(directMessageChannels.user2Id, friendId)
           ),
-          and(            eq(directMessageChannels.user1Id, friendId),
+          and(
+            eq(directMessageChannels.user1Id, friendId),
             eq(directMessageChannels.user2Id, req.user.id)
           )
         ))
@@ -1775,93 +1776,148 @@ export function registerRoutes(app: Express): Server {
       // Get current user's friends
       const userFriends = await db
         .select({
-          friendId: users.id
+          friendId: sql<number>`CASE 
+            WHEN ${friends.user1Id} = ${req.user.id} THEN ${friends.user2Id}
+            ELSE ${friends.user1Id}
+            END`
         })
         .from(friends)
-        .leftJoin(users, or(
-          and(
-            eq(friends.user1Id, req.user.id),
-            eq(users.id, friends.user2Id)
-          ),
-          and(
-            eq(friends.user2Id, req.user.id),
-            eq(users.id, friends.user1Id)
-          )
-        ))
         .where(or(
           eq(friends.user1Id, req.user.id),
           eq(friends.user2Id, req.user.id)
         ));
 
+      // If user has no friends, return empty array
       if (userFriends.length === 0) {
-        return res.json([]); // Return empty array if user has no friends
+        return res.json([]);
       }
 
       const friendIds = userFriends.map(f => f.friendId);
 
-      // Get friends of friends
-      const friendsOfFriends = await db
+      // Get recommendations and count mutual friends
+      const recommendations = await db
         .select({
-          id: users.id,
+          userId: sql<number>`DISTINCT u.id`,
           username: users.username,
           avatarUrl: users.avatarUrl,
+          mutualFriendCount: sql<number>`COUNT(DISTINCT 
+            CASE 
+              WHEN f.user1_id = ${sql.join(friendIds)} THEN f.user1_id
+              WHEN f.user2_id = ${sql.join(friendIds)} THEN f.user2_id
+            END
+          )`
         })
-        .from(friends)
-        .leftJoin(users, or(
-          and(
-            inArray(friends.user1Id, friendIds),
-            eq(users.id, friends.user2Id)
-          ),
-          and(
-            inArray(friends.user2Id, friendIds),
-            eq(users.id, friends.user1Id)
-          )
-        ))
-        .where(and(
+        .from(friends.as('f'))
+        .innerJoin(users.as('u'), 
           or(
-            inArray(friends.user1Id, friendIds),
-            inArray(friends.user2Id, friendIds)
-          ),
-          not(eq(users.id, req.user.id)),
-          not(inArray(users.id, friendIds))
-        ))
+            and(
+              inArray(sql`f.user1_id`, friendIds),
+              eq(sql`f.user2_id`, sql`u.id`),
+              not(eq(sql`u.id`, req.user.id)),
+              not(inArray(sql`u.id`, friendIds))
+            ),
+            and(
+              inArray(sql`f.user2_id`, friendIds),
+              eq(sql`f.user1_id`, sql`u.id`),
+              not(eq(sql`u.id`, req.user.id)),
+              not(inArray(sql`u.id`, friendIds))
+            )
+          )
+        )
+        .groupBy(sql`u.id`, sql`u.username`, sql`u.avatar_url`)
+        .orderBy(sql<number>`COUNT(DISTINCT 
+          CASE 
+            WHEN f.user1_id = ${sql.join(friendIds)} THEN f.user1_id
+            WHEN f.user2_id = ${sql.join(friendIds)} THEN f.user2_id
+          END
+        )` as any, 'desc')
         .limit(10);
 
-      // Count mutual friends for each recommendation
-      const recommendationsWithMutualCount = await Promise.all(
-        friendsOfFriends.map(async (friend) => {
-          const mutualFriends = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(friends)
-            .where(
-              or(
-                and(
-                  eq(friends.user1Id, friend.id),
-                  inArray(friends.user2Id, friendIds)
-                ),
-                and(
-                  eq(friends.user2Id, friend.id),
-                  inArray(friends.user1Id, friendIds)
-                )
-              )
-            );
-
-          return {
-            ...friend,
-            mutualFriendCount: Number(mutualFriends[0]?.count || 0)
-          };
-        })
-      );
-
-      // Sort by number of mutual friends
-      const sortedRecommendations = recommendationsWithMutualCount.sort(
-        (a, b) => b.mutualFriendCount - a.mutualFriendCount
-      );
-
-      res.json(sortedRecommendations);
+      res.json(recommendations);
     } catch (error) {
-      console.error("Error fetching friend recommendations:", error);
-      res.status(500).send("Error fetching friend recommendations");
+      console.error("Error getting friend recommendations:", error);
+      res.status(500).send("Error getting friend recommendations");
+    }
+  });
+
+  // Fix the direct message channel query
+  app.post("/api/direct-messages/channel", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const { friendId } = req.body;
+    if (!friendId) {
+      return res.status(400).send("Friend ID is required");
+    }
+
+    try {
+      // Check if users are friends
+      const [friendship] = await db
+        .select()
+        .from(friends)
+        .where(or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(friends.user2Id, friendId)
+          ),
+          and(
+            eq(friends.user1Id, friendId),
+            eq(friends.user2Id, req.user.id)
+          )
+        ))
+        .limit(1);
+
+      if (!friendship) {
+        return res.status(403).send("Users are not friends");
+      }
+
+      // Check if DM channel already exists
+      const [existingChannel] = await db
+        .select()
+        .from(directMessageChannels)
+        .where(or(
+          and(
+            eq(directMessageChannels.user1Id, req.user.id),
+            eq(directMessageChannels.user2Id, friendId)
+          ),
+          and(
+            eq(directMessageChannels.user1Id, friendId),
+            eq(directMessageChannels.user2Id, req.user.id)
+          )
+        ))
+        .limit(1);
+
+      if (existingChannel) {
+        return res.json({ channelId: existingChannel.channelId });
+      }
+
+      // Create new channel and DM relationship
+      const [channel] = await db
+        .insert(channels)
+        .values({
+          name: 'Direct Message',
+          isDirectMessage: true
+        })
+        .returning();
+
+      await db
+        .insert(directMessageChannels)
+        .values({
+          channelId: channel.id,
+          user1Id: req.user.id,
+          user2Id: friendId
+        });
+
+      await db.insert(channelMembers).values([
+        { channelId: channel.id, userId: req.user.id },
+        { channelId: channel.id, userId: friendId }
+      ]);
+
+      res.json({ channelId: channel.id });
+    } catch (error) {
+      console.error("Error creating direct message channel:", error);
+      res.status(500).send("Error creating direct message channel");
     }
   });
 
