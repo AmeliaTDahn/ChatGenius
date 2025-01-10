@@ -7,10 +7,25 @@ import { Loader2, FileIcon, Download, Reply } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
+import { cn } from "@/lib/utils";
 
 type MessageListProps = {
   channelId: number;
 };
+
+function parseFormattedText(text: string) {
+  // Replace color tags with spans
+  text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
+    (_, color, content) => `<span style="color: ${color}">${content}</span>`);
+
+  // Replace bold tags
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Replace italic tags
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  return text;
+}
 
 export function MessageList({ channelId }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
@@ -79,7 +94,12 @@ export function MessageList({ channelId }: MessageListProps) {
               {new Date(message.createdAt).toLocaleTimeString()}
             </span>
           </div>
-          <p className="text-sm mt-1 break-words">{message.content}</p>
+          <div 
+            className="text-sm mt-1 break-words"
+            dangerouslySetInnerHTML={{ 
+              __html: parseFormattedText(message.content)
+            }}
+          />
 
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 space-y-2">
