@@ -15,9 +15,7 @@ type MessageInputProps = {
   onSendMessage: (content: string, files?: File[]) => void;
 };
 
-type TextRange = {
-  start: number;
-  end: number;
+type Format = {
   type: 'bold' | 'italic' | 'color';
   value?: string;
 };
@@ -25,7 +23,6 @@ type TextRange = {
 export function MessageInput({ onSendMessage }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [formats, setFormats] = useState<TextRange[]>([]);
   const [currentFormat, setCurrentFormat] = useState<{
     bold: boolean;
     italic: boolean;
@@ -35,6 +32,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
     italic: false,
     color: null
   });
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -49,70 +47,36 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
     }
   }, [message]);
 
-  const applyFormat = (type: 'bold' | 'italic' | 'color', value?: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    if (start === end && type !== 'color') {
-      setCurrentFormat(prev => ({
-        ...prev,
-        [type]: !prev[type]
-      }));
-      return;
-    }
-
-    // Add new format
-    setFormats(prev => [
-      ...prev,
-      { start, end, type, value }
-    ]);
-
-    // Update current format state
-    if (type === 'color') {
-      setCurrentFormat(prev => ({ ...prev, color: value || null }));
-    } else {
-      setCurrentFormat(prev => ({ ...prev, [type]: !prev[type] }));
-    }
-
-    // Force textarea to update
-    textarea.focus();
-  };
-
-  const getFormattedText = () => {
-    let formattedMessage = message;
-    // Apply formats in reverse order to maintain correct indices
-    [...formats].reverse().forEach(format => {
-      const before = formattedMessage.slice(0, format.start);
-      const formatted = formattedMessage.slice(format.start, format.end);
-      const after = formattedMessage.slice(format.end);
-
-      switch (format.type) {
-        case 'bold':
-          formattedMessage = `${before}**${formatted}**${after}`;
-          break;
-        case 'italic':
-          formattedMessage = `${before}*${formatted}*${after}`;
-          break;
-        case 'color':
-          formattedMessage = `${before}[color=${format.value}]${formatted}[/color]${after}`;
-          break;
-      }
-    });
-    return formattedMessage;
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() || files.length > 0) {
-      const formattedMessage = getFormattedText();
+      const formattedMessage = formatMessageForSending(message);
       onSendMessage(formattedMessage, files);
       setMessage("");
       setFiles([]);
-      setFormats([]);
+      setCurrentFormat({
+        bold: false,
+        italic: false,
+        color: null
+      });
     }
+  };
+
+  const formatMessageForSending = (text: string) => {
+    let formattedText = text;
+
+    // Apply current formatting to the entire message if any format is active
+    if (currentFormat.bold) {
+      formattedText = `**${formattedText}**`;
+    }
+    if (currentFormat.italic) {
+      formattedText = `*${formattedText}*`;
+    }
+    if (currentFormat.color) {
+      formattedText = `[color=${currentFormat.color}]${formattedText}[/color]`;
+    }
+
+    return formattedText;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -143,6 +107,21 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
 
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleFormat = (type: 'bold' | 'italic' | 'color', value?: string) => {
+    if (type === 'color') {
+      setCurrentFormat(prev => ({
+        ...prev,
+        color: prev.color === value ? null : value
+      }));
+    } else {
+      setCurrentFormat(prev => ({
+        ...prev,
+        [type]: !prev[type]
+      }));
+    }
+    textareaRef.current?.focus();
   };
 
   const COLORS = [
@@ -202,7 +181,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             type="button"
             size="icon"
             variant={currentFormat.bold ? "secondary" : "ghost"}
-            onClick={() => applyFormat('bold')}
+            onClick={() => toggleFormat('bold')}
           >
             <Bold className="h-4 w-4" />
           </Button>
@@ -210,7 +189,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             type="button"
             size="icon"
             variant={currentFormat.italic ? "secondary" : "ghost"}
-            onClick={() => applyFormat('italic')}
+            onClick={() => toggleFormat('italic')}
           >
             <Italic className="h-4 w-4" />
           </Button>
@@ -237,7 +216,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
                       currentFormat.color === color && "ring-2 ring-primary"
                     )}
                     style={{ backgroundColor: color }}
-                    onClick={() => applyFormat('color', color)}
+                    onClick={() => toggleFormat('color', color)}
                   />
                 ))}
               </div>
@@ -248,9 +227,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
           <Textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-            }}
+            onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
