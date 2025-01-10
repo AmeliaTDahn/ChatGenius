@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq, and, ne, ilike, or, inArray, desc, gt, sql } from "drizzle-orm";
+import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import { WebSocketServer, WebSocket } from 'ws';
@@ -1763,6 +1763,105 @@ export function registerRoutes(app: Express): Server {
       });
     } catch (error) {
       next(error);
+    }
+  });
+
+  app.get("/api/friend-recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      // Get current user's friends
+      const userFriends = await db
+        .select({
+          friendId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      if (userFriends.length === 0) {
+        return res.json([]); // Return empty array if user has no friends
+      }
+
+      const friendIds = userFriends.map(f => f.friendId);
+
+      // Get friends of friends
+      const friendsOfFriends = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            inArray(friends.user1Id, friendIds),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            inArray(friends.user2Id, friendIds),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(and(
+          or(
+            inArray(friends.user1Id, friendIds),
+            inArray(friends.user2Id, friendIds)
+          ),
+          not(eq(users.id, req.user.id)),
+          not(inArray(users.id, friendIds))
+        ))
+        .limit(10);
+
+      // Count mutual friends for each recommendation
+      const recommendationsWithMutualCount = await Promise.all(
+        friendsOfFriends.map(async (friend) => {
+          const mutualFriends = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(friends)
+            .where(
+              or(
+                and(
+                  eq(friends.user1Id, friend.id),
+                  inArray(friends.user2Id, friendIds)
+                ),
+                and(
+                  eq(friends.user2Id, friend.id),
+                  inArray(friends.user1Id, friendIds)
+                )
+              )
+            );
+
+          return {
+            ...friend,
+            mutualFriendCount: Number(mutualFriends[0]?.count || 0)
+          };
+        })
+      );
+
+      // Sort by number of mutual friends
+      const sortedRecommendations = recommendationsWithMutualCount.sort(
+        (a, b) => b.mutualFriendCount - a.mutualFriendCount
+      );
+
+      res.json(sortedRecommendations);
+    } catch (error) {
+      console.error("Error fetching friend recommendations:", error);
+      res.status(500).send("Error fetching friend recommendations");
     }
   });
 

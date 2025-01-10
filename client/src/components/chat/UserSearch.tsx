@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 type User = {
   id: number;
   username: string;
   avatarUrl?: string;
   isFriend?: boolean;
+  mutualFriendCount?: number;
 };
 
 export function UserSearch() {
@@ -19,7 +21,18 @@ export function UserSearch() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: searchResults, isLoading } = useQuery<User[]>({
+  const { data: recommendations, isLoading: isLoadingRecommendations } = useQuery<User[]>({
+    queryKey: ['/api/friend-recommendations'],
+    queryFn: async () => {
+      const res = await fetch('/api/friend-recommendations', {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+  });
+
+  const { data: searchResults, isLoading: isLoadingSearch } = useQuery<User[]>({
     queryKey: ['/api/users/search', searchQuery],
     queryFn: async () => {
       if (!searchQuery.trim()) return [];
@@ -50,6 +63,7 @@ export function UserSearch() {
         description: "They will be notified of your request.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/users/search'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/friend-recommendations'] });
     },
     onError: (error: Error) => {
       toast({
@@ -59,6 +73,48 @@ export function UserSearch() {
       });
     }
   });
+
+  const UserCard = ({ user }: { user: User }) => (
+    <div key={user.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
+      <div className="flex items-center gap-2">
+        <Avatar>
+          {user.avatarUrl ? (
+            <AvatarImage src={user.avatarUrl} alt={user.username} />
+          ) : (
+            <AvatarFallback>
+              {user.username[0].toUpperCase()}
+            </AvatarFallback>
+          )}
+        </Avatar>
+        <div>
+          <span className="font-medium">{user.username}</span>
+          {user.mutualFriendCount !== undefined && user.mutualFriendCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {user.mutualFriendCount} mutual {user.mutualFriendCount === 1 ? 'friend' : 'friends'}
+            </p>
+          )}
+        </div>
+      </div>
+      {user.isFriend ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={true}
+        >
+          Added
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => sendFriendRequest.mutate(user.id)}
+          disabled={sendFriendRequest.isPending}
+        >
+          Add Friend
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <Card className="p-4">
@@ -73,47 +129,31 @@ export function UserSearch() {
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
 
-        {isLoading ? (
-          <div className="text-sm text-muted-foreground">Searching...</div>
-        ) : searchResults && searchResults.length > 0 ? (
-          <div className="space-y-2">
-            {searchResults.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                <div className="flex items-center gap-2">
-                  <Avatar>
-                    {user.avatarUrl ? (
-                      <AvatarImage src={user.avatarUrl} alt={user.username} />
-                    ) : (
-                      <AvatarFallback>
-                        {user.username[0].toUpperCase()}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span className="font-medium">{user.username}</span>
-                </div>
-                {user.isFriend ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={true}
-                  >
-                    Added
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => sendFriendRequest.mutate(user.id)}
-                    disabled={sendFriendRequest.isPending}
-                  >
-                    Add Friend
-                  </Button>
-                )}
-              </div>
-            ))}
+        {isLoadingSearch || isLoadingRecommendations ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : searchQuery.length >= 2 ? (
-          <div className="text-sm text-muted-foreground">No users found</div>
+          <div className="space-y-2">
+            {searchResults && searchResults.length > 0 ? (
+              searchResults.map((user) => (
+                <UserCard key={user.id} user={user} />
+              ))
+            ) : (
+              <div className="text-sm text-muted-foreground">No users found</div>
+            )}
+          </div>
+        ) : recommendations && recommendations.length > 0 ? (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Recommended Friends</h3>
+            {recommendations.map((user) => (
+              <UserCard key={user.id} user={user} />
+            ))}
+          </div>
+        ) : !searchQuery ? (
+          <div className="text-sm text-muted-foreground text-center py-8">
+            No recommendations available. Add some friends to see suggestions!
+          </div>
         ) : null}
       </div>
     </Card>
