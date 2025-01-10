@@ -115,14 +115,15 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
               key={channel.id}
               variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
               className="w-full justify-start"
-              style={{ 
-                backgroundColor: channel.backgroundColor || undefined,
-                transition: 'background-color 0.2s ease-in-out'
-              }}
               onClick={() => handleChannelSelect(channel)}
             >
               <Hash className="h-4 w-4 mr-2" />
               {channel.name}
+              {channel.unreadCount > 0 && (
+                <span className="ml-auto bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs">
+                  {channel.unreadCount}
+                </span>
+              )}
             </Button>
           ))}
         </div>
