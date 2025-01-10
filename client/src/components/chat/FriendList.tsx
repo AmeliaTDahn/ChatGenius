@@ -67,8 +67,17 @@ export function FriendList() {
 
   const startDirectMessage = useMutation({
     mutationFn: async (friendId: number) => {
-      try {
-        // First try to create a new DM channel
+      // First try to get existing channel
+      const res = await fetch(`/api/direct-messages/channel?friendId=${friendId}`, {
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        return res.json();
+      }
+
+      // If no existing channel, create a new one
+      if (res.status === 404) {
         const createRes = await fetch('/api/direct-messages/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,31 +85,15 @@ export function FriendList() {
           credentials: 'include'
         });
 
-        if (createRes.ok) {
-          return createRes.json();
-        }
-
-        const error = await createRes.text();
-        // If DM already exists, fetch the existing channel
-        if (error.includes("Direct message channel already exists")) {
-          const dmRes = await fetch(`/api/direct-messages/channel?friendId=${friendId}`, {
-            credentials: 'include'
-          });
-          if (!dmRes.ok) throw new Error(await dmRes.text());
-          return dmRes.json();
-        }
-        throw new Error(error);
-      } catch (error) {
-        throw error;
+        if (!createRes.ok) throw new Error(await createRes.text());
+        return createRes.json();
       }
+
+      throw new Error(await res.text());
     },
     onSuccess: (data) => {
-      // Navigate to the direct message channel
+      // Navigate to the direct message channel immediately
       setLocation(`/chat/dm/${data.channelId}`);
-      toast({
-        title: "Opening chat",
-        description: "You can now start chatting with your friend.",
-      });
     },
     onError: (error: Error) => {
       toast({
@@ -177,7 +170,6 @@ export function FriendList() {
         ))}
       </div>
 
-      {/* Friend Profile View Dialog */}
       {selectedFriend && (
         <UserProfileView
           user={selectedFriend}
