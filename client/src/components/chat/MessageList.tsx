@@ -12,10 +12,15 @@ import { cn } from "@/lib/utils";
 
 type MessageListProps = {
   channelId: number;
-  channelTheme: {
+  channelTheme?: {
     backgroundColor: string;
     messageBackgroundColor: string;
   };
+};
+
+const defaultTheme = {
+  backgroundColor: '#ffffff',
+  messageBackgroundColor: '#f3f4f6'
 };
 
 function parseFormattedText(text: string) {
@@ -32,11 +37,12 @@ function parseFormattedText(text: string) {
   return text;
 }
 
-export function MessageList({ channelId, channelTheme }: MessageListProps) {
+export function MessageList({ channelId, channelTheme = defaultTheme }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
+  const theme = channelTheme || defaultTheme;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,7 +89,7 @@ export function MessageList({ channelId, channelTheme }: MessageListProps) {
       <div 
         id={`message-${message.id}`} 
         className="flex items-start gap-3 transition-colors duration-200 p-3 rounded-lg"
-        style={{ backgroundColor: channelTheme.messageBackgroundColor }}
+        style={{ backgroundColor: theme.messageBackgroundColor }}
       >
         <Avatar className="h-8 w-8 flex-shrink-0">
           {message.user.avatarUrl ? (
@@ -209,11 +215,11 @@ export function MessageList({ channelId, channelTheme }: MessageListProps) {
     <div className="flex h-full overflow-hidden">
       <div className="flex-1 flex flex-col">
         <div className="p-2 border-b flex justify-end">
-          <ChannelThemeCustomizer channelId={channelId} currentTheme={channelTheme} />
+          <ChannelThemeCustomizer channelId={channelId} currentTheme={theme} />
         </div>
         <ScrollArea 
           className="flex-1 p-4"
-          style={{ backgroundColor: channelTheme.backgroundColor }}
+          style={{ backgroundColor: theme.backgroundColor }}
         >
           <div className="space-y-4">
             {messages.map((message) => (
