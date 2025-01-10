@@ -1079,7 +1079,7 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user2Id, friendId)
           ),
           and(            eq(directMessageChannels.user1Id, friendId)
-          )
+                    )
         ))
         .limit(1);
 
@@ -1257,6 +1257,115 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching direct message channel:", error);
       res.status(500).send("Error fetching direct message channel");
+    }
+  });
+
+  app.get("/api/friends/recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      // First, get user's current friends
+      const userFriends = await db
+        .select({
+          friendId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      // If user has no friends, return empty array
+      if (userFriends.length === 0) {
+        return res.json([]);
+      }
+
+      const friendIds = userFriends.map(f => f.friendId);
+
+      // Get friends of friends
+      const friendsOfFriends = await db
+        .select({
+          recommendedUserId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          eq(users.id, friends.user1Id),
+          eq(users.id, friends.user2Id)
+        ))
+        .where(
+          and(
+            or(
+              inArray(friends.user1Id, friendIds),
+              inArray(friends.user2Id, friendIds)
+            ),
+            not(eq(users.id, req.user.id)),
+            not(inArray(users.id, friendIds))
+          )
+        );
+
+      if (friendsOfFriends.length === 0) {
+        return res.json([]);
+      }
+
+      // Get recommendation details with mutual friend count
+      const recommendations = await Promise.all(
+        [...new Set(friendsOfFriends.map(f => f.recommendedUserId))].map(async (userId) => {
+          const [user] = await db
+            .select({
+              id: users.id,
+              username: users.username,
+              avatarUrl: users.avatarUrl
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+          const mutualFriends = await db
+            .select({
+              count: sql<number>`count(*)`
+            })
+            .from(friends as typeof friends)
+            .where(
+              and(
+                or(
+                  and(
+                    eq(friends.user1Id, userId),
+                    inArray(friends.user2Id, friendIds)
+                  ),
+                  and(
+                    eq(friends.user2Id, userId),
+                    inArray(friends.user1Id, friendIds)
+                  )
+                )
+              )
+            );
+
+          return {
+            ...user,
+            mutualFriendCount: Number(mutualFriends[0]?.count || 0)
+          };
+        })
+      );
+
+      // Sort by mutual friend count
+      recommendations.sort((a, b) => b.mutualFriendCount - a.mutualFriendCount);
+
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error getting friend recommendations:", error);
+      res.status(500).send("Error getting friend recommendations");
     }
   });
 
@@ -1951,6 +2060,40 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error getting friend recommendations:", error);
       res.status(500).send("Error getting friend recommendations");
+    }
+  });
+
+  // Add new theme endpoint
+  app.post("/api/theme", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const { primary, appearance, variant, radius } = req.body;
+
+      // Validate required fields
+      if (!primary || !appearance || !variant || radius === undefined) {
+        return res.status(400).send("Missing required theme properties");
+      }
+
+      // Update theme.json
+      const themeConfig = {
+        primary,
+        appearance,
+        variant,
+        radius
+      };
+
+      await fs.writeFile(
+        path.resolve(process.cwd(), "theme.json"),
+        JSON.stringify(themeConfig, null, 2)
+      );
+
+      res.json({ message: "Theme updated successfully" });
+    } catch (error) {
+      console.error("Error updating theme:", error);
+      res.status(500).send("Error updating theme");
     }
   });
 
