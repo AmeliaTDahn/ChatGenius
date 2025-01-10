@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import AuthPage from "./pages/AuthPage";
 import ChatPage from "./pages/ChatPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import SuggestedFriends from "./pages/suggested-friends";
 
 function App() {
   const { user, isLoading } = useUser();
@@ -24,9 +25,14 @@ function App() {
       </Route>
 
       {/* Protected routes */}
-      <Route path="/">
-        {user ? <ChatPage /> : <AuthPage />}
-      </Route>
+      {user ? (
+        <Switch>
+          <Route path="/" component={ChatPage} />
+          <Route path="/suggested-friends" component={SuggestedFriends} />
+        </Switch>
+      ) : (
+        <AuthPage />
+      )}
     </Switch>
   );
 }
