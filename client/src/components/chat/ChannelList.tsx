@@ -120,7 +120,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
               <div className="flex items-center gap-2 flex-1">
                 <Hash className="h-4 w-4 mr-2" />
                 <span>{channel.name}</span>
-                {channel.unreadCount && channel.unreadCount > 0 && (
+                {channel.unreadCount > 0 && (
                   <div className="absolute right-2 w-2 h-2 rounded-full bg-red-500" />
                 )}
               </div>
