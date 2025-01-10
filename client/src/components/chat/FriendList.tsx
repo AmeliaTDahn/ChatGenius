@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { UserProfileView } from "./UserProfileView";
 import { useLocation } from "wouter";
+import { PeopleYouMayKnow } from "./PeopleYouMayKnow";
 
 type Friend = {
   id: number;
@@ -76,57 +77,65 @@ export function FriendList() {
   }
 
   if (!friends?.length) {
-    return <div className="text-sm text-muted-foreground">No friends yet</div>;
+    return (
+      <div className="space-y-4">
+        <PeopleYouMayKnow />
+        <div className="text-sm text-muted-foreground">No friends yet</div>
+      </div>
+    );
   }
 
   return (
-    <Card className="p-4">
-      <h3 className="font-semibold mb-4">Friends</h3>
-      <div className="space-y-4">
-        {friends.map((friend) => (
-          <div key={friend.id} className="flex items-center justify-between">
-            <div 
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => setSelectedFriend(friend)}
-            >
-              <div className="relative">
-                <Avatar>
-                  {friend.avatarUrl ? (
-                    <AvatarImage src={friend.avatarUrl} alt={friend.username} />
-                  ) : (
-                    <AvatarFallback>
-                      {friend.username[0].toUpperCase()}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${getStatusColor(friend.isOnline, friend.hideActivity)}`} />
+    <div className="space-y-4">
+      <PeopleYouMayKnow />
+      <Card className="p-4">
+        <h3 className="font-semibold mb-4">Friends</h3>
+        <div className="space-y-4">
+          {friends.map((friend) => (
+            <div key={friend.id} className="flex items-center justify-between">
+              <div 
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setSelectedFriend(friend)}
+              >
+                <div className="relative">
+                  <Avatar>
+                    {friend.avatarUrl ? (
+                      <AvatarImage src={friend.avatarUrl} alt={friend.username} />
+                    ) : (
+                      <AvatarFallback>
+                        {friend.username[0].toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${getStatusColor(friend.isOnline, friend.hideActivity)}`} />
+                </div>
+                <div>
+                  <p className="font-medium">{friend.displayName || friend.username}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {friend.hideActivity || !friend.isOnline ? 'offline' : 'online'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">{friend.displayName || friend.username}</p>
-                <p className="text-xs text-muted-foreground">
-                  {friend.hideActivity || !friend.isOnline ? 'offline' : 'online'}
-                </p>
-              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => removeFriend.mutate(friend.id)}
+                disabled={removeFriend.isPending}
+              >
+                Remove
+              </Button>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => removeFriend.mutate(friend.id)}
-              disabled={removeFriend.isPending}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {selectedFriend && (
-        <UserProfileView
-          user={selectedFriend}
-          isOpen={true}
-          onClose={() => setSelectedFriend(null)}
-        />
-      )}
-    </Card>
+        {selectedFriend && (
+          <UserProfileView
+            user={selectedFriend}
+            isOpen={true}
+            onClose={() => setSelectedFriend(null)}
+          />
+        )}
+      </Card>
+    </div>
   );
 }
