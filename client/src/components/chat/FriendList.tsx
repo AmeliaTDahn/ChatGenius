@@ -6,11 +6,12 @@ import { useToast } from "@/hooks/use-toast";
 import { MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { UserProfileView } from "./UserProfileView";
+import { useLocation } from "wouter";
 
 type Friend = {
   id: number;
   username: string;
-  displayName?: string; // Added displayName
+  displayName?: string;
   avatarUrl?: string;
   isOnline: boolean;
   hideActivity: boolean;
@@ -24,6 +25,7 @@ export function FriendList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [, setLocation] = useLocation();
 
   const { data: friends, isLoading } = useQuery<Friend[]>({
     queryKey: ['/api/friends'],
@@ -41,12 +43,10 @@ export function FriendList() {
       return res.json();
     },
     onSuccess: (data, friendId) => {
-      // Immediately update the friends list cache
       queryClient.setQueryData<Friend[]>(['/api/friends'], (oldFriends = []) => {
         return oldFriends.filter(friend => friend.id !== friendId);
       });
 
-      // Immediately update the direct messages cache
       queryClient.setQueryData<any[]>(['/api/direct-messages'], (oldDMs = []) => {
         return oldDMs.filter(dm => dm.otherUser.id !== friendId);
       });
@@ -77,12 +77,15 @@ export function FriendList() {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
       toast({
         title: "Direct message channel created",
         description: "You can now start chatting with your friend.",
       });
+
+      // Navigate to the direct message channel
+      setLocation(`/chat/dm/${data.channelId}`);
     },
     onError: (error: Error) => {
       toast({
