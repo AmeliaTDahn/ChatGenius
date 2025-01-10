@@ -1774,12 +1774,12 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // Get current user's friends
-      const userFriends = await db
+      const currentUserFriends = await db
         .select({
           friendId: sql<number>`CASE 
             WHEN ${friends.user1Id} = ${req.user.id} THEN ${friends.user2Id}
             ELSE ${friends.user1Id}
-            END`
+          END`,
         })
         .from(friends)
         .where(or(
@@ -1787,53 +1787,76 @@ export function registerRoutes(app: Express): Server {
           eq(friends.user2Id, req.user.id)
         ));
 
-      // If user has no friends, return empty array
-      if (userFriends.length === 0) {
-        return res.json([]);
-      }
+      const friendIds = currentUserFriends.map(f => f.friendId);
 
-      const friendIds = userFriends.map(f => f.friendId);
-
-      // Get recommendations and count mutual friends
-      const recommendations = await db
+      // Find users who are friends with user's friends (potential recommendations)
+      const mutualFriendsQuery = await db
         .select({
-          userId: sql<number>`DISTINCT u.id`,
-          username: users.username,
-          avatarUrl: users.avatarUrl,
-          mutualFriendCount: sql<number>`COUNT(DISTINCT 
-            CASE 
-              WHEN f.user1_id = ${sql.join(friendIds)} THEN f.user1_id
-              WHEN f.user2_id = ${sql.join(friendIds)} THEN f.user2_id
-            END
-          )`
+          userId: sql<number>`CASE 
+            WHEN ${friends.user1Id} IN (${sql.join(friendIds)}) AND ${friends.user2Id} != ${req.user.id} THEN ${friends.user2Id}
+            WHEN ${friends.user2Id} IN (${sql.join(friendIds)}) AND ${friends.user1Id} != ${req.user.id} THEN ${friends.user1Id}
+          END`,
+          mutualFriendId: sql<number>`CASE 
+            WHEN ${friends.user1Id} IN (${sql.join(friendIds)}) THEN ${friends.user1Id}
+            ELSE ${friends.user2Id}
+          END`
         })
-        .from(friends.as('f'))
-        .innerJoin(users.as('u'), 
+        .from(friends)
+        .where(and(
           or(
-            and(
-              inArray(sql`f.user1_id`, friendIds),
-              eq(sql`f.user2_id`, sql`u.id`),
-              not(eq(sql`u.id`, req.user.id)),
-              not(inArray(sql`u.id`, friendIds))
-            ),
-            and(
-              inArray(sql`f.user2_id`, friendIds),
-              eq(sql`f.user1_id`, sql`u.id`),
-              not(eq(sql`u.id`, req.user.id)),
-              not(inArray(sql`u.id`, friendIds))
-            )
-          )
-        )
-        .groupBy(sql`u.id`, sql`u.username`, sql`u.avatar_url`)
-        .orderBy(sql<number>`COUNT(DISTINCT 
-          CASE 
-            WHEN f.user1_id = ${sql.join(friendIds)} THEN f.user1_id
-            WHEN f.user2_id = ${sql.join(friendIds)} THEN f.user2_id
-          END
-        )` as any, 'desc')
-        .limit(10);
+            inArray(friends.user1Id, friendIds),
+            inArray(friends.user2Id, friendIds)
+          ),
+          not(or(
+            eq(friends.user1Id, req.user.id),
+            eq(friends.user2Id, req.user.id)
+          ))
+        ));
 
-      res.json(recommendations);
+      // Group and count mutual friends
+      const userMutualFriends = mutualFriendsQuery.reduce((acc, { userId, mutualFriendId }) => {
+        if (!userId) return acc;
+        if (!acc[userId]) {
+          acc[userId] = new Set();
+        }
+        acc[userId].add(mutualFriendId);
+        return acc;
+      }, {} as Record<number, Set<number>>);
+
+      // Get recommended users with their details and mutual friend count
+      const recommendedUsers = await Promise.all(
+        Object.entries(userMutualFriends).map(async ([userId, mutualFriendIds]) => {
+          const [user] = await db
+            .select({
+              id: users.id,
+              username: users.username,
+              avatarUrl: users.avatarUrl,
+            })
+            .from(users)
+            .where(eq(users.id, parseInt(userId)))
+            .limit(1);
+
+          const mutualFriends = await db
+            .select({
+              id: users.id,
+              username: users.username,
+              avatarUrl: users.avatarUrl,
+            })
+            .from(users)
+            .where(inArray(users.id, Array.from(mutualFriendIds)));
+
+          return {
+            ...user,
+            mutualFriendCount: mutualFriendIds.size,
+            mutualFriends,
+          };
+        })
+      );
+
+      // Sort by number of mutual friends
+      recommendedUsers.sort((a, b) => b.mutualFriendCount - a.mutualFriendCount);
+
+      res.json(recommendedUsers.slice(0, 5)); // Limit to top 5 recommendations
     } catch (error) {
       console.error("Error getting friend recommendations:", error);
       res.status(500).send("Error getting friend recommendations");
