@@ -1772,35 +1772,17 @@ export function registerRoutes(app: Express): Server {
       return res.status(401).send("Not authenticated");
     }
 
-    const { friendId } = req.body;
-    if (!friendId) {
-      return res.status(400).send("Friend ID is required");
+    const friendId = parseInt(req.query.friendId as string);
+    if (isNaN(friendId)) {
+      return res.status(400).send("Invalid friend ID");
     }
 
     try {
-      // Check if users are friends
-      const [friendship] = await db
-        .select()
-        .from(friends)
-        .where(or(
-          and(
-            eq(friends.user1Id, req.user.id),
-            eq(friends.user2Id, friendId)
-          ),
-          and(
-            eq(friends.user1Id, friendId),
-            eq(friends.user2Id, req.user.id)
-          )
-        ))
-        .limit(1);
-
-      if (!friendship) {
-        return res.status(403).send("Users are not friends");
-      }
-
-      // Check if DM channel already exists
-      const [existingChannel] = await db
-        .select()
+      // Find existing direct message channel
+      const [existingDM] = await db
+        .select({
+          channelId: directMessageChannels.channelId
+        })
         .from(directMessageChannels)
         .where(or(
           and(
@@ -1814,36 +1796,14 @@ export function registerRoutes(app: Express): Server {
         ))
         .limit(1);
 
-      if (existingChannel) {
-        return res.json({ channelId: existingChannel.channelId });
+      if (!existingDM) {
+        return res.status(404).send("Direct message channel not found");
       }
 
-      // Create new channel and DM relationship
-      const [channel] = await db
-        .insert(channels)
-        .values({
-          name: 'Direct Message',
-          isDirectMessage: true
-        })
-        .returning();
-
-      await db
-        .insert(directMessageChannels)
-        .values({
-          channelId: channel.id,
-          user1Id: req.user.id,
-          user2Id: friendId
-        });
-
-      await db.insert(channelMembers).values([
-        { channelId: channel.id, userId: req.user.id },
-        { channelId: channel.id, userId: friendId }
-      ]);
-
-      res.json({ channelId: channel.id });
+      res.json({ channelId: existingDM.channelId });
     } catch (error) {
-      console.error("Error creating direct message channel:", error);
-      res.status(500).send("Error creating direct message channel");
+      console.error("Error fetching direct message channel:", error);
+      res.status(500).send("Error fetching direct message channel");
     }
   });
 
