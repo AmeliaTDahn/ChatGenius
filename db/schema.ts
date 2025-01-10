@@ -38,8 +38,6 @@ export const channels = pgTable("channels", {
   description: text("description"),
   isDirectMessage: boolean("is_direct_message").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  backgroundColor: text("background_color").default("#ffffff"),
-  messageBackgroundColor: text("message_background_color").default("#f3f4f6"),
 });
 
 export type Channel = typeof channels.$inferSelect;
@@ -271,9 +269,3 @@ export const messageAttachmentRelations = relations(messageAttachments, ({ one }
 
 export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments);
 export const selectMessageAttachmentSchema = createSelectSchema(messageAttachments);
-
-// Add new schemas for channel theme validation
-export const updateChannelThemeSchema = z.object({
-  backgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/),
-  messageBackgroundColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/)
-});
