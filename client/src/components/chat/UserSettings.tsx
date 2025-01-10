@@ -180,39 +180,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     }
   });
 
-  const deleteAccount = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/user/account', {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Account Deleted",
-        description: "Your account has been permanently deleted.",
-        duration: 3000,
-      });
-      // Clear all cached data
-      queryClient.clear();
-      // Redirect to login page
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 1000);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error Deleting Account",
-        description: error.message || "There was a problem deleting your account. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
-      setShowDeleteConfirm(false);
-    }
-  });
+  
 
   const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
     setIsAutoSaving(true);
