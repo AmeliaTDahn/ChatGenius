@@ -90,10 +90,6 @@ export default function ChatPage() {
         backgroundColor: updatedChannel.backgroundColor
       } : null);
 
-      toast({
-        title: "Success",
-        description: "Channel color updated",
-      });
     } catch (error: any) {
       toast({
         title: "Error",
