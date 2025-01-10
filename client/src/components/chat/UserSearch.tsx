@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 
 type User = {
   id: number;
@@ -14,6 +14,11 @@ type User = {
   avatarUrl?: string;
   isFriend?: boolean;
   mutualFriendCount?: number;
+  mutualFriends?: {
+    id: number;
+    username: string;
+    avatarUrl?: string;
+  }[];
 };
 
 export function UserSearch() {
@@ -93,6 +98,21 @@ export function UserSearch() {
               {user.mutualFriendCount} mutual {user.mutualFriendCount === 1 ? 'friend' : 'friends'}
             </p>
           )}
+          {user.mutualFriends && user.mutualFriends.length > 0 && (
+            <div className="flex -space-x-2 mt-1">
+              {user.mutualFriends.slice(0, 3).map((friend) => (
+                <Avatar key={friend.id} className="h-5 w-5 border-2 border-background">
+                  {friend.avatarUrl ? (
+                    <AvatarImage src={friend.avatarUrl} alt={friend.username} />
+                  ) : (
+                    <AvatarFallback className="text-xs">
+                      {friend.username[0].toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {user.isFriend ? (
@@ -145,7 +165,10 @@ export function UserSearch() {
           </div>
         ) : recommendations && recommendations.length > 0 ? (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Recommended Friends</h3>
+            <h3 className="text-sm font-medium flex items-center gap-2 text-muted-foreground mb-2">
+              <Users className="h-4 w-4" />
+              Suggested Friends
+            </h3>
             {recommendations.map((user) => (
               <UserCard key={user.id} user={user} />
             ))}
