@@ -75,11 +75,21 @@ export function PeopleYouMayKnow() {
   });
 
   if (isLoading) {
-    return null;
+    return (
+      <Card className="p-4 mb-4">
+        <h3 className="font-semibold mb-4">People You May Know</h3>
+        <div className="text-sm text-muted-foreground">Loading recommendations...</div>
+      </Card>
+    );
   }
 
   if (!recommendations?.length) {
-    return null;
+    return (
+      <Card className="p-4 mb-4">
+        <h3 className="font-semibold mb-4">People You May Know</h3>
+        <div className="text-sm text-muted-foreground">No recommendations available</div>
+      </Card>
+    );
   }
 
   return (
