@@ -1001,62 +1001,38 @@ export function registerRoutes(app: Express): Server {
             user2Id: req.user.id
           });
 
-        const [sender] = await db
-          .select({
-            id: users.id,
-            username: users.username,
-            avatarUrl: users.avatarUrl,
-          })
-          .from(users)
-          .where(eq(users.id, request.senderId))
-          .limit(1);
-
-        const [receiver] = await db
-          .select({
-            id: users.id,
-            username: users.username,
-            avatarUrl: users.avatarUrl,
-          })
-          .from(users)
-          .where(eq(users.id, req.user.id))
-          .limit(1);
-
+        // Create a DM channel for the new friends
         const [dmChannel] = await db
           .insert(channels)
           .values({
-            name: 'Direct Message',
-            isDirectMessage: true
+            name: `DM-${request.senderId}-${req.user.id}`,
+            isDirectMessage: true,
           })
           .returning();
 
-        await db.insert(channelMembers).values([
-          {
-            userId: request.senderId,
-            channelId: dmChannel.id
-          },
-          {
-            userId: req.user.id,
-            channelId: dmChannel.id
-          }
-        ]);
-
+        // Create the direct message channel relationship
         await db
           .insert(directMessageChannels)
           .values({
             user1Id: request.senderId,
             user2Id: req.user.id,
-            channelId: dmChannel.id
+            channelId: dmChannel.id,
           });
 
-        res.json({
-          message: `Friend request ${status}`,
-          sender,
-          receiver,
-          dmChannel
-        });
-      } else {
-        res.json({ message: `Friend request ${status}` });
+        // Add both users as channel members
+        await db.insert(channelMembers).values([
+          {
+            userId: request.senderId,
+            channelId: dmChannel.id,
+          },
+          {
+            userId: req.user.id,
+            channelId: dmChannel.id,
+          },
+        ]);
       }
+
+      res.json({ message: `Friend request ${status}` });
     } catch (error) {
       console.error("Error handling friend request:", error);
       res.status(500).send("Error handling friend request");
@@ -1080,7 +1056,7 @@ export function registerRoutes(app: Express): Server {
           hideActivity: users.hideActivity,
           lastActive: users.lastActive,
         })
-                .from(friends)
+        .from(friends)
         .leftJoin(users, or(
           and(
             eq(friends.user1Id, req.user.id),
@@ -1098,8 +1074,36 @@ export function registerRoutes(app: Express): Server {
 
       res.json(userFriends);
     } catch (error) {
-      console.error("Error fetching friends:", error);
+      consoleerror("Error fetching friends:", error);
       res.status(500).send("Error fetching friends");
+    }
+  });
+
+  app.get("/api/friends/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const query = req.query.q as string;
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+
+    try {
+      const searchResults = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(users)
+        .where(ilike(users.username, `%${query}%`))
+        .limit(10);
+
+      res.json(searchResults);
+    } catch (error) {
+      console.error("Error searching friends:", error);
+      res.status(500).send("Error searching friends");
     }
   });
 
@@ -2051,6 +2055,89 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error updating channel color:", error);
       res.status(500).send("Error updating channel color");
+    }
+  });
+  // Add this new route after the existing friend-related routes
+  app.post("/api/friends/ensure-dm-channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      // Get all friends without DM channels
+      const userFriends = await db
+        .select({
+          friendId: users.id,
+          username: users.username,
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      for (const friend of userFriends) {
+        // Check if DM channel already exists
+        const existingDM = await db.query.directMessageChannels.findFirst({
+          where: or(
+            and(
+              eq(directMessageChannels.user1Id, req.user.id),
+              eq(directMessageChannels.user2Id, friend.friendId)
+            ),
+            and(
+              eq(directMessageChannels.user1Id, friend.friendId),
+              eq(directMessageChannels.user2Id, req.user.id)
+            )
+          ),
+        });
+
+        if (!existingDM) {
+          // Create new DM channel
+          const [dmChannel] = await db
+            .insert(channels)
+            .values({
+              name: `DM-${req.user.id}-${friend.friendId}`,
+              isDirectMessage: true,
+            })
+            .returning();
+
+          // Create direct message channel relationship
+          await db
+            .insert(directMessageChannels)
+            .values({
+              user1Id: req.user.id,
+              user2Id: friend.friendId,
+              channelId: dmChannel.id,
+            });
+
+          // Add both users as channel members
+          await db.insert(channelMembers).values([
+            {
+              userId: req.user.id,
+              channelId: dmChannel.id,
+            },
+            {
+              userId: friend.friendId,
+              channelId: dmChannel.id,
+            },
+          ]);
+        }
+      }
+
+      res.json({ message: "DM channels created for all friends" });
+    } catch (error) {
+      console.error("Error ensuring DM channels:", error);
+      res.status(500).send("Error ensuring DM channels");
     }
   });
 
