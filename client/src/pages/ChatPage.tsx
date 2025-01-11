@@ -224,16 +224,6 @@ export default function ChatPage() {
                     >
                       <Search className="h-4 w-4" />
                     </Button>
-                                "w-6 h-6 p-0",
-                                selectedChannel?.backgroundColor === color && "ring-2 ring-primary"
-                              )}
-                              style={{ backgroundColor: color }}
-                              onClick={() => handleColorChange(color)}
-                            />
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
                     {!selectedChannel.isDirectMessage && (
                       <>
                         <Button
