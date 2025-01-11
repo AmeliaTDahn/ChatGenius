@@ -1062,7 +1062,7 @@ export function registerRoutes(app: Express): Server {
           .where(eq(users.id, request.senderId))
           .limit(1);
 
-        res.json({ 
+        res.json({
           message: "Friend request accepted",
           friend
         });
@@ -1081,6 +1081,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      // Get all friends with their details
       const userFriends = await db
         .select({
           id: users.id,
@@ -1105,6 +1106,56 @@ export function registerRoutes(app: Express): Server {
           eq(friends.user1Id, req.user.id),
           eq(friends.user2Id, req.user.id)
         ));
+
+      // For each friend, ensure there's a DM channel
+      for (const friend of userFriends) {
+        // Check if DM channel exists
+        const existingDM = await db.query.directMessageChannels.findFirst({
+          where: or(
+            and(
+              eq(directMessageChannels.user1Id, req.user.id),
+              eq(directMessageChannels.user2Id, friend.id)
+            ),
+            and(
+              eq(directMessageChannels.user1Id, friend.id),
+              eq(directMessageChannels.user2Id, req.user.id)
+            )
+          ),
+        });
+
+        if (!existingDM) {
+          // Create a new DM channel
+          const [dmChannel] = await db
+            .insert(channels)
+            .values({
+              name: `DM-${req.user.id}-${friend.id}`,
+              isDirectMessage: true,
+              description: "Direct Message Channel"
+            })
+            .returning();
+
+          // Create the direct message channel relationship
+          await db
+            .insert(directMessageChannels)
+            .values({
+              user1Id: req.user.id,
+              user2Id: friend.id,
+              channelId: dmChannel.id,
+            });
+
+          // Add both users as channel members
+          await db.insert(channelMembers).values([
+            {
+              userId: req.user.id,
+              channelId: dmChannel.id,
+            },
+            {
+              userId: friend.id,
+              channelId: dmChannel.id,
+            },
+          ]);
+        }
+      }
 
       res.json(userFriends);
     } catch (error) {
@@ -1162,7 +1213,9 @@ export function registerRoutes(app: Express): Server {
             eq(directMessageChannels.user1Id, req.user.id),
             eq(directMessageChannels.user2Id, friendId)
           ),
-          and(            eq(directMessageChannels.user1Id, friendId)
+          and(
+            eq(directMessageChannels.user1Id, friendId),
+            eq(directMessageChannels.user2Id, req.user.id)
           )
         ))
         .limit(1);
@@ -1344,113 +1397,249 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/messages/:messageId/read", async (req, res) => {
+  app.get("/api/friends/recommendations", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
-    const messageId = parseInt(req.params.messageId);
-    if (isNaN(messageId)) {
-      return res.status(400).send("Invalid message ID");
-    }
-
     try {
-      const [existingRead] = await db
-        .select()
-        .from(messageReads)
-        .where(and(
-          eq(messageReads.messageId, messageId),
-          eq(messageReads.userId, req.user.id)
+      // First, get user's current friends
+      const userFriends = await db
+        .select({
+          friendId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
         ))
-        .limit(1);
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
 
-      if (!existingRead) {
-        await db.insert(messageReads).values({
-          messageId,
-          userId: req.user.id,
-        });
+      // If user has no friends, return empty array
+      if (userFriends.length === 0) {
+        return res.json([]);
       }
 
-      const updatedMessage = await db.query.messages.findFirst({
-        where: eq(messages.id, messageId),
-        with: {
-          user: true,
-          reactions: {
-            with: {
-              user: true
-            }
-          },
-          reads: {
-            with: {
-              user: true
-            }
-          }
-        }
-      });
+      const friendIds = userFriends.map(f => f.friendId);
 
-      if (!updatedMessage) {
-        return res.status(404).send("Message not found");
+      // Get friends of friends
+      const friendsOfFriends = await db
+        .select({
+          recommendedUserId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          eq(users.id, friends.user1Id),
+          eq(users.id, friends.user2Id)
+        ))
+        .where(
+          and(
+            or(
+              inArray(friends.user1Id, friendIds),
+              inArray(friends.user2Id, friendIds)
+            ),
+            not(eq(users.id, req.user.id)),
+            not(inArray(users.id, friendIds))
+          )
+        );
+
+      if (friendsOfFriends.length === 0) {
+        return res.json([]);
       }
 
-      wss.clients.forEach((client: any) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({
-            type: 'message_read',
-            messageId,
-            userId: req.user.id,
-            readAt: new Date().toISOString()
-          }));
-        }
-      });
+      // Get recommendation details with mutual friend count
+      const recommendations = await Promise.all(
+        [...new Set(friendsOfFriends.map(f => f.recommendedUserId))].map(async (userId) => {
+          const [user] = await db
+            .select({
+              id: users.id,
+              username: users.username,
+              avatarUrl: users.avatarUrl
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
 
-      res.json(updatedMessage);
+          const mutualFriends = await db
+            .select({
+              count: sql<number>`count(*)`
+            })
+            .from(friends as typeof friends)
+            .where(
+              and(
+                or(
+                  and(
+                    eq(friends.user1Id, userId),
+                    inArray(friends.user2Id, friendIds)
+                  ),
+                  and(
+                    eq(friends.user2Id, userId),
+                    inArray(friends.user1Id, friendIds)
+                  )
+                )
+              )
+            );
+
+          return {
+            ...user,
+            mutualFriendCount: Number(mutualFriends[0]?.count || 0)
+          };
+        })
+      );
+
+      // Sort by mutual friend count
+      recommendations.sort((a, b) => b.mutualFriendCount - a.mutualFriendCount);
+
+      res.json(recommendations);
     } catch (error) {
-      console.error("Error marking message as read:", error);
-      res.status(500).send("Error marking message as read");
+      console.error("Error getting friend recommendations:", error);
+      res.status(500).send("Error getting friend recommendations");
     }
   });
-  app.post("/api/channels/:channelId/read", async (req, res) => {
+
+  app.put("/api/channels/:channelId/color", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
     const channelId = parseInt(req.params.channelId);
-    if (isNaN(channelId)) {
-      return res.status(400).send("Invalid channel ID");
+    const { backgroundColor } = req.body;
+
+    if (isNaN(channelId) || !backgroundColor) {
+      return res.status(400).send("Invalid channel ID or color");
     }
 
     try {
-      const unreadMessages = await db
-        .select({ id: messages.id })
-        .from(messages)
-        .leftJoin(
-          messageReads,
-          and(
-            eq(messageReads.messageId, messages.id),
-            eq(messageReads.userId, req.user.id)
-          )
-        )
+      // Check if user is a member of the channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
         .where(and(
-          eq(messages.channelId, channelId),
-          ne(messages.userId, req.user.id),
-          sql`${messageReads.id} IS NULL`
-        ));
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
 
-      if (unreadMessages.length > 0) {
-        await db.insert(messageReads)
-          .values(
-            unreadMessages.map(msg => ({
-              messageId: msg.id,
-              userId: req.user.id,
-              readAt: new Date()
-            }))
-          );
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
       }
 
-      res.json({ success: true });
+      // Update channel background color
+      const [updatedChannel] = await db
+        .update(channels)
+        .set({ backgroundColor })
+        .where(eq(channels.id, channelId))
+        .returning();
+
+      // Notify all clients about the color change via WebSocket
+      const colorUpdate = {
+        type: 'channel_color_update',
+        channelId,
+        backgroundColor,
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(colorUpdate));
+        }
+      });
+
+      res.json(updatedChannel);
     } catch (error) {
-      console.error("Error marking messages as read:", error);
-      res.status(500).send("Error marking messages as read");
+      console.error("Error updating channel color:", error);
+      res.status(500).send("Error updating channel color");
+    }
+  });
+  // Add this new route after the existing friend-related routes
+  app.post("/api/friends/ensure-dm-channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      // Get all friends without DM channels
+      const userFriends = await db
+        .select({
+          friendId: users.id,
+          username: users.username,
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      for (const friend of userFriends) {
+        // Check if DM channel already exists
+        const existingDM = await db.query.directMessageChannels.findFirst({
+          where: or(
+            and(
+              eq(directMessageChannels.user1Id, req.user.id),
+              eq(directMessageChannels.user2Id, friend.friendId)
+            ),
+            and(
+              eq(directMessageChannels.user1Id, friend.friendId),
+              eq(directMessageChannels.user2Id, req.user.id)
+            )
+          ),
+        });
+
+        if (!existingDM) {
+          // Create new DM channel
+          const [dmChannel] = await db
+            .insert(channels)
+            .values({
+              name: `DM-${req.user.id}-${friend.friendId}`,
+              isDirectMessage: true,
+            })
+            .returning();
+
+          // Create direct message channel relationship
+          await db
+            .insert(directMessageChannels)
+            .values({
+              user1Id: req.user.id,
+              user2Id: friend.friendId,
+              channelId: dmChannel.id,
+            });
+
+          // Add both users as channel members
+          await db.insert(channelMembers).values([
+            {
+              userId: req.user.id,
+              channelId: dmChannel.id,
+            },
+            {
+              userId: friend.friendId,
+              channelId: dmChannel.id,
+            },
+          ]);
+        }
+      }
+
+      res.json({ message: "DM channels created for all friends" });
+    } catch (error) {
+      console.error("Error ensuring DM channels:", error);
+      res.status(500).send("Error ensuring DM channels");
     }
   });
 
@@ -1943,7 +2132,7 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),
+            eq(friends.user1Id,req.user.id),
             eq(users.id, friends.user2Id)
           ),
           and(
@@ -2091,7 +2280,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error updating channel color");
     }
   });
-  // Add this new route after the existing friend-related routes
   app.post("/api/friends/ensure-dm-channels", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -2129,7 +2317,7 @@ export function registerRoutes(app: Express): Server {
               eq(directMessageChannels.user2Id, friend.friendId)
             ),
             and(
-              eq(directMessageChannelsChannels.user1Id, friend.friendId),
+              eq(directMessageChannels.user1Id, friend.friendId),
               eq(directMessageChannels.user2Id, req.user.id)
             )
           ),
