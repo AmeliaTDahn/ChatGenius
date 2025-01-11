@@ -27,6 +27,9 @@
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 84% 4.9%;
     --sidebar-border: 214.3 31.8% 91.4%;
+    --chat-background: 210 40% 98%;
+    --chat-message-background: 0 0% 100%;
+    --chat-message-hover: 210 40% 96.1%;
   }
 
   .dark {
@@ -52,6 +55,9 @@
     --sidebar-background: 222.2 84% 4.9%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 17.5%;
+    --chat-background: 222.2 84% 5.9%;
+    --chat-message-background: 223 47% 11%;
+    --chat-message-hover: 217.2 32.6% 17.5%;
   }
 
   * {
@@ -61,8 +67,18 @@
   body {
     @apply font-sans antialiased bg-background text-foreground transition-colors duration-300;
   }
+
+  /* Chat-specific styles */
+  .chat-container {
+    @apply bg-[hsl(var(--chat-background))] transition-colors duration-300;
+  }
+
+  .chat-message {
+    @apply bg-[hsl(var(--chat-message-background))] hover:bg-[hsl(var(--chat-message-hover))] transition-colors duration-200;
+  }
 }
 
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

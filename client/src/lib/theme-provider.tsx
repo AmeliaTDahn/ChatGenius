@@ -11,11 +11,13 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
 };
 
 const initialState: ThemeProviderState = {
-  theme: "dark",
+  theme: "light",
   setTheme: () => null,
+  toggleTheme: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
@@ -40,6 +42,7 @@ export function ThemeProvider({
   const value = {
     theme,
     setTheme: (theme: Theme) => setTheme(theme),
+    toggleTheme: () => setTheme(prev => prev === "light" ? "dark" : "light"),
   };
 
   return (
