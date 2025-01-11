@@ -41,14 +41,13 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "chat-app-secret",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     proxy: true,
     cookie: {
       secure: true,
       sameSite: 'none',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      domain: process.env.REPL_SLUG ? `.${process.env.REPL_SLUG}.repl.co` : undefined
     },
     store: new MemoryStore({
       checkPeriod: 86400000,
