@@ -56,10 +56,10 @@ export function setupWebSocket(server: Server) {
     });
   }, 30000);
 
-  const broadcastToChannel = async (channelId: number, message: WSMessage, senderTabId: string) => {
+  const broadcastToChannel = async (channelId: number, message: WSMessage, senderTabId: string, senderId: number) => {
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
-      if (client.readyState === WebSocket.OPEN && client.tabId !== senderTabId) {
+      if (client.readyState === WebSocket.OPEN && client.userId !== senderId) {
         client.send(JSON.stringify(message));
       }
     });
@@ -101,8 +101,8 @@ export function setupWebSocket(server: Server) {
         const message: WSMessage = JSON.parse(data.toString());
         switch (message.type) {
           case 'message':
-            if (message.channelId && message.content) {
-              await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!);
+            if (message.channelId && message.content && ws.userId) {
+              await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!, ws.userId);
             }
             break;
           case 'typing':
