@@ -15,7 +15,6 @@ import { UserSettings } from "./UserSettings";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
-
 type UserHeaderProps = {
   user: User;
   onLogout: () => Promise<void>;
@@ -165,7 +164,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
             size="icon"
             onClick={() => setShowSettings(true)}
             title="Settings"
-            className="w-9 h-9"
+            className="w-9 h-9 cursor-pointer"
           >
             <UserIcon className="h-5 w-5" />
           </Button>
@@ -194,7 +193,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           </Button>
         </div>
 
-
         <Button
           variant="ghost"
           onClick={onViewRequests}
@@ -209,9 +207,11 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
       </div>
 
       {/* Settings Dialog */}
-      {showSettings && (
-        <UserSettings user={user} onClose={() => setShowSettings(false)} />
-      )}
+      <UserSettings 
+        user={user} 
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)} 
+      />
     </div>
   );
 }

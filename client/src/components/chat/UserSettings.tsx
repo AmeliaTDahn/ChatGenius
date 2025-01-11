@@ -72,13 +72,13 @@ type UserSettingsFormData = z.infer<typeof formSchema>;
 
 type UserSettingsProps = {
   user: User;
+  isOpen?: boolean;
   onClose?: () => void;
 };
 
-export function UserSettings({ user, onClose }: UserSettingsProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
+export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -180,7 +180,6 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     }
   });
 
-  
 
   const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
     setIsAutoSaving(true);
@@ -196,27 +195,19 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
     }
   }, [form, debouncedSave]);
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    if (!open && onClose) {
-      onClose();
-    }
-  };
-
   const handleDeleteAccount = () => {
     deleteAccount.mutate();
   };
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>User Settings</DialogTitle>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle>User Settings</DialogTitle>
+        </DialogHeader>
 
-          <ScrollArea className="pr-4 h-[70vh]">
-            <Form {...form}>
+        <ScrollArea className="pr-4 h-[70vh]">
+          <Form {...form}>
             <form onSubmit={(e) => {
               e.preventDefault();
               const data = form.getValues();
@@ -388,7 +379,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                     }}
                   />
                 </div>
-                
+
               </div>
 
               <div className="flex justify-end pt-4 border-t">
@@ -402,8 +393,8 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
           <div className="mt-6 border-t pt-6">
             <h3 className="text-lg font-semibold text-red-600">Danger Zone</h3>
             <p className="text-sm text-gray-500 mt-2">Once you delete your account, there is no going back.</p>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               className="mt-4"
               onClick={() => setShowDeleteConfirm(true)}
             >
@@ -422,8 +413,8 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                   <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
                     Cancel
                   </Button>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     onClick={() => deleteAccount.mutate()}
                     disabled={deleteAccount.isPending}
                   >
@@ -433,9 +424,8 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
               </DialogContent>
             </Dialog>
           </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-    </>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }
