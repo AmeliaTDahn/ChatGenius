@@ -280,19 +280,25 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      // Handle other fields if they exist
-      const fields = ['username', 'age', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
+      // Handle fields with proper validation
+      const fields = ['username', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
       fields.forEach(field => {
         if (req.body[field] !== undefined) {
-          if (field === 'age') {
-            updateData[field] = parseInt(req.body[field]);
-          } else if (field === 'hideActivity') {
+          if (field === 'hideActivity') {
             updateData[field] = req.body[field] === 'true';
           } else {
             updateData[field] = req.body[field];
           }
         }
       });
+
+      // Handle age field separately with validation
+      if (req.body.age !== undefined && req.body.age !== '') {
+        const age = parseInt(req.body.age);
+        if (!isNaN(age) && age >= 0) {
+          updateData.age = age;
+        }
+      }
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).send("No valid update data provided");
