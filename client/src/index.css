@@ -56,10 +56,9 @@
     --sidebar-background: 222.2 84% 4.9%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 17.5%;
-    --chat-background: 222.2 84% 5.9%;
-    --chat-message-background: 223 47% 11%;
+    --chat-background: 0 0% 0%;
+    --chat-message-background: 220 13% 8%;
     --chat-message-hover: 217.2 32.6% 17.5%;
-    /* Keep chat text color same as light mode */
     --chat-text: 222.2 84% 4.9%;
   }
 
@@ -78,11 +77,6 @@
 
   .chat-message {
     @apply bg-[hsl(var(--chat-message-background))] hover:bg-[hsl(var(--chat-message-hover))] transition-colors duration-200;
-    color: hsl(var(--chat-text)); /* Force consistent text color */
-  }
-
-  .chat-message-content {
-    color: hsl(var(--chat-text)); /* Ensure chat text stays consistent */
   }
 }
 
