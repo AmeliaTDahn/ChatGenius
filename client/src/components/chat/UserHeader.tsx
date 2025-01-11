@@ -1,6 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Bell, Users, User as UserIcon, Settings } from "lucide-react"; // Added Settings import
+import { UserPlus, Bell, Users, User as UserIcon, Settings } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/ui/logo";

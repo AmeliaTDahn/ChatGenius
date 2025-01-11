@@ -76,7 +76,7 @@ type UserSettingsProps = {
 };
 
 export function UserSettings({ user, onClose }: UserSettingsProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { toast } = useToast();
