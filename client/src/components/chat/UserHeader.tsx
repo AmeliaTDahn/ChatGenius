@@ -165,6 +165,8 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           >
             <UserIcon className="h-5 w-5" />
           </Button>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="relative">
             <Button
               variant="ghost"
@@ -179,6 +181,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
               )}
             </Button>
           </div>
+          <ThemeToggle />
         </div>
       </div>
 
