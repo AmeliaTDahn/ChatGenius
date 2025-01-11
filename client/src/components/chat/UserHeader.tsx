@@ -165,33 +165,34 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           >
             <UserIcon className="h-5 w-5" />
           </Button>
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onViewRequests}
-              title="Friend Requests"
-              className="w-9 h-9"
-            >
-              <Bell className="h-5 w-5" />
-              {hasNotifications && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
-              )}
-            </Button>
-          </div>
         </div>
       </div>
 
       {/* Action buttons section */}
       <div className="flex flex-col border-t">
-        <Button
-          variant="ghost"
-          onClick={onViewFriends}
-          className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none"
-        >
-          <Users className="h-4 w-4" />
-          <span className="text-sm font-medium">Friends</span>
-        </Button>
+        <div className="flex items-center gap-3 px-6 py-3"> {/*Added div for better layout*/}
+          <Button
+            variant="ghost"
+            onClick={onViewFriends}
+            className="flex items-center gap-2 hover:bg-accent/10 rounded-none"
+          >
+            <Users className="h-4 w-4" />
+            <span className="text-sm font-medium">Friends</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onViewRequests}
+            title="Friend Requests"
+            className="w-9 h-9"
+          >
+            <Bell className="h-5 w-5" />
+            {hasNotifications && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+            )}
+          </Button>
+        </div>
+
 
         <Button
           variant="ghost"
