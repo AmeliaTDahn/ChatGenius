@@ -30,6 +30,7 @@
     --chat-background: 210 40% 98%;
     --chat-message-background: 0 0% 100%;
     --chat-message-hover: 210 40% 96.1%;
+    --chat-text: 222.2 84% 4.9%;
   }
 
   .dark {
@@ -58,6 +59,7 @@
     --chat-background: 0 0% 0%;
     --chat-message-background: 220 13% 8%;
     --chat-message-hover: 217.2 32.6% 17.5%;
+    --chat-text: 222.2 84% 4.9%;
   }
 
   * {
