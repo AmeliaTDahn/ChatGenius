@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
-  onSendMessage: (content: string, files?: File[]) => void;
+  onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
 };
 
 export function MessageInput({ onSendMessage }: MessageInputProps) {
@@ -58,7 +58,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
         finalMessage = `**${finalMessage}**`;
       }
 
-      onSendMessage(finalMessage, files);
+      onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
       setMessage("");
       setFiles([]);
       setCurrentFormat({

@@ -99,7 +99,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleSendMessage = async (content: string, files?: File[]) => {
+  const handleSendMessage = async (content: string, files?: File[], tabId?: string | null) => {
     if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
       try {
         await sendWebSocketMessage({ content: content.trim(), files });
@@ -108,6 +108,7 @@ export default function ChatPage() {
           channelId: selectedChannel.id,
           content: content.trim(),
           userId: user.id,
+          tabId: tabId
         });
       } catch (error: any) {
         console.error('Failed to send message:', error);
