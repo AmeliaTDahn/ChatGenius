@@ -14,6 +14,17 @@ import fs from "fs/promises";
 import express from "express";
 import crypto from 'crypto';
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
+import session, { SessionOptions } from 'express-session';
+import passport from 'passport';
+
+// Assuming sessionSettings is defined elsewhere, this is a placeholder
+const sessionSettings: SessionOptions = {
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+};
+
 
 async function getUnreadMessageCounts(userId: number) {
   const userChannels = await db.query.channelMembers.findMany({
@@ -77,7 +88,17 @@ const upload = multer({
 
 interface ExtendedWebSocket extends WebSocket {
   userId?: number;
+  sessionId?: string;
   isAlive?: boolean;
+}
+
+interface WebSocketMessageType {
+  type: 'message' | 'status_update' | 'typing';
+  content?: string;
+  channelId?: number;
+  userId?: number;
+  isOnline?: boolean;
+  hideActivity?: boolean;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -104,8 +125,24 @@ export function registerRoutes(app: Express): Server {
       return;
     }
 
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
+    // Parse the session from the request
+    const sessionParser = session(sessionSettings);
+    sessionParser(request as any, {} as any, () => {
+      // @ts-ignore - passport.session() types are not complete
+      passport.session()(request as any, {} as any, () => {
+        if (!(request as any).user) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          const extWs = ws as ExtendedWebSocket;
+          extWs.userId = (request as any).user.id;
+          extWs.sessionId = (request as any).sessionID;
+          wss.emit('connection', extWs, request);
+        });
+      });
     });
   });
 
@@ -122,11 +159,21 @@ export function registerRoutes(app: Express): Server {
 
         switch (message.type) {
           case 'message': {
+            // Ensure the message is sent with the correct user ID from the WebSocket connection
+            const userId = ws.userId;
+            if (!userId) {
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not authenticated',
+              }));
+              return;
+            }
+
             const [newMessage] = await db.insert(messages)
               .values({
                 content: message.content,
                 channelId: message.channelId,
-                userId: message.userId,
+                userId: userId, // Use the WebSocket's authenticated user ID
               })
               .returning();
 
@@ -154,28 +201,21 @@ export function registerRoutes(app: Express): Server {
               }
             });
 
-            const channelMembers = await db.query.channelMembers.findMany({
-              where: eq(channelMembers.channelId, message.channelId),
-              columns: {
-                userId: true
-              }
-            });
-
+            // Broadcast to all clients except those with the same session ID
             const broadcastMessage = JSON.stringify({
               type: 'new_message',
               message: fullMessage,
               channelId: message.channelId,
-              senderId: message.userId,
+              senderId: userId,
             });
 
-            wss.clients.forEach((client) => {
-              if (client.readyState === WebSocket.OPEN) {
+            wss.clients.forEach((client: ExtendedWebSocket) => {
+              if (client.readyState === WebSocket.OPEN && client.sessionId !== ws.sessionId) {
                 client.send(broadcastMessage);
               }
             });
             break;
           }
-
           case 'status_update': {
             const statusUpdate = JSON.stringify({
               type: 'status_update',
@@ -1040,7 +1080,7 @@ export function registerRoutes(app: Express): Server {
           hideActivity: users.hideActivity,
           lastActive: users.lastActive,
         })
-        .from(friends)
+                .from(friends)
         .leftJoin(users, or(
           and(
             eq(friends.user1Id, req.user.id),

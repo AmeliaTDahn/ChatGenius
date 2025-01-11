@@ -5,12 +5,11 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, type User, insertUserSchema } from "@db/schema";
+import { users, type User } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
 import * as z from 'zod';
 import { createInsertSchema } from 'drizzle-zod';
-
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -41,22 +40,30 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "chat-app-secret",
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
+    name: 'sessionId', // Set a specific cookie name
     proxy: true,
     cookie: {
       secure: true,
       sameSite: 'none',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: true, // Prevents client-side access to the cookie
     },
     store: new MemoryStore({
-      checkPeriod: 86400000,
+      checkPeriod: 86400000, // Prune expired entries every 24h
+      stale: false, // Don't serve stale data
+      ttl: 86400000, // Match cookie maxAge
     }),
+    genid: function(req) {
+      return randomBytes(16).toString('hex'); // Generate unique session IDs
+    }
   };
 
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
     sessionSettings.cookie = {
+      ...sessionSettings.cookie,
       secure: true,
     };
   }
@@ -115,7 +122,11 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const result = insertUserSchema.safeParse(req.body);
+      const result = createInsertSchema(users, {
+        username: z.string().min(3, "Username must be at least 3 characters"),
+        email: z.string().email("Invalid email format"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+      }).safeParse(req.body);
       if (!result.success) {
         return res
           .status(400)
