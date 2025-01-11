@@ -188,83 +188,80 @@ export default function ChatPage() {
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedChannel ? (
-              <>
-                <div className="p-4 border-b flex items-center justify-between bg-background">
-                  <div>
-                    {selectedChannel.isDirectMessage ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={selectedChannel.otherUser?.avatarUrl || ""} alt={selectedChannel.otherUser?.username} />
-                          <AvatarFallback>
-                            {selectedChannel.otherUser?.username?.[0].toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <h2 className="font-semibold text-lg">
-                          {selectedChannel.otherUser?.username}
-                        </h2>
-                      </div>
-                    ) : (
-                      <>
-                        <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
-                        {selectedChannel.description && (
-                          <p className="text-sm text-muted-foreground">
-                            {selectedChannel.description}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsMessageSearchOpen(true)}
-                      title="Search Messages"
-                    >
-                      <Search className="h-4 w-4" />
-                    </Button>
-                    {!selectedChannel.isDirectMessage && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setIsInviteOpen(true)}
-                          title="Invite to Channel"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleLeaveChannel}
-                          title="Leave Channel"
-                        >
-                          <LogOut className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+          {selectedChannel ? (
+            <>
+              <div className="p-4 border-b flex items-center justify-between bg-background">
+                <div>
+                  {selectedChannel.isDirectMessage ? (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage
+                          src={selectedChannel.otherUser?.avatarUrl || ""}
+                          alt={selectedChannel.otherUser?.username}
+                        />
+                        <AvatarFallback>
+                          {selectedChannel.otherUser?.username?.[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <h2 className="font-semibold text-lg">
+                        {selectedChannel.otherUser?.username}
+                      </h2>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="font-semibold text-lg"># {selectedChannel.name}</h2>
+                      {selectedChannel.description && (
+                        <p className="text-sm text-muted-foreground">
+                          {selectedChannel.description}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
-                <div 
-                  className="flex-1 min-h-0"
-                  style={{ 
-                    backgroundColor: selectedChannel.backgroundColor || '#ffffff',
-                    transition: 'background-color 0.2s ease-in-out'
-                  }}
-                >
-                  <MessageList channelId={selectedChannel.id} />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsMessageSearchOpen(true)}
+                    title="Search Messages"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                  {!selectedChannel.isDirectMessage && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsInviteOpen(true)}
+                        title="Invite to Channel"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleLeaveChannel}
+                        title="Leave Channel"
+                      >
+                        <LogOut className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
-                <div className="p-4 border-t bg-background">
-                  <MessageInput onSendMessage={handleSendMessage} />
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                Select a channel to start chatting
               </div>
-            )}
-          </div>
+              <div className="flex-1 min-h-0 chat-container">
+                <MessageList channelId={selectedChannel.id} />
+              </div>
+              <div className="p-4 border-t bg-background">
+                <MessageInput onSendMessage={handleSendMessage} />
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground">
+              Select a channel to start chatting
+            </div>
+          )}
+        </div>
       </div>
 
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
