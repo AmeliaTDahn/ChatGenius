@@ -182,25 +182,25 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           <Button
             variant="ghost"
             size="icon"
-            onClick={onViewRequests}
-            title="Friend Requests"
+            onClick={onAddFriend}
+            title="Add Friend"
             className="w-9 h-9"
           >
-            <Bell className="h-5 w-5" />
-            {hasNotifications && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
-            )}
+            <UserPlus className="h-5 w-5" />
           </Button>
         </div>
 
 
         <Button
           variant="ghost"
-          onClick={onAddFriend}
-          className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t"
+          onClick={onViewRequests}
+          className="flex items-center gap-2 px-6 py-3 justify-start hover:bg-accent/10 rounded-none border-t relative"
         >
-          <UserPlus className="h-4 w-4" />
-          <span className="text-sm font-medium">Add Friend</span>
+          <Bell className="h-4 w-4" />
+          <span className="text-sm font-medium">Notifications</span>
+          {hasNotifications && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+          )}
         </Button>
       </div>
 
