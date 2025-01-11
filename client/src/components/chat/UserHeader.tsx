@@ -13,6 +13,8 @@ import {
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { UserSettings } from "./UserSettings";
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/ui/theme-toggle"; // Added import
+
 
 type UserHeaderProps = {
   user: User;
@@ -146,6 +148,9 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </div>
+          <div className="ml-auto"> {/* Added div for theme toggle */}
+            <ThemeToggle />
           </div>
         </div>
 
