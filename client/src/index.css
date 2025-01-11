@@ -30,7 +30,6 @@
     --chat-background: 210 40% 98%;
     --chat-message-background: 0 0% 100%;
     --chat-message-hover: 210 40% 96.1%;
-    --chat-text: 222.2 84% 4.9%;
   }
 
   .dark {
@@ -56,10 +55,10 @@
     --sidebar-background: 222.2 84% 4.9%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 17.5%;
-    --chat-background: 0 0% 0%;
-    --chat-message-background: 220 13% 8%;
-    --chat-message-hover: 217.2 32.6% 17.5%;
-    --chat-text: 222.2 84% 4.9%;
+    --chat-background: 222.2 84% 5.9%;
+    --chat-message-background: 217.2 32.6% 17.5%;
+    --chat-message-hover: 223 47% 11%;
+    --chat-text: 210 40% 98%;
   }
 
   * {
@@ -76,7 +75,7 @@
   }
 
   .chat-message {
-    @apply bg-[hsl(var(--chat-message-background))] hover:bg-[hsl(var(--chat-message-hover))] transition-colors duration-200;
+    @apply bg-[hsl(var(--chat-message-background))] hover:bg-[hsl(var(--chat-message-hover))] text-foreground transition-colors duration-200;
   }
 }
 
