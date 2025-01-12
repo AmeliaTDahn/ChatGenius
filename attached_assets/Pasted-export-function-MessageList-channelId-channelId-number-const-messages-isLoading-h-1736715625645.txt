@@ -1,11 +1,3 @@
-import { useEffect, useRef, useState } from "react";
-import { useMessages } from "@/hooks/use-messages";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { ThreadView } from "./ThreadView";
-import type { Message } from "@db/schema";
-
 export function MessageList({ channelId }: { channelId: number }) {
   const { messages, isLoading, handleWebSocketMessage } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
