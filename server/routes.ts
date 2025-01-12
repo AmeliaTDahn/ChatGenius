@@ -1050,8 +1050,7 @@ export function registerRoutes(app: Express): Server {
             eq(users.id, friends.user1Id)
           )
         ))
-        .where(or(
-          eq(friends.user1Id, req.user.id),
+        .where(or(          eq(friends.user1Id, req.user.id),
           eq(friends.user2Id, req.user.id)
         ));
 
@@ -1189,6 +1188,46 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Error creating friend request" });
     }
   });
+  app.get("/api/friends", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Get all friends for the current user
+      const userFriends = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          isOnline: users.isOnline,
+          hideActivity: users.hideActivity,
+          createdAt: users.createdAt,
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      res.json(userFriends);
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+      res.status(500).json({ message: "Error fetching friends" });
+    }
+  });
+
   app.put("/api/friend-requests/:id", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1229,10 +1268,32 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       if (status === 'accepted') {
-        // Create friendship
+        // Check for existing friendship
+        const existingFriendship = await db
+          .select()
+          .from(friends)
+          .where(or(
+            and(
+              eq(friends.user1Id, friendRequest.senderId),
+              eq(friends.user2Id, friendRequest.receiverId)
+            ),
+            and(
+              eq(friends.user1Id, friendRequest.receiverId),
+              eq(friends.user2Id, friendRequest.senderId)
+            )
+          ))
+          .limit(1);
+
+        if (existingFriendship.length > 0) {
+          return res.status(400).json({ message: "Already friends" });
+        }
+
+        // Create friendship with consistent ordering (smaller ID as user1_id)
+        const [user1Id, user2Id] = [friendRequest.senderId, friendRequest.receiverId].sort((a, b) => a - b);
+
         await db.insert(friends).values({
-          user1Id: friendRequest.senderId,
-          user2Id: friendRequest.receiverId,
+          user1Id,
+          user2Id,
           createdAt: new Date()
         });
 
