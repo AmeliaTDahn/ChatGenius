@@ -161,16 +161,16 @@ export function MessageList({ channelId }: MessageListProps) {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-6 px-2 text-xs relative",
-                  message.replyCount > 0 && "bg-accent/50"
+                  "h-6 px-2 text-xs relative flex items-center gap-1",
+                  message.replyCount > 0 && "bg-primary/10 hover:bg-primary/20 text-primary"
                 )}
                 onClick={handleReply}
               >
-                <Reply className="h-3 w-3 mr-1" />
-                Reply
+                <Reply className={cn("h-3 w-3", message.replyCount > 0 && "text-primary")} />
+                <span>Reply</span>
                 {message.replyCount > 0 && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({message.replyCount})
+                  <span className="inline-flex items-center justify-center bg-primary text-primary-foreground rounded-full text-[10px] min-w-[16px] h-4 px-1">
+                    {message.replyCount}
                   </span>
                 )}
               </Button>
