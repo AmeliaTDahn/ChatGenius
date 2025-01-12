@@ -28,7 +28,7 @@ type MessageListProps = {
 };
 
 export function MessageList({ channelId }: MessageListProps) {
-  const { messages, isLoading, handleReaction: addReaction } = useMessages(channelId);
+  const { messages, isLoading } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
@@ -46,20 +46,10 @@ export function MessageList({ channelId }: MessageListProps) {
   }
 
   const MessageComponent = ({ message }: { message: Message }) => {
-    const handleReaction = async (emoji: string) => {
-      await addReaction({ messageId: message.id, emoji });
-    };
-
     const handleReply = () => {
       setSelectedMessage(message);
       setShowThread(true);
     };
-
-    // Group reactions by emoji
-    const reactionGroups = message.reactions?.reduce<Record<string, number>>((acc, reaction) => {
-      acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
-      return acc;
-    }, {}) ?? {};
 
     const formatFileSize = (bytes: number) => {
       if (bytes < 1024) return bytes + ' B';
@@ -155,41 +145,24 @@ export function MessageList({ channelId }: MessageListProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-6 px-2 text-xs relative flex items-center gap-1",
-                  message.replyCount > 0 && "bg-primary/10 hover:bg-primary/20 text-primary"
-                )}
-                onClick={handleReply}
-              >
-                <Reply className={cn("h-3 w-3", message.replyCount > 0 && "text-primary")} />
-                <span>Reply</span>
-                {message.replyCount > 0 && (
-                  <span className="inline-flex items-center justify-center bg-primary text-primary-foreground rounded-full text-[10px] min-w-[16px] h-4 px-1">
-                    {message.replyCount}
-                  </span>
-                )}
-              </Button>
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              {Object.entries(reactionGroups).map(([emoji, count]) => (
-                <Button
-                  key={emoji}
-                  variant="secondary"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => handleReaction(emoji)}
-                >
-                  <span>{emoji}</span>
-                  <span className="ml-1">{count}</span>
-                </Button>
-              ))}
-            </div>
-            <ReactionPicker onSelectEmoji={handleReaction} />
+          <div className="flex items-center gap-2 mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-6 px-2 text-xs relative flex items-center gap-1",
+                message.replyCount > 0 && "bg-primary/10 hover:bg-primary/20 text-primary"
+              )}
+              onClick={handleReply}
+            >
+              <Reply className={cn("h-3 w-3", message.replyCount > 0 && "text-primary")} />
+              <span>Reply</span>
+              {message.replyCount > 0 && (
+                <span className="inline-flex items-center justify-center bg-primary text-primary-foreground rounded-full text-[10px] min-w-[16px] h-4 px-1">
+                  {message.replyCount}
+                </span>
+              )}
+            </Button>
           </div>
         </div>
       </div>
@@ -200,7 +173,8 @@ export function MessageList({ channelId }: MessageListProps) {
     <div className="flex h-full overflow-hidden">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {messages.map((message) => (
+          {/* Only show messages that are not replies (no parentId) */}
+          {messages.filter(message => !message.parentId).map((message) => (
             <MessageComponent key={message.id} message={message} />
           ))}
           <div ref={bottomRef} />

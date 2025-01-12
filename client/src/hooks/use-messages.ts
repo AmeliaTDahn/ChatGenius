@@ -15,6 +15,9 @@ export function useMessages(channelId: number, parentId?: number) {
       const url = new URL(`/api/channels/${channelId}/messages`, window.location.origin);
       if (parentId) {
         url.searchParams.append('parentId', parentId.toString());
+      } else {
+        // Only fetch root messages (no parentId) for the main chat
+        url.searchParams.append('rootOnly', 'true');
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch messages');
@@ -23,26 +26,12 @@ export function useMessages(channelId: number, parentId?: number) {
     enabled: !!channelId
   });
 
-  const reactionMutation = useMutation({
-    mutationFn: async ({ messageId, emoji }: { messageId: number; emoji: string }) => {
-      const response = await fetch(`/api/messages/${messageId}/reactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emoji }),
-      });
-      if (!response.ok) throw new Error('Failed to add reaction');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
-
   const sendMessage = useMutation({
-    mutationFn: async ({ content, files }: { content: string, files?: File[] }) => {
+    mutationFn: async ({ content, files, parentId }: { content: string, files?: File[], parentId?: number }) => {
       const formData = new FormData();
       formData.append('content', content);
       if (files) files.forEach(file => formData.append('files', file));
+      if (parentId) formData.append('parentId', parentId.toString());
 
       const res = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
@@ -53,20 +42,34 @@ export function useMessages(channelId: number, parentId?: number) {
       return res.json();
     },
     onSuccess: (newMessage) => {
-      queryClient.setQueryData<Message[]>(queryKey, (old = []) => [...old, newMessage]);
+      // Update the appropriate message list based on whether it's a reply or not
+      if (newMessage.parentId) {
+        queryClient.setQueryData<Message[]>(['messages', channelId, newMessage.parentId], 
+          (old = []) => [...old, newMessage]);
+      } else {
+        queryClient.setQueryData<Message[]>(['messages', channelId], 
+          (old = []) => [...old, newMessage]);
+      }
     }
   });
 
   const handleWebSocketMessage = (newMessage: Message) => {
     if (newMessage.userId === user?.id) return;
-    queryClient.setQueryData<Message[]>(queryKey, (old = []) => [...old, newMessage]);
+
+    // Update the appropriate message list based on whether it's a reply or not
+    if (newMessage.parentId) {
+      queryClient.setQueryData<Message[]>(['messages', channelId, newMessage.parentId], 
+        (old = []) => old ? [...old, newMessage] : [newMessage]);
+    } else {
+      queryClient.setQueryData<Message[]>(['messages', channelId], 
+        (old = []) => old ? [...old, newMessage] : [newMessage]);
+    }
   };
 
   return {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
-    handleReaction: reactionMutation.mutate,
     handleWebSocketMessage
   };
 }
