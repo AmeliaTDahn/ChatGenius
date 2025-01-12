@@ -3,7 +3,6 @@ import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 import AuthPage from "./pages/AuthPage";
 import ChatPage from "./pages/ChatPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SuggestedFriends from "./pages/suggested-friends";
 
 function App() {
@@ -19,11 +18,6 @@ function App() {
 
   return (
     <Switch>
-      {/* Public routes */}
-      <Route path="/reset-password">
-        <ResetPasswordPage />
-      </Route>
-
       {/* Protected routes */}
       {user ? (
         <Switch>

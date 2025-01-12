@@ -153,16 +153,8 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full mb-2" disabled={isLoading}>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Loading..." : "Login"}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="link" 
-                    className="w-full text-sm text-muted-foreground"
-                    onClick={() => navigate("/reset-password")}
-                  >
-                    Forgot password?
                   </Button>
                 </form>
               </Form>
