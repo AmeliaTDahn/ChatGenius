@@ -1025,5 +1025,65 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/users/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+
+      // Get current user's friends to exclude them from search results
+      const userFriends = await db
+        .select({ friendId: users.id })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      const friendIds = userFriends.map(f => f.friendId);
+
+      // Search for users that match the query and are not friends
+      const searchResults = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(users)
+        .where(and(
+          ilike(users.username, `%${query}%`),
+          ne(users.id, req.user.id), // Exclude current user
+          not(inArray(users.id, [...friendIds, req.user.id])) // Exclude friends and current user
+        ))
+        .limit(10);
+
+      // Add isFriend flag
+      const results = searchResults.map(user => ({
+        ...user,
+        isFriend: false // These users are not friends since we excluded them
+      }));
+
+      res.json(results);
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).send("Error searching users");
+    }
+  });
+
   return httpServer;
 }
