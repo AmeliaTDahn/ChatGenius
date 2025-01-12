@@ -1,16 +1,26 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Message } from '@db/schema';
+import { useUser } from '@/hooks/use-user';
 
-export function useMessages(channelId: number) {
+export function useMessages(channelId: number, parentId?: number) {
   const queryClient = useQueryClient();
+  const { user } = useUser();
+  const queryKey = parentId 
+    ? ['messages', channelId, parentId] 
+    : ['messages', channelId];
 
-  const { data: messages = [], isLoading } = useQuery({
-    queryKey: ['messages', channelId],
+  const { data: messages, isLoading } = useQuery<Message[]>({
+    queryKey,
     queryFn: async () => {
-      const response = await fetch(`/api/channels/${channelId}/messages`);
-      if (!response.ok) throw new Error('Failed to fetch messages');
-      return response.json();
+      const url = new URL(`/api/channels/${channelId}/messages`, window.location.origin);
+      if (parentId) {
+        url.searchParams.append('parentId', parentId.toString());
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch messages');
+      return res.json();
     },
+    enabled: !!channelId
   });
 
   const reactionMutation = useMutation({
@@ -24,95 +34,39 @@ export function useMessages(channelId: number) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+      queryClient.invalidateQueries({ queryKey });
     },
-  });
-
-  return {
-    messages,
-    isLoading,
-    handleReaction: reactionMutation.mutate,
-  };
-}
-</new_str>
-
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Message } from '@db/schema';
-import { useUser } from '@/hooks/use-user';
-
-export function useMessages(channelId: number, parentId?: number) {
-  const queryClient = useQueryClient();
-  const { user } = useUser();
-  const queryKey = parentId 
-    ? [`/api/channels/${channelId}/messages`, parentId] 
-    : [`/api/channels/${channelId}/messages`];
-
-  const { data: messages, isLoading } = useQuery<Message[]>({
-    queryKey,
-    queryFn: async () => {
-      const url = new URL(`/api/channels/${channelId}/messages`, window.location.origin);
-      if (parentId) {
-        url.searchParams.append('parentId', parentId.toString());
-      }
-      const res = await fetch(url, {
-        credentials: 'include'
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      return res.json();
-    },
-    enabled: !!channelId,
-    refetchInterval: false,
-    refetchOnWindowFocus: true
   });
 
   const sendMessage = useMutation({
-    mutationFn: async ({ content, files, parentId }: { content: string, files?: File[], parentId?: number }) => {
+    mutationFn: async ({ content, files }: { content: string, files?: File[] }) => {
       const formData = new FormData();
       formData.append('content', content);
-      if (parentId) formData.append('parentId', parentId.toString());
       if (files) files.forEach(file => formData.append('files', file));
 
       const res = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
-        body: formData,
-        credentials: 'include',
+        body: formData
       });
 
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      return res.json() as Promise<Message>;
+      if (!res.ok) throw new Error('Failed to send message');
+      return res.json();
     },
     onSuccess: (newMessage) => {
-      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-        if (!oldMessages.some(m => m.id === newMessage.id)) {
-          return [...oldMessages, newMessage];
-        }
-        return oldMessages;
-      });
-    },
+      queryClient.setQueryData<Message[]>(queryKey, (old = []) => [...old, newMessage]);
+    }
   });
 
   const handleWebSocketMessage = (newMessage: Message) => {
     if (newMessage.userId === user?.id) return;
-
-    queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
-      if (!oldMessages.some(m => m.id === newMessage.id)) {
-        return [...oldMessages, newMessage];
-      }
-      return oldMessages;
-    });
+    queryClient.setQueryData<Message[]>(queryKey, (old = []) => [...old, newMessage]);
   };
 
   return {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
-    handleWebSocketMessage,
+    handleReaction: reactionMutation.mutate,
+    handleWebSocketMessage
   };
 }
