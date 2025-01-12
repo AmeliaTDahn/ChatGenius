@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Loader2, Search, LogOut, Palette } from "lucide-react";
+import { UserPlus, Search, LogOut, Palette, Loader2 } from "lucide-react";
 import type { Channel, User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";

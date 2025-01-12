@@ -86,12 +86,23 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
 
   const deleteAccount = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/user/account', {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      try {
+        const res = await fetch('/api/user/account', {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || 'Failed to delete account');
+        }
+        return res.json();
+      } catch (err) {
+        console.error('Delete account error:', err);
+        throw err;
+      }
     },
     onSuccess: () => {
       toast({
@@ -99,12 +110,13 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
         description: "Your account has been permanently deleted.",
       });
       queryClient.clear();
-      window.location.href = '/';
+      setTimeout(() => window.location.href = '/', 1500);
     },
     onError: (error: Error) => {
+      console.error('Delete mutation error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to delete account. Please try again.",
         variant: "destructive",
       });
     }
