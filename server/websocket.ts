@@ -4,24 +4,41 @@ import type { IncomingMessage } from 'http';
 import type { User, Message } from '@db/schema';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
-import { users, messages, channels } from '@db/schema';
+import { users, messages } from '@db/schema';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
-  sessionId?: string;
+  tabId?: string;
   isAlive: boolean;
 }
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping';
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request' | 'message_read';
   channelId?: number;
   content?: string;
   userId?: number;
-  parentId?: number;
+  tabId?: string;
+  isOnline?: boolean;
+  message?: Message;
+  friendRequest?: {
+    id: number;
+    sender: {
+      id: number;
+      username: string;
+      avatarUrl?: string;
+    };
+  };
+  messageId?: number;
+  readAt?: string;
 };
 
 export function setupWebSocket(server: Server) {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({
+    server,
+    path: '/ws',
+  });
+
+  const clients = new Map<string, AuthenticatedWebSocket>();
 
   const heartbeat = (ws: AuthenticatedWebSocket) => {
     ws.isAlive = true;
@@ -31,6 +48,7 @@ export function setupWebSocket(server: Server) {
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
       if (!client.isAlive) {
+        if (client.userId) updateUserPresence(client.userId, false);
         return client.terminate();
       }
       client.isAlive = false;
@@ -38,7 +56,7 @@ export function setupWebSocket(server: Server) {
     });
   }, 30000);
 
-  const broadcastToOthers = async (channelId: number, message: any, senderId: number) => {
+  const broadcastToChannel = async (channelId: number, message: WSMessage, senderTabId: string, senderId: number) => {
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
       if (client.readyState === WebSocket.OPEN && client.userId !== senderId) {
@@ -47,80 +65,61 @@ export function setupWebSocket(server: Server) {
     });
   };
 
-  wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
+  const updateUserPresence = async (userId: number, isOnline: boolean) => {
+    await db.update(users).set({ isOnline }).where(eq(users.id, userId));
+    wss.clients.forEach((ws) => {
+      const client = ws as AuthenticatedWebSocket;
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'presence', userId, isOnline }));
+      }
+    });
+  };
+
+  wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
     try {
-      if (!(req as any).user?.id) {
-        ws.close(1008, 'Not authenticated');
+      const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
+      const userId = parseInt(urlParams.get('userId') || '0');
+      const tabId = urlParams.get('tabId');
+
+      if (!userId || !tabId) {
+        ws.close(1008, 'Missing userId or tabId');
         return;
       }
 
-      ws.userId = (req as any).user.id;
+      ws.userId = userId;
+      ws.tabId = tabId;
       ws.isAlive = true;
+
+      const clientKey = `${userId}-${tabId}`;
+      clients.set(clientKey, ws);
+
+      await updateUserPresence(userId, true);
 
       ws.on('pong', () => heartbeat(ws));
 
       ws.on('message', async (data) => {
-        try {
-          const message: WSMessage = JSON.parse(data.toString());
-
-          switch (message.type) {
-            case 'message': {
-              if (!message.channelId || !message.content || !ws.userId) {
-                return;
-              }
-
-              const [newMessage] = await db.insert(messages)
-                .values({
-                  content: message.content,
-                  channelId: message.channelId,
-                  userId: ws.userId,
-                  parentId: message.parentId
-                })
-                .returning();
-
-              if (newMessage) {
-                const fullMessage = await db.query.messages.findFirst({
-                  where: eq(messages.id, newMessage.id),
-                  with: {
-                    user: {
-                      columns: {
-                        id: true,
-                        username: true,
-                        avatarUrl: true,
-                      }
-                    },
-                    reactions: true,
-                    attachments: true
-                  }
-                });
-
-                // Send to all clients in the channel except the sender
-                await broadcastToOthers(message.channelId, {
-                  type: 'message',
-                  message: fullMessage
-                }, ws.userId);
-
-                // Send back to sender to confirm receipt
-                ws.send(JSON.stringify({
-                  type: 'message',
-                  message: fullMessage
-                }));
-              }
-              break;
+        const message: WSMessage = JSON.parse(data.toString());
+        switch (message.type) {
+          case 'message':
+            if (message.channelId && message.content && ws.userId) {
+              await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!, ws.userId);
             }
-
-            case 'typing': {
-              if (!message.channelId || !ws.userId) return;
-              await broadcastToOthers(message.channelId, {
-                type: 'typing',
-                channelId: message.channelId,
-                userId: ws.userId
-              }, ws.userId);
-              break;
+            break;
+          case 'typing':
+            if (message.channelId) {
+              await broadcastToChannel(message.channelId, { type: 'typing', channelId: message.channelId, userId: ws.userId }, ws.tabId!);
             }
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
+            break;
+          case 'ping':
+            ws.isAlive = true;
+            break;
+        }
+      });
+
+      ws.on('close', () => {
+        clients.delete(clientKey);
+        if (Array.from(clients.keys()).filter((key) => key.startsWith(`${userId}-`)).length === 0) {
+          updateUserPresence(userId, false);
         }
       });
 
@@ -128,14 +127,13 @@ export function setupWebSocket(server: Server) {
         console.error('WebSocket error:', error);
         ws.terminate();
       });
-
-    } catch (error) {
-      console.error('WebSocket connection error:', error);
+    } catch (err) {
+      console.error('Error in WebSocket connection:', err);
       ws.terminate();
     }
   });
 
   wss.on('close', () => clearInterval(interval));
 
-  return wss;
+  return { wss, broadcastToChannel };
 }

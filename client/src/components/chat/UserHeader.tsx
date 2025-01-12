@@ -107,10 +107,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
   const hasNotifications = friendRequests.length > 0 || channelInvites.length > 0;
 
-  const handleProfileClick = () => {
-    setShowSettings(true);
-  };
-
   return (
     <div className="flex flex-col border-b bg-background">
       {/* Top section with logo, user info, and main actions */}
@@ -120,57 +116,63 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           <Logo showText={false} />
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Button 
-                variant="ghost" 
-                onClick={handleProfileClick}
-                className="flex items-center gap-2 px-2 hover:bg-accent/10"
-              >
-                <div className="relative">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatarUrl || ""} />
-                    <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${getStatusColor(user.isOnline, user.hideActivity)}`} />
-                </div>
-                <span className="font-medium">{user.username}</span>
-              </Button>
+              <Avatar>
+                {user?.avatarUrl ? (
+                  <AvatarImage src={user.avatarUrl} alt={displayName} />
+                ) : (
+                  <AvatarFallback>{fallbackInitial}</AvatarFallback>
+                )}
+              </Avatar>
+              <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${getStatusColor(user.isOnline, user.hideActivity)}`} />
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
-                {user.hideActivity ? 'Activity Hidden' : 'Online'}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => updateStatus.mutate(false)}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    Show Activity
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => updateStatus.mutate(true)}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-500" />
-                    Hide Activity
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowSettings(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div>
+              <p className="font-medium text-sm">{displayName}</p>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
+                  {user.hideActivity ? 'Activity Hidden' : 'Online'}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate(false)}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      Show Activity
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus.mutate(true)}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-500" />
+                      Hide Activity
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowSettings(true)}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <div className="ml-auto">
+            <ThemeToggle />
           </div>
         </div>
 
         {/* Right side: Action buttons */}
         <div className="flex items-center gap-3">
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSettings(true)}
+            title="Settings"
+            className="w-9 h-9 cursor-pointer"
+          >
+            <UserIcon className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Action buttons section */}
       <div className="flex flex-col border-t">
-        <div className="border-b p-2">
-          <ThemeToggle className="w-full justify-start px-2 font-medium" />
-        </div>
         <div className="flex items-center gap-3 px-6 py-3">
           <Button
             variant="ghost"

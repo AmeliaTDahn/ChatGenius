@@ -6,6 +6,7 @@ import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import { WebSocketServer, WebSocket } from 'ws';
+import type { Message } from "@db/schema";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import path from "path";
@@ -119,12 +120,12 @@ export function registerRoutes(app: Express): Server {
     clearInterval(pingInterval);
   });
 
-  // Handle WebSocket upgrade
   httpServer.on('upgrade', (request, socket, head) => {
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
 
+    // Parse the session from the request
     const sessionParser = session(sessionSettings);
     sessionParser(request as any, {} as any, () => {
       // @ts-ignore - passport.session() types are not complete
@@ -139,7 +140,6 @@ export function registerRoutes(app: Express): Server {
           const extWs = ws as ExtendedWebSocket;
           extWs.userId = (request as any).user.id;
           extWs.sessionId = (request as any).sessionID;
-          extWs.isAlive = true;
           wss.emit('connection', extWs, request);
         });
       });
