@@ -315,7 +315,48 @@ export function registerRoutes(app: Express): Server {
         or(eq(friends.user1Id, userId), eq(friends.user2Id, userId))
       );
 
-      // Get all channels the user is part of
+      // Get all direct message channels first
+      const userDMChannels = await db.query.directMessageChannels.findMany({
+        where: or(
+          eq(directMessageChannels.user1Id, userId),
+          eq(directMessageChannels.user2Id, userId)
+        ),
+        columns: {
+          channelId: true
+        }
+      });
+
+      const dmChannelIds = userDMChannels.map(dc => dc.channelId);
+
+      // Delete direct messages if they exist
+      if (dmChannelIds.length > 0) {
+        console.log("Deleting user direct messages");
+        
+        // Delete message attachments in DM channels
+        await db.delete(messageAttachments).where(
+          inArray(
+            messageAttachments.messageId,
+            db.select({ id: messages.id }).from(messages).where(inArray(messages.channelId, dmChannelIds))
+          )
+        );
+
+        // Delete all messages in DM channels
+        await db.delete(messages).where(inArray(messages.channelId, dmChannelIds));
+        
+        // Delete DM channel memberships
+        await db.delete(channelMembers).where(inArray(channelMembers.channelId, dmChannelIds));
+        
+        // Delete DM relationships
+        await db.delete(directMessageChannels).where(or(
+          eq(directMessageChannels.user1Id, userId),
+          eq(directMessageChannels.user2Id, userId)
+        ));
+        
+        // Delete the DM channels themselves
+        await db.delete(channels).where(inArray(channels.id, dmChannelIds));
+      }
+
+      // Get all regular channels the user is part of
       const userChannels = await db.query.channelMembers.findMany({
         where: eq(channelMembers.userId, userId),
         columns: { channelId: true },
