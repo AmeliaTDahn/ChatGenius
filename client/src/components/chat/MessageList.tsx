@@ -32,6 +32,7 @@ export function MessageList({ channelId }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,6 +56,10 @@ export function MessageList({ channelId }: MessageListProps) {
       setShowThread(true);
     };
 
+    const handleImageError = (fileUrl: string) => {
+      setFailedImages(prev => new Set([...prev, fileUrl]));
+    };
+
     // Group reactions by emoji
     const reactionGroups = message.reactions?.reduce<Record<string, number>>((acc, reaction) => {
       acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
@@ -71,7 +76,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
     const isImageFile = (filename: string, mimeType?: string) => {
       if (mimeType?.startsWith('image/')) return true;
-      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
       return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
     };
 
@@ -104,56 +109,62 @@ export function MessageList({ channelId }: MessageListProps) {
 
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 space-y-2">
-              {message.attachments.map((attachment: MessageAttachment) => (
-                <div
-                  key={attachment.id}
-                  className="flex flex-col gap-2"
-                >
-                  {isImageFile(attachment.filename, attachment.mimeType) ? (
-                    <div className="relative group">
-                      <img
-                        src={attachment.fileUrl}
-                        alt={attachment.filename}
-                        className="max-w-[300px] max-h-[300px] rounded-md object-contain bg-secondary/50"
-                        loading="lazy"
-                      />
-                      <a
-                        href={attachment.fileUrl}
-                        download={attachment.filename}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Button variant="secondary" size="icon" className="h-8 w-8">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 p-2 rounded-md bg-secondary/50">
-                      <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {attachment.filename}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(attachment.fileSize)}
-                        </p>
+              {message.attachments.map((attachment: MessageAttachment) => {
+                const isImage = isImageFile(attachment.filename, attachment.mimeType);
+                const showFallback = failedImages.has(attachment.fileUrl);
+
+                return (
+                  <div
+                    key={attachment.id}
+                    className="flex flex-col gap-2"
+                  >
+                    {isImage && !showFallback ? (
+                      <div className="relative group max-w-2xl">
+                        <img
+                          src={attachment.fileUrl}
+                          alt={attachment.filename}
+                          className="rounded-lg object-contain max-h-[500px] bg-secondary/50"
+                          onError={() => handleImageError(attachment.fileUrl)}
+                          loading="lazy"
+                        />
+                        <a
+                          href={attachment.fileUrl}
+                          download={attachment.filename}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Button variant="secondary" size="icon" className="h-8 w-8">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </a>
                       </div>
-                      <a
-                        href={attachment.fileUrl}
-                        download={attachment.filename}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </a>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <div className="flex items-center gap-2 p-2 rounded-md bg-secondary/50">
+                        <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {attachment.filename}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(attachment.fileSize)}
+                          </p>
+                        </div>
+                        <a
+                          href={attachment.fileUrl}
+                          download={attachment.filename}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
