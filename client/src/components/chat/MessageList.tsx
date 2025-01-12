@@ -3,25 +3,10 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileIcon, Download, Reply } from "lucide-react";
-import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
+import { FileIcon, Download, Reply, MessageSquare } from "lucide-react";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
-
-function parseFormattedText(text: string) {
-  // Replace color tags with spans
-  text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
-    (_, color, content) => `<span style="color: ${color}">${content}</span>`);
-
-  // Replace bold tags
-  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // Replace italic tags
-  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-  return text;
-}
 
 type MessageListProps = {
   channelId: number;
@@ -83,6 +68,12 @@ export function MessageList({ channelId }: MessageListProps) {
             <span className="text-xs text-muted-foreground">
               {new Date(message.createdAt).toLocaleTimeString()}
             </span>
+            {message.replyCount > 0 && (
+              <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                <MessageSquare className="h-3 w-3" />
+                <span>{message.replyCount} replies</span>
+              </div>
+            )}
           </div>
           <div 
             className="text-sm mt-1 break-words"
@@ -193,4 +184,18 @@ export function MessageList({ channelId }: MessageListProps) {
       )}
     </div>
   );
+}
+
+function parseFormattedText(text: string) {
+  // Replace color tags with spans
+  text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
+    (_, color, content) => `<span style="color: ${color}">${content}</span>`);
+
+  // Replace bold tags
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Replace italic tags
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  return text;
 }
