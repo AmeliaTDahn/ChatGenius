@@ -1189,6 +1189,107 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ message: "Error creating friend request" });
     }
   });
+  app.put("/api/friend-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const requestId = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!requestId || !status) {
+        return res.status(400).json({ message: "Request ID and status are required" });
+      }
+
+      if (!['accepted', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      // Get the friend request
+      const [friendRequest] = await db
+        .select()
+        .from(friendRequests)
+        .where(and(
+          eq(friendRequests.id, requestId),
+          eq(friendRequests.receiverId, req.user.id),
+          eq(friendRequests.status, 'pending')
+        ))
+        .limit(1);
+
+      if (!friendRequest) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+
+      // Update the request status
+      const [updatedRequest] = await db
+        .update(friendRequests)
+        .set({ status })
+        .where(eq(friendRequests.id, requestId))
+        .returning();
+
+      if (status === 'accepted') {
+        // Create friendship
+        await db.insert(friends).values({
+          user1Id: friendRequest.senderId,
+          user2Id: friendRequest.receiverId,
+          createdAt: new Date()
+        });
+
+        // Create DM channel for the new friends
+        const [dmChannel] = await db
+          .insert(channels)
+          .values({
+            name: `DM-${friendRequest.senderId}-${friendRequest.receiverId}`,
+            isDirectMessage: true,
+          })
+          .returning();
+
+        // Create direct message channel relationship
+        await db
+          .insert(directMessageChannels)
+          .values({
+            channelId: dmChannel.id,
+            user1Id: friendRequest.senderId,
+            user2Id: friendRequest.receiverId,
+          });
+
+        // Add both users as channel members
+        await db.insert(channelMembers).values([
+          {
+            userId: friendRequest.senderId,
+            channelId: dmChannel.id,
+          },
+          {
+            userId: friendRequest.receiverId,
+            channelId: dmChannel.id,
+          },
+        ]);
+
+        // Get sender info for the response
+        const [sender] = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            avatarUrl: users.avatarUrl,
+          })
+          .from(users)
+          .where(eq(users.id, friendRequest.senderId))
+          .limit(1);
+
+        res.json({
+          ...updatedRequest,
+          sender,
+          dmChannel
+        });
+      } else {
+        res.json(updatedRequest);
+      }
+    } catch (error) {
+      console.error("Error responding to friend request:", error);
+      res.status(500).json({ message: "Error responding to friend request" });
+    }
+  });
 
   return httpServer;
 }
