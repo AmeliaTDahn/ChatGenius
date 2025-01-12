@@ -160,11 +160,16 @@ export function MessageList({ channelId }: MessageListProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-xs"
+                className="h-6 px-2 text-xs relative"
                 onClick={handleReply}
               >
                 <Reply className="h-3 w-3 mr-1" />
-                Reply {message.replyCount > 0 && `(${message.replyCount})`}
+                Reply
+                {message.replyCount > 0 && (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({message.replyCount})
+                  </span>
+                )}
               </Button>
             </div>
             <div className="flex gap-1 flex-wrap">
