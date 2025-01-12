@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -161,23 +161,7 @@ export const friends = pgTable("friends", {
   user1Id: integer("user1_id").references(() => users.id).notNull(),
   user2Id: integer("user2_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => {
-  return {
-    // Ensure unique friendships and prevent duplicates
-    uniq: unique().on(table.user1Id, table.user2Id),
-  };
 });
-
-export const friendsRelations = relations(friends, ({ one }) => ({
-  user1: one(users, {
-    fields: [friends.user1Id],
-    references: [users.id],
-  }),
-  user2: one(users, {
-    fields: [friends.user2Id],
-    references: [users.id],
-  }),
-}));
 
 // Relations
 export const friendRequestRelations = relations(friendRequests, ({ one }) => ({

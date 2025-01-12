@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { SmilePlus } from "lucide-react";
 
-const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "😢", "🎉", "🚀", "👀", "🔥", "💯", "🙏", "✨"];
+const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "😢", "🎉", "🚀", "👀"];
 
 type ReactionPickerProps = {
   onSelectEmoji: (emoji: string) => void;

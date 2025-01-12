@@ -13,10 +13,9 @@ import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
   onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
-  isThread?: boolean;
 };
 
-export function MessageInput({ onSendMessage, isThread = false }: MessageInputProps) {
+export function MessageInput({ onSendMessage }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [currentFormat, setCurrentFormat] = useState<{
@@ -168,53 +167,48 @@ export function MessageInput({ onSendMessage, isThread = false }: MessageInputPr
           >
             <Paperclip className="h-4 w-4" />
           </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant={currentFormat.bold ? "secondary" : "ghost"}
+            onClick={() => toggleFormat('bold')}
+          >
+            <Bold className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant={currentFormat.italic ? "secondary" : "ghost"}
+            onClick={() => toggleFormat('italic')}
+          >
+            <Italic className="h-4 w-4" />
+          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 type="button"
                 size="icon"
-                variant={Object.values(currentFormat).some(Boolean) ? "secondary" : "ghost"}
+                variant={currentFormat.color ? "secondary" : "ghost"}
               >
                 <Palette className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-52 p-2">
-              <div className="space-y-2">
-                <Button
-                  type="button"
-                  variant={currentFormat.bold ? "secondary" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => toggleFormat('bold')}
-                >
-                  <Bold className="h-4 w-4 mr-2" /> Bold
-                </Button>
-                <Button
-                  type="button"
-                  variant={currentFormat.italic ? "secondary" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => toggleFormat('italic')}
-                >
-                  <Italic className="h-4 w-4 mr-2" /> Italic
-                </Button>
-                <div className="pt-2 border-t">
-                  <p className="text-sm mb-2">Colors</p>
-                  <div className="grid grid-cols-4 gap-1">
-                    {COLORS.map((color) => (
-                      <Button
-                        key={color}
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className={cn(
-                          "w-6 h-6 p-0",
-                          currentFormat.color === color && "ring-2 ring-primary"
-                        )}
-                        style={{ backgroundColor: color }}
-                        onClick={() => toggleFormat('color', color)}
-                      />
-                    ))}
-                  </div>
-                </div>
+            <PopoverContent className="w-auto p-2">
+              <div className="flex gap-1">
+                {COLORS.map((color) => (
+                  <Button
+                    key={color}
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "w-6 h-6 p-0",
+                      currentFormat.color === color && "ring-2 ring-primary"
+                    )}
+                    style={{ backgroundColor: color }}
+                    onClick={() => toggleFormat('color', color)}
+                  />
+                ))}
               </div>
             </PopoverContent>
           </Popover>
@@ -226,10 +220,7 @@ export function MessageInput({ onSendMessage, isThread = false }: MessageInputPr
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className={cn(
-              "resize-none pr-14",
-              isThread ? "min-h-[100px] max-h-[300px]" : "min-h-[44px] max-h-[200px]"
-            )}
+            className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
               fontWeight: currentFormat.bold ? 'bold' : 'normal',
               fontStyle: currentFormat.italic ? 'italic' : 'normal',

@@ -91,7 +91,7 @@ export function ThreadView({ message, onClose }: ThreadViewProps) {
       </ScrollArea>
 
       <div className="p-4 border-t mt-auto">
-        <MessageInput onSendMessage={handleSendReply} isThread={true} />
+        <MessageInput onSendMessage={handleSendReply} />
       </div>
     </div>
   );

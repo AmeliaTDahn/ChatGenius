@@ -3,17 +3,32 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Loader2, FileIcon, Download, Reply } from "lucide-react";
+import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
-import { FileIcon, Download, Reply, MessageSquare, Loader2 } from "lucide-react";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
+
+function parseFormattedText(text: string) {
+  // Replace color tags with spans
+  text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
+    (_, color, content) => `<span style="color: ${color}">${content}</span>`);
+
+  // Replace bold tags
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Replace italic tags
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  return text;
+}
 
 type MessageListProps = {
   channelId: number;
 };
 
 export function MessageList({ channelId }: MessageListProps) {
-  const { messages, isLoading } = useMessages(channelId);
+  const { messages, isLoading, addReaction } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
@@ -31,10 +46,20 @@ export function MessageList({ channelId }: MessageListProps) {
   }
 
   const MessageComponent = ({ message }: { message: Message }) => {
+    const handleReaction = async (emoji: string) => {
+      await addReaction({ messageId: message.id, emoji });
+    };
+
     const handleReply = () => {
       setSelectedMessage(message);
       setShowThread(true);
     };
+
+    // Group reactions by emoji
+    const reactionGroups = message.reactions?.reduce<Record<string, number>>((acc, reaction) => {
+      acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+      return acc;
+    }, {}) ?? {};
 
     const formatFileSize = (bytes: number) => {
       if (bytes < 1024) return bytes + ' B';
@@ -45,7 +70,7 @@ export function MessageList({ channelId }: MessageListProps) {
     };
 
     const isImageFile = (filename: string) => {
-      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'];
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
       return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
     };
 
@@ -68,12 +93,6 @@ export function MessageList({ channelId }: MessageListProps) {
             <span className="text-xs text-muted-foreground">
               {new Date(message.createdAt).toLocaleTimeString()}
             </span>
-            {message.replyCount > 0 && (
-              <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                <MessageSquare className="h-3 w-3" />
-                <span>{message.replyCount} replies</span>
-              </div>
-            )}
           </div>
           <div 
             className="text-sm mt-1 break-words"
@@ -136,24 +155,41 @@ export function MessageList({ channelId }: MessageListProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                "h-6 px-2 text-xs relative flex items-center gap-1",
-                message.replyCount > 0 && "bg-primary/10 hover:bg-primary/20 text-primary"
-              )}
+              className="h-6 px-2 text-xs"
               onClick={handleReply}
             >
-              <Reply className={cn("h-3 w-3", message.replyCount > 0 && "text-primary")} />
-              <span>Reply</span>
-              {message.replyCount > 0 && (
-                <span className="inline-flex items-center justify-center bg-primary text-primary-foreground rounded-full text-[10px] min-w-[16px] h-4 px-1">
-                  {message.replyCount}
-                </span>
-              )}
+              <Reply className="h-3 w-3 mr-1" />
+              Reply
             </Button>
+            {message.replyCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                onClick={handleReply}
+              >
+                {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+              </Button>
+            )}
+            <div className="flex gap-1 flex-wrap">
+              {Object.entries(reactionGroups).map(([emoji, count]) => (
+                <Button
+                  key={emoji}
+                  variant="secondary"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => handleReaction(emoji)}
+                >
+                  <span>{emoji}</span>
+                  <span className="ml-1">{count}</span>
+                </Button>
+              ))}
+            </div>
+            <ReactionPicker onSelectEmoji={handleReaction} />
           </div>
         </div>
       </div>
@@ -164,8 +200,7 @@ export function MessageList({ channelId }: MessageListProps) {
     <div className="flex h-full overflow-hidden">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {/* Only show messages that are not replies (no parentId) */}
-          {messages.filter(message => !message.parentId).map((message) => (
+          {messages.map((message) => (
             <MessageComponent key={message.id} message={message} />
           ))}
           <div ref={bottomRef} />
@@ -184,18 +219,4 @@ export function MessageList({ channelId }: MessageListProps) {
       )}
     </div>
   );
-}
-
-function parseFormattedText(text: string) {
-  // Replace color tags with spans
-  text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
-    (_, color, content) => `<span style="color: ${color}">${content}</span>`);
-
-  // Replace bold tags
-  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // Replace italic tags
-  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-  return text;
 }

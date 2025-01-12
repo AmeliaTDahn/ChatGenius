@@ -56,22 +56,13 @@ export function UserSearch() {
     queryKey: ['/api/users/search', searchQuery],
     queryFn: async () => {
       if (!searchQuery.trim()) return [];
-      try {
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery.trim())}`, {
-          credentials: 'include'
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        console.log('Search results:', data);
-        return data;
-      } catch (error) {
-        console.error('Search error:', error);
-        throw error;
-      }
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
     },
-    enabled: searchQuery.length >= 2,
-    staleTime: 0, // Don't cache results
-    retry: false
+    enabled: searchQuery.length >= 2
   });
 
   const { data: recommendations, isLoading: isLoadingRecommendations } = useQuery<RecommendedFriend[]>({
