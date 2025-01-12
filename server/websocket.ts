@@ -4,7 +4,7 @@ import type { IncomingMessage } from 'http';
 import type { User, Message } from '@db/schema';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
-import { users, messages } from '@db/schema';
+import { users, messages, channels } from '@db/schema';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -13,32 +13,17 @@ interface AuthenticatedWebSocket extends WebSocket {
 }
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request' | 'message_read';
+  type: 'message' | 'typing' | 'presence';
   channelId?: number;
   content?: string;
   userId?: number;
   tabId?: string;
   isOnline?: boolean;
-  message?: Message;
-  friendRequest?: {
-    id: number;
-    sender: {
-      id: number;
-      username: string;
-      avatarUrl?: string;
-    };
-  };
-  messageId?: number;
-  readAt?: string;
+  parentId?: number;
 };
 
 export function setupWebSocket(server: Server) {
-  const wss = new WebSocketServer({
-    server,
-    path: '/ws',
-  });
-
-  const clients = new Map<string, AuthenticatedWebSocket>();
+  const wss = new WebSocketServer({ noServer: true });
 
   const heartbeat = (ws: AuthenticatedWebSocket) => {
     ws.isAlive = true;
@@ -56,10 +41,17 @@ export function setupWebSocket(server: Server) {
     });
   }, 30000);
 
-  const broadcastToChannel = async (channelId: number, message: WSMessage, senderTabId: string, senderId: number) => {
+  const broadcastToChannel = async (channelId: number, message: any) => {
+    const channelMembers = await db
+      .select({ userId: channels.id })
+      .from(channels)
+      .where(eq(channels.id, channelId));
+
+    const memberIds = new Set(channelMembers.map(m => m.userId));
+
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
-      if (client.readyState === WebSocket.OPEN && client.userId !== senderId) {
+      if (client.readyState === WebSocket.OPEN && client.userId && memberIds.has(client.userId)) {
         client.send(JSON.stringify(message));
       }
     });
@@ -75,65 +67,90 @@ export function setupWebSocket(server: Server) {
     });
   };
 
-  wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
+  wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
-      const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
-      const userId = parseInt(urlParams.get('userId') || '0');
-      const tabId = urlParams.get('tabId');
-
-      if (!userId || !tabId) {
-        ws.close(1008, 'Missing userId or tabId');
+      if (!req.session?.passport?.user) {
+        ws.close(1008, 'Not authenticated');
         return;
       }
 
-      ws.userId = userId;
-      ws.tabId = tabId;
+      ws.userId = req.session.passport.user;
       ws.isAlive = true;
 
-      const clientKey = `${userId}-${tabId}`;
-      clients.set(clientKey, ws);
-
-      await updateUserPresence(userId, true);
+      await updateUserPresence(ws.userId, true);
 
       ws.on('pong', () => heartbeat(ws));
 
       ws.on('message', async (data) => {
-        const message: WSMessage = JSON.parse(data.toString());
-        switch (message.type) {
-          case 'message':
-            if (message.channelId && message.content && ws.userId) {
-              await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!, ws.userId);
+        try {
+          const message: WSMessage = JSON.parse(data.toString());
+
+          switch (message.type) {
+            case 'message': {
+              if (!message.channelId || !message.content || !ws.userId) {
+                return;
+              }
+
+              const [newMessage] = await db.insert(messages)
+                .values({
+                  content: message.content,
+                  channelId: message.channelId,
+                  userId: ws.userId,
+                  parentId: message.parentId
+                })
+                .returning();
+
+              if (newMessage) {
+                const fullMessage = await db.query.messages.findFirst({
+                  where: eq(messages.id, newMessage.id),
+                  with: {
+                    user: {
+                      columns: {
+                        id: true,
+                        username: true,
+                        avatarUrl: true,
+                      }
+                    }
+                  }
+                });
+
+                await broadcastToChannel(message.channelId, {
+                  type: 'message',
+                  message: fullMessage
+                });
+              }
+              break;
             }
-            break;
-          case 'typing':
-            if (message.channelId) {
-              await broadcastToChannel(message.channelId, { type: 'typing', channelId: message.channelId, userId: ws.userId }, ws.tabId!);
+
+            case 'typing': {
+              if (message.channelId) {
+                await broadcastToChannel(message.channelId, {
+                  type: 'typing',
+                  channelId: message.channelId,
+                  userId: ws.userId
+                });
+              }
+              break;
             }
-            break;
-          case 'ping':
-            ws.isAlive = true;
-            break;
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
         }
       });
 
       ws.on('close', () => {
-        clients.delete(clientKey);
-        if (Array.from(clients.keys()).filter((key) => key.startsWith(`${userId}-`)).length === 0) {
-          updateUserPresence(userId, false);
+        if (ws.userId) {
+          updateUserPresence(ws.userId, false);
         }
       });
 
-      ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-        ws.terminate();
-      });
-    } catch (err) {
-      console.error('Error in WebSocket connection:', err);
+    } catch (error) {
+      console.error('WebSocket connection error:', error);
       ws.terminate();
     }
   });
 
   wss.on('close', () => clearInterval(interval));
 
-  return { wss, broadcastToChannel };
+  return wss;
 }

@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Loader2, Search, LogOut, Palette } from "lucide-react";
+import { UserPlus, Loader2, Search, LogOut } from "lucide-react";
 import type { Channel, User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,7 +42,7 @@ export default function ChatPage() {
   const { user, logout } = useUser();
   const { toast } = useToast();
   const [selectedChannel, setSelectedChannel] = useState<ExtendedChannel | null>(null);
-  const { handleWebSocketMessage, sendMessage: sendWebSocketMessage } = useMessages(selectedChannel?.id || 0);
+  const { handleWebSocketMessage } = useMessages(selectedChannel?.id || 0);
   const { sendMessage: sendWsMessage } = useWebSocket(user, handleWebSocketMessage);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
@@ -75,49 +75,14 @@ export default function ChatPage() {
     }
   };
 
-  const handleColorChange = async (color: string) => {
-    if (!selectedChannel) return;
-
-    try {
-      const updatedChannel = await updateChannelColor({
+  const handleSendMessage = async (content: string, files?: File[]) => {
+    if (selectedChannel && content.trim() && user) {
+      sendWsMessage({
+        type: "message",
         channelId: selectedChannel.id,
-        backgroundColor: color,
+        content: content.trim(),
+        userId: user.id,
       });
-
-      // Update the selected channel state with the new color
-      setSelectedChannel(prev => prev ? {
-        ...prev,
-        backgroundColor: updatedChannel.backgroundColor
-      } : null);
-
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update channel color",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSendMessage = async (content: string, files?: File[], tabId?: string | null) => {
-    if (selectedChannel && (content.trim() || (files && files.length > 0)) && user) {
-      try {
-        await sendWebSocketMessage({ content: content.trim(), files });
-        sendWsMessage({
-          type: "message",
-          channelId: selectedChannel.id,
-          content: content.trim(),
-          userId: user.id,
-          tabId: tabId
-        });
-      } catch (error: any) {
-        console.error('Failed to send message:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to send message",
-          variant: "destructive",
-        });
-      }
     }
   };
 
