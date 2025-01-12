@@ -1,6 +1,6 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Bell, Users, User as UserIcon } from "lucide-react";
+import { UserPlus, Bell, Users, User as UserIcon, Settings } from "lucide-react";
 import type { User } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/ui/logo";
@@ -13,8 +13,7 @@ import {
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { UserSettings } from "./UserSettings";
 import { useState, useEffect } from "react";
-import { ThemeToggle } from "@/components/ui/theme-toggle"; // Added import
-
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 type UserHeaderProps = {
   user: User;
@@ -145,11 +144,15 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
                       Hide Activity
                     </div>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowSettings(true)}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-          <div className="ml-auto"> {/* Added div for theme toggle */}
+          <div className="ml-auto">
             <ThemeToggle />
           </div>
         </div>
@@ -161,7 +164,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
             size="icon"
             onClick={() => setShowSettings(true)}
             title="Settings"
-            className="w-9 h-9"
+            className="w-9 h-9 cursor-pointer"
           >
             <UserIcon className="h-5 w-5" />
           </Button>
@@ -170,7 +173,7 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
       {/* Action buttons section */}
       <div className="flex flex-col border-t">
-        <div className="flex items-center gap-3 px-6 py-3"> {/*Added div for better layout*/}
+        <div className="flex items-center gap-3 px-6 py-3">
           <Button
             variant="ghost"
             onClick={onViewFriends}
@@ -190,7 +193,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
           </Button>
         </div>
 
-
         <Button
           variant="ghost"
           onClick={onViewRequests}
@@ -205,9 +207,11 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
       </div>
 
       {/* Settings Dialog */}
-      {showSettings && (
-        <UserSettings user={user} onClose={() => setShowSettings(false)} />
-      )}
+      <UserSettings 
+        user={user} 
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)} 
+      />
     </div>
   );
 }

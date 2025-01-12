@@ -60,6 +60,32 @@ export function useMessages(channelId: number, parentId?: number) {
     },
   });
 
+  const addReaction = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: number, emoji: string }) => {
+      const res = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ emoji }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      return res.json() as Promise<Message>;
+    },
+    onSuccess: (updatedMessage) => {
+      queryClient.setQueryData<Message[]>(queryKey, (oldMessages = []) => {
+        return oldMessages.map(msg => 
+          msg.id === updatedMessage.id ? updatedMessage : msg
+        );
+      });
+    },
+  });
+
   const handleWebSocketMessage = (newMessage: Message) => {
     if (newMessage.userId === user?.id) return;
 
@@ -75,6 +101,7 @@ export function useMessages(channelId: number, parentId?: number) {
     messages: messages || [],
     isLoading,
     sendMessage: sendMessage.mutateAsync,
+    addReaction: addReaction.mutateAsync,
     handleWebSocketMessage,
   };
 }

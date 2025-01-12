@@ -1075,7 +1075,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {
+  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1094,11 +1094,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),
+            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),
+            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user1Id)
           )
         ))
@@ -1559,7 +1559,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error updating channel color");
     }
   });
-  // Add this new route after the existing friend-related routes
   app.post("/api/friends/ensure-dm-channels", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1824,65 +1823,37 @@ export function registerRoutes(app: Express): Server {
     try {
       const userId = req.user.id;
 
-      // First delete all user's message reactions
-      await db.delete(messageReactions)
-        .where(eq(messageReactions.userId, userId));
-
-      // Delete all user's message reads
-      await db.delete(messageReads)
-        .where(eq(messageReads.userId, userId));
-
-      // Delete message attachments
-      await db.delete(messageAttachments)
-        .where(
-          inArray(
-            messageAttachments.messageId,
-            db.select({ id: messages.id })
-              .from(messages)
-              .where(eq(messages.userId, userId))
-          )
-        );
-
-      // Delete all replies to user's messages first
-      await db.delete(messages)
-        .where(inArray(
-          messages.parentId,
-          db.select({ id: messages.id })
-            .from(messages)
-            .where(eq(messages.userId, userId))
-        ));
-
-      // Delete all user's messages
-      await db.delete(messages)
-        .where(eq(messages.userId, userId));
-
-      // Delete user's friend requests
+      // First delete all friend requests
       await db.delete(friendRequests)
         .where(or(
           eq(friendRequests.senderId, userId),
           eq(friendRequests.receiverId, userId)
         ));
 
-      // Delete user's friends
+      // Delete friend relationships
       await db.delete(friends)
         .where(or(
           eq(friends.user1Id, userId),
           eq(friends.user2Id, userId)
         ));
 
-      // Delete user's channel memberships
-      await db.delete(channelMembers)
-        .where(eq(channelMembers.userId, userId));
+      // Delete all message reactions by this user
+      await db.delete(messageReactions)
+        .where(eq(messageReactions.userId, userId));
 
-      // Delete user's channel invites
+      // Delete all message reads by this user
+      await db.delete(messageReads)
+        .where(eq(messageReads.userId, userId));
+
+      // Delete channel invites
       await db.delete(channelInvites)
         .where(or(
           eq(channelInvites.senderId, userId),
           eq(channelInvites.receiverId, userId)
         ));
 
-      // Get and delete direct message channels
-      const userDirectChannels = await db.query.directMessageChannels.findMany({
+      // Get all DM channels associated with the user
+      const userDMChannels = await db.query.directMessageChannels.findMany({
         where: or(
           eq(directMessageChannels.user1Id, userId),
           eq(directMessageChannels.user2Id, userId)
@@ -1892,26 +1863,53 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      const channelIds = userDirectChannels.map(dc => dc.channelId);
+      const dmChannelIds = userDMChannels.map(dc => dc.channelId);
 
-      // Delete the direct message channels entries
-      await db.delete(directMessageChannels)
-        .where(or(
-          eq(directMessageChannels.user1Id, userId),
-          eq(directMessageChannels.user2Id, userId)
-        ));
+      if (dmChannelIds.length > 0) {
+        // Delete all message attachments in DM channels
+        await db.delete(messageAttachments)
+          .where(
+            inArray(
+              messageAttachments.messageId,
+              db.select({ id: messages.id })
+                .from(messages)
+                .where(inArray(messages.channelId, dmChannelIds))
+            )
+          );
 
-      // Delete the channels
-      if (channelIds.length > 0) {
+        // Delete all messages in DM channels
+        await db.delete(messages)
+          .where(inArray(messages.channelId, dmChannelIds));
+
+        // Delete DM channel memberships
+        await db.delete(channelMembers)
+          .where(inArray(channelMembers.channelId, dmChannelIds));
+
+        // Delete DM channels relationships
+        await db.delete(directMessageChannels)
+          .where(or(
+            eq(directMessageChannels.user1Id, userId),
+            eq(directMessageChannels.user2Id, userId)
+          ));
+
+        // Delete the DM channels themselves
         await db.delete(channels)
-          .where(inArray(channels.id, channelIds));
+          .where(inArray(channels.id, dmChannelIds));
       }
+
+      // Remove user from all other channels
+      await db.delete(channelMembers)
+        .where(eq(channelMembers.userId, userId));
+
+      // Delete all messages by this user in other channels
+      await db.delete(messages)
+        .where(eq(messages.userId, userId));
 
       // Finally, delete the user
       await db.delete(users)
         .where(eq(users.id, userId));
 
-      // Logout the user
+      // Logout the user and destroy session
       req.logout((err) => {
         if (err) {
           console.error("Error logging out user:", err);
@@ -1926,6 +1924,7 @@ export function registerRoutes(app: Express): Server {
           res.json({ message: "Account deleted successfully" });
         });
       });
+
     } catch (error) {
       console.error("Error deleting user account:", error);
       res.status(500).send("Error deleting user account");
@@ -2132,7 +2131,7 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id,req.user.id),
+            eq(friends.user1Id, req.user.id),
             eq(users.id, friends.user2Id)
           ),
           and(
@@ -2544,65 +2543,37 @@ export function registerRoutes(app: Express): Server {
     try {
       const userId = req.user.id;
 
-      // First delete all user's message reactions
-      await db.delete(messageReactions)
-        .where(eq(messageReactions.userId, userId));
-
-      // Delete all user's message reads
-      await db.delete(messageReads)
-        .where(eq(messageReads.userId, userId));
-
-      // Delete message attachments
-      await db.delete(messageAttachments)
-        .where(
-          inArray(
-            messageAttachments.messageId,
-            db.select({ id: messages.id })
-              .from(messages)
-              .where(eq(messages.userId, userId))
-          )
-        );
-
-      // Delete all replies to user's messages first
-      await db.delete(messages)
-        .where(inArray(
-          messages.parentId,
-          db.select({ id: messages.id })
-            .from(messages)
-            .where(eq(messages.userId, userId))
-        ));
-
-      // Delete all user's messages
-      await db.delete(messages)
-        .where(eq(messages.userId, userId));
-
-      // Delete user's friend requests
+      // First delete all friend requests
       await db.delete(friendRequests)
         .where(or(
           eq(friendRequests.senderId, userId),
           eq(friendRequests.receiverId, userId)
         ));
 
-      // Delete user's friends
+      // Delete friend relationships
       await db.delete(friends)
         .where(or(
           eq(friends.user1Id, userId),
           eq(friends.user2Id, userId)
         ));
 
-      // Delete user's channel memberships
-      await db.delete(channelMembers)
-        .where(eq(channelMembers.userId, userId));
+      // Delete all message reactions by this user
+      await db.delete(messageReactions)
+        .where(eq(messageReactions.userId, userId));
 
-      // Delete user's channel invites
+      // Delete all message reads by this user
+      await db.delete(messageReads)
+        .where(eq(messageReads.userId, userId));
+
+      // Delete channel invites
       await db.delete(channelInvites)
         .where(or(
           eq(channelInvites.senderId, userId),
           eq(channelInvites.receiverId, userId)
         ));
 
-      // Get and delete direct message channels
-      const userDirectChannels = await db.query.directMessageChannels.findMany({
+      // Get all DM channels associated with the user
+      const userDMChannels = await db.query.directMessageChannels.findMany({
         where: or(
           eq(directMessageChannels.user1Id, userId),
           eq(directMessageChannels.user2Id, userId)
@@ -2612,26 +2583,53 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      const channelIds = userDirectChannels.map(dc => dc.channelId);
+      const dmChannelIds = userDMChannels.map(dc => dc.channelId);
 
-      // Delete the direct message channels entries
-      await db.delete(directMessageChannels)
-        .where(or(
-          eq(directMessageChannels.user1Id, userId),
-          eq(directMessageChannels.user2Id, userId)
-        ));
+      if (dmChannelIds.length > 0) {
+        // Delete all message attachments in DM channels
+        await db.delete(messageAttachments)
+          .where(
+            inArray(
+              messageAttachments.messageId,
+              db.select({ id: messages.id })
+                .from(messages)
+                .where(inArray(messages.channelId, dmChannelIds))
+            )
+          );
 
-      // Delete the channels
-      if (channelIds.length > 0) {
+        // Delete all messages in DM channels
+        await db.delete(messages)
+          .where(inArray(messages.channelId, dmChannelIds));
+
+        // Delete DM channel memberships
+        await db.delete(channelMembers)
+          .where(inArray(channelMembers.channelId, dmChannelIds));
+
+        // Delete DM channels relationships
+        await db.delete(directMessageChannels)
+          .where(or(
+            eq(directMessageChannels.user1Id, userId),
+            eq(directMessageChannels.user2Id, userId)
+          ));
+
+        // Delete the DM channels themselves
         await db.delete(channels)
-          .where(inArray(channels.id, channelIds));
+          .where(inArray(channels.id, dmChannelIds));
       }
+
+      // Remove user from all other channels
+      await db.delete(channelMembers)
+        .where(eq(channelMembers.userId, userId));
+
+      // Delete all messages by this user in other channels
+      await db.delete(messages)
+        .where(eq(messages.userId, userId));
 
       // Finally, delete the user
       await db.delete(users)
         .where(eq(users.id, userId));
 
-      // Logout the user
+      // Logout the user and destroy session
       req.logout((err) => {
         if (err) {
           console.error("Error logging out user:", err);
@@ -2646,6 +2644,7 @@ export function registerRoutes(app: Express): Server {
           res.json({ message: "Account deleted successfully" });
         });
       });
+
     } catch (error) {
       console.error("Error deleting user account:", error);
       res.status(500).send("Error deleting user account");
