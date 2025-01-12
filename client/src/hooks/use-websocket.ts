@@ -3,91 +3,107 @@ import type { User, Message } from '@db/schema';
 import { useToast } from '@/hooks/use-toast';
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request';
+  type: 'message' | 'typing' | 'presence' | 'ping';
   channelId?: number;
   content?: string;
   userId?: number;
   tabId?: string;
   isOnline?: boolean;
   message?: Message;
-  friendRequest?: {
-    id: number;
-    sender: {
-      id: number;
-      username: string;
-      avatarUrl?: string;
-    };
-  };
+  parentId?: number;
 };
 
 export function useWebSocket(user: User | null, onMessage?: (message: Message) => void) {
   const ws = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-
-  const tabId = useRef<string | null>(null);
-
-  if (!tabId.current) {
-    if (!localStorage.getItem('tabId')) {
-      localStorage.setItem('tabId', `${Date.now()}-${Math.random()}`);
-    }
-    tabId.current = localStorage.getItem('tabId');
-  }
+  const reconnectTimeout = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (!user) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${tabId.current}`;
-    ws.current = new WebSocket(wsUrl);
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
 
-    ws.current.onmessage = (event) => {
-      const data: WSMessage = JSON.parse(event.data);
-
-      switch (data.type) {
-        case 'message':
-          if (data.message && onMessage) {
-            onMessage(data.message);
-          }
-          break;
-        case 'presence':
-          break;
-        case 'friend_request':
-          if (data.friendRequest) {
-            toast({
-              title: 'New Friend Request',
-              description: `${data.friendRequest.sender.username} sent you a friend request!`,
-              duration: 5000,
-            });
-          }
-          break;
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        return;
       }
-    };
 
-    ws.current.onclose = () => {
-      setTimeout(() => {
-        if (user) {
-          ws.current = new WebSocket(wsUrl);
+      ws.current = new WebSocket(wsUrl);
+
+      ws.current.onopen = () => {
+        console.log('WebSocket connected');
+        if (reconnectTimeout.current) {
+          clearTimeout(reconnectTimeout.current);
+          reconnectTimeout.current = undefined;
         }
-      }, 1000);
+      };
+
+      ws.current.onmessage = (event) => {
+        try {
+          const data: WSMessage = JSON.parse(event.data);
+
+          switch (data.type) {
+            case 'message':
+              if (data.message && onMessage) {
+                onMessage(data.message);
+              }
+              break;
+            case 'presence':
+              // Handle presence updates if needed
+              break;
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
+
+      ws.current.onclose = () => {
+        console.log('WebSocket disconnected, attempting to reconnect...');
+        if (!reconnectTimeout.current) {
+          reconnectTimeout.current = setTimeout(() => {
+            connect();
+          }, 3000);
+        }
+      };
+
+      ws.current.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
     };
 
+    connect();
+
+    // Ping to keep connection alive
     const pingInterval = setInterval(() => {
       if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ type: 'ping', tabId: tabId.current }));
+        ws.current.send(JSON.stringify({ type: 'ping' }));
       }
     }, 25000);
 
     return () => {
       clearInterval(pingInterval);
-      ws.current?.close();
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
+      if (ws.current) {
+        ws.current.close();
+      }
     };
-  }, [user, onMessage, toast]);
+  }, [user, onMessage]);
 
-  const sendMessage = useCallback((message: WSMessage & { userId: number }) => {
+  const sendMessage = useCallback((message: WSMessage) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ ...message, tabId: tabId.current }));
+      ws.current.send(JSON.stringify(message));
+    } else {
+      console.error('WebSocket is not connected');
+      toast({
+        title: "Connection Error",
+        description: "Unable to send message. Please try again.",
+        variant: "destructive"
+      });
     }
-  }, []);
+  }, [toast]);
 
   return { sendMessage };
 }

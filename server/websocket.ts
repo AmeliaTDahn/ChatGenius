@@ -8,17 +8,15 @@ import { users, messages, channels } from '@db/schema';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
-  tabId?: string;
+  sessionId?: string;
   isAlive: boolean;
 }
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence';
+  type: 'message' | 'typing' | 'presence' | 'ping';
   channelId?: number;
   content?: string;
   userId?: number;
-  tabId?: string;
-  isOnline?: boolean;
   parentId?: number;
 };
 
@@ -33,7 +31,6 @@ export function setupWebSocket(server: Server) {
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
       if (!client.isAlive) {
-        if (client.userId) updateUserPresence(client.userId, false);
         return client.terminate();
       }
       client.isAlive = false;
@@ -41,43 +38,24 @@ export function setupWebSocket(server: Server) {
     });
   }, 30000);
 
-  const broadcastToChannel = async (channelId: number, message: any) => {
-    const channelMembers = await db
-      .select({ userId: channels.id })
-      .from(channels)
-      .where(eq(channels.id, channelId));
-
-    const memberIds = new Set(channelMembers.map(m => m.userId));
-
+  const broadcastToOthers = async (channelId: number, message: any, senderId: number) => {
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
-      if (client.readyState === WebSocket.OPEN && client.userId && memberIds.has(client.userId)) {
+      if (client.readyState === WebSocket.OPEN && client.userId !== senderId) {
         client.send(JSON.stringify(message));
-      }
-    });
-  };
-
-  const updateUserPresence = async (userId: number, isOnline: boolean) => {
-    await db.update(users).set({ isOnline }).where(eq(users.id, userId));
-    wss.clients.forEach((ws) => {
-      const client = ws as AuthenticatedWebSocket;
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: 'presence', userId, isOnline }));
       }
     });
   };
 
   wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
-      if (!req.session?.passport?.user) {
+      if (!(req as any).user?.id) {
         ws.close(1008, 'Not authenticated');
         return;
       }
 
-      ws.userId = req.session.passport.user;
+      ws.userId = (req as any).user.id;
       ws.isAlive = true;
-
-      await updateUserPresence(ws.userId, true);
 
       ws.on('pong', () => heartbeat(ws));
 
@@ -110,26 +88,34 @@ export function setupWebSocket(server: Server) {
                         username: true,
                         avatarUrl: true,
                       }
-                    }
+                    },
+                    reactions: true,
+                    attachments: true
                   }
                 });
 
-                await broadcastToChannel(message.channelId, {
+                // Send to all clients in the channel except the sender
+                await broadcastToOthers(message.channelId, {
                   type: 'message',
                   message: fullMessage
-                });
+                }, ws.userId);
+
+                // Send back to sender to confirm receipt
+                ws.send(JSON.stringify({
+                  type: 'message',
+                  message: fullMessage
+                }));
               }
               break;
             }
 
             case 'typing': {
-              if (message.channelId) {
-                await broadcastToChannel(message.channelId, {
-                  type: 'typing',
-                  channelId: message.channelId,
-                  userId: ws.userId
-                });
-              }
+              if (!message.channelId || !ws.userId) return;
+              await broadcastToOthers(message.channelId, {
+                type: 'typing',
+                channelId: message.channelId,
+                userId: ws.userId
+              }, ws.userId);
               break;
             }
           }
@@ -138,10 +124,9 @@ export function setupWebSocket(server: Server) {
         }
       });
 
-      ws.on('close', () => {
-        if (ws.userId) {
-          updateUserPresence(ws.userId, false);
-        }
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+        ws.terminate();
       });
 
     } catch (error) {
