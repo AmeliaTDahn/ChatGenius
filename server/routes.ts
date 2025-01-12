@@ -1052,7 +1052,7 @@ export function registerRoutes(app: Express): Server {
         ))
         .where(or(
           eq(friends.user1Id, req.user.id),
-          eq(friends.user2Id, req.user.id)
+          eqeq(friends.user2Id, req.user.id)
         ));
 
       const friendIds = userFriends.map(f => f.friendId);
@@ -1230,11 +1230,14 @@ export function registerRoutes(app: Express): Server {
 
       if (status === 'accepted') {
         // Create friendship
-        await db.insert(friends).values({
-          user1Id: friendRequest.senderId,
-          user2Id: friendRequest.receiverId,
-          createdAt: new Date()
-        });
+        const [newFriendship] = await db
+          .insert(friends)
+          .values({
+            user1Id: friendRequest.senderId,
+            user2Id: friendRequest.receiverId,
+            createdAt: new Date()
+          })
+          .returning();
 
         // Create DM channel for the new friends
         const [dmChannel] = await db
@@ -1242,17 +1245,19 @@ export function registerRoutes(app: Express): Server {
           .values({
             name: `DM-${friendRequest.senderId}-${friendRequest.receiverId}`,
             isDirectMessage: true,
+            description: 'Direct Message Channel'
           })
           .returning();
 
         // Create direct message channel relationship
-        await db
+        const [dmRelationship] = await db
           .insert(directMessageChannels)
           .values({
             channelId: dmChannel.id,
             user1Id: friendRequest.senderId,
             user2Id: friendRequest.receiverId,
-          });
+          })
+          .returning();
 
         // Add both users as channel members
         await db.insert(channelMembers).values([
@@ -1272,15 +1277,66 @@ export function registerRoutes(app: Express): Server {
             id: users.id,
             username: users.username,
             avatarUrl: users.avatarUrl,
+            isOnline: users.isOnline,
+            hideActivity: users.hideActivity,
           })
           .from(users)
           .where(eq(users.id, friendRequest.senderId))
           .limit(1);
 
+        // Get receiver info
+        const [receiver] = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            avatarUrl: users.avatarUrl,
+            isOnline: users.isOnline,
+            hideActivity: users.hideActivity,
+          })
+          .from(users)
+          .where(eq(users.id, friendRequest.receiverId))
+          .limit(1);
+
+        // Create welcome message in the DM channel
+        const [welcomeMessage] = await db
+          .insert(messages)
+          .values({
+            channelId: dmChannel.id,
+            userId: friendRequest.senderId,
+            content: `👋 Chat started between ${sender.username} and ${receiver.username}`,
+            isSystemMessage: true
+          })
+          .returning();
+
+        // Notify connected WebSocket clients about the new friendship and DM channel
+        const newFriendshipNotification = {
+          type: 'friendship_created',
+          friendship: {
+            ...newFriendship,
+            dmChannel: {
+              ...dmChannel,
+              members: [sender, receiver],
+              lastMessage: welcomeMessage
+            }
+          }
+        };
+
+        wss.clients.forEach((client: ExtendedWebSocket) => {
+          if (
+            client.readyState === WebSocket.OPEN &&
+            (client.userId === friendRequest.senderId || client.userId === friendRequest.receiverId)
+          ) {
+            client.send(JSON.stringify(newFriendshipNotification));
+          }
+        });
+
         res.json({
           ...updatedRequest,
           sender,
-          dmChannel
+          dmChannel: {
+            ...dmChannel,
+            otherUser: sender
+          }
         });
       } else {
         res.json(updatedRequest);
