@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, or, inArray, desc, gt, sql, not, ilike, ne } from "drizzle-orm";
 import { setupAuth } from "./auth";
+import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
@@ -153,6 +154,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error fetching user");
     }
   });
+
   app.post("/api/channels/:channelId/invites", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
