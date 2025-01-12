@@ -1,3 +1,41 @@
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+export function useMessages(channelId: number) {
+  const queryClient = useQueryClient();
+
+  const { data: messages = [], isLoading } = useQuery({
+    queryKey: ['messages', channelId],
+    queryFn: async () => {
+      const response = await fetch(`/api/channels/${channelId}/messages`);
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      return response.json();
+    },
+  });
+
+  const reactionMutation = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: number; emoji: string }) => {
+      const response = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!response.ok) throw new Error('Failed to add reaction');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+    },
+  });
+
+  return {
+    messages,
+    isLoading,
+    handleReaction: reactionMutation.mutate,
+  };
+}
+</new_str>
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Message } from '@db/schema';
 import { useUser } from '@/hooks/use-user';

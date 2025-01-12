@@ -28,7 +28,7 @@ type MessageListProps = {
 };
 
 export function MessageList({ channelId }: MessageListProps) {
-  const { messages, isLoading, addReaction } = useMessages(channelId);
+  const { messages, isLoading, handleReaction: addReaction } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
