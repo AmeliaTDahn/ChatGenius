@@ -69,7 +69,8 @@ export function MessageList({ channelId }: MessageListProps) {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
-    const isImageFile = (filename: string) => {
+    const isImageFile = (filename: string, mimeType?: string) => {
+      if (mimeType?.startsWith('image/')) return true;
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
       return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
     };
@@ -108,12 +109,13 @@ export function MessageList({ channelId }: MessageListProps) {
                   key={attachment.id}
                   className="flex flex-col gap-2"
                 >
-                  {isImageFile(attachment.filename) ? (
+                  {isImageFile(attachment.filename, attachment.mimeType) ? (
                     <div className="relative group">
                       <img
                         src={attachment.fileUrl}
                         alt={attachment.filename}
-                        className="max-w-[300px] max-h-[300px] rounded-md object-cover"
+                        className="max-w-[300px] max-h-[300px] rounded-md object-contain bg-secondary/50"
+                        loading="lazy"
                       />
                       <a
                         href={attachment.fileUrl}
