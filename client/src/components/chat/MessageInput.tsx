@@ -199,22 +199,22 @@ export function MessageInput({ onSendMessage, isThread = false }: MessageInputPr
                 <div className="pt-2 border-t">
                   <p className="text-sm mb-2">Colors</p>
                   <div className="grid grid-cols-4 gap-1">
-            <PopoverContent className="w-auto p-2">
-              <div className="flex gap-1">
-                {COLORS.map((color) => (
-                  <Button
-                    key={color}
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className={cn(
-                      "w-6 h-6 p-0",
-                      currentFormat.color === color && "ring-2 ring-primary"
-                    )}
-                    style={{ backgroundColor: color }}
-                    onClick={() => toggleFormat('color', color)}
-                  />
-                ))}
+                    {COLORS.map((color) => (
+                      <Button
+                        key={color}
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className={cn(
+                          "w-6 h-6 p-0",
+                          currentFormat.color === color && "ring-2 ring-primary"
+                        )}
+                        style={{ backgroundColor: color }}
+                        onClick={() => toggleFormat('color', color)}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
