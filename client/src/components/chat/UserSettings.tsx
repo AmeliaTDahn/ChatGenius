@@ -139,18 +139,9 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ['user'] });
-      const previousData = queryClient.getQueryData(['user']);
-      queryClient.setQueryData(['user'], old => ({
-        ...old,
-        ...newData
-      }));
-      return { previousData };
-    },
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['user'], updatedUser);
-      queryClient.invalidateQueries(['user']);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
       form.reset({
         username: updatedUser.username,
         age: updatedUser.age,
@@ -166,10 +157,7 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
         duration: 2000,
       });
     },
-    onError: (error: Error, _newData, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['user'], context.previousData);
-      }
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -214,13 +202,13 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
     const formData = new FormData();
     formData.append('files', croppedBlob, 'profile.jpg');
 
+    // Add other form data
     const formValues = form.getValues();
     Object.entries(formValues).forEach(([key, value]) => {
       if (key !== 'files') {
         formData.append(key, value?.toString() || '');
       }
     });
-    formData.append('hideActivity', form.getValues('hideActivity').toString());
 
     setIsAutoSaving(true);
     try {
@@ -232,7 +220,13 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
 
       if (!response.ok) throw new Error(await response.text());
       const updatedUser = await response.json();
+
+      // Update form with new avatar URL
+      form.setValue('avatarUrl', updatedUser.avatarUrl);
+
+      // Update cached user data
       queryClient.setQueryData(['user'], updatedUser);
+
       toast({
         title: "Avatar updated",
         description: "Your profile photo has been updated successfully.",
@@ -248,7 +242,6 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
       setCropperImage(null);
     }
   };
-
 
   return (
     <>
