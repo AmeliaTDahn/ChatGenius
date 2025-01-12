@@ -30,24 +30,9 @@ const crypto = {
   },
 };
 
-// Extend express user object without recursion
 declare global {
   namespace Express {
-    interface User {
-      id: number;
-      username: string;
-      email: string;
-      avatarUrl: string | null;
-      age: number | null;
-      city: string | null;
-      isOnline: boolean;
-      hideActivity: boolean;
-      timezone: string;
-      lastActive: Date;
-      createdAt: Date;
-      resetToken: string | null;
-      resetTokenExpiry: Date | null;
-    }
+    interface User extends Omit<User, 'password'> {}
   }
 }
 
@@ -57,23 +42,32 @@ export function setupAuth(app: Express) {
     secret: process.env.REPL_ID || "chat-app-secret",
     resave: false,
     saveUninitialized: false,
-    name: 'sessionId',
+    name: 'sessionId', // Set a specific cookie name
+    proxy: true,
     cookie: {
+      secure: true,
+      sameSite: 'none',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      httpOnly: true,
-      secure: app.get("env") === "production",
-      sameSite: app.get("env") === "production" ? 'none' : 'lax'
+      httpOnly: true, // Prevents client-side access to the cookie
     },
     store: new MemoryStore({
       checkPeriod: 86400000, // Prune expired entries every 24h
-    })
+      stale: false, // Don't serve stale data
+      ttl: 86400000, // Match cookie maxAge
+    }),
+    genid: function(req) {
+      return randomBytes(16).toString('hex'); // Generate unique session IDs
+    }
   };
 
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
+    sessionSettings.cookie = {
+      ...sessionSettings.cookie,
+      secure: true,
+    };
   }
 
-  // Initialize session before passport
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
@@ -90,7 +84,6 @@ export function setupAuth(app: Express) {
         if (!user) {
           return done(null, false, { message: "Incorrect username." });
         }
-
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
           return done(null, false, { message: "Incorrect password." });
@@ -124,6 +117,58 @@ export function setupAuth(app: Express) {
       done(null, userWithoutPassword);
     } catch (err) {
       done(err);
+    }
+  });
+
+  app.post("/api/register", async (req, res, next) => {
+    try {
+      const result = createInsertSchema(users, {
+        username: z.string().min(3, "Username must be at least 3 characters"),
+        email: z.string().email("Invalid email format"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+      }).safeParse(req.body);
+      if (!result.success) {
+        return res
+          .status(400)
+          .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
+      }
+
+      const { username, password, email } = result.data;
+
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (existingUser) {
+        return res.status(400).send("Username already exists");
+      }
+
+      const hashedPassword = await crypto.hash(password);
+
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          username,
+          password: hashedPassword,
+          email // Added email field
+        })
+        .returning();
+
+      const { password: _, ...userWithoutPassword } = newUser;
+
+      req.login(userWithoutPassword, (err) => {
+        if (err) {
+          return next(err);
+        }
+        return res.json({
+          message: "Registration successful",
+          user: userWithoutPassword,
+        });
+      });
+    } catch (error) {
+      next(error);
     }
   });
 

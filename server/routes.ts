@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { users, type User } from "@db/schema";
-import { eq, and, ne, ilike, or, inArray, desc, gt, sql } from "drizzle-orm";
+import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import { WebSocketServer, WebSocket } from 'ws';
@@ -12,110 +12,97 @@ import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import express from "express";
+import crypto from 'crypto';
+import { sendPasswordResetEmail, generateResetToken } from './utils/email';
+import session, { SessionOptions } from 'express-session';
+import passport from 'passport';
 
-// Ensure uploads directory exists
-(async () => {
-  await fs.mkdir("./uploads", { recursive: true });
-})();
+// Assuming sessionSettings is defined elsewhere, this is a placeholder
+const sessionSettings: SessionOptions = {
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+};
 
-// Update multer config with clear file handling
+
+async function getUnreadMessageCounts(userId: number) {
+  const userChannels = await db.query.channelMembers.findMany({
+    where: eq(channelMembers.userId, userId),
+    with: {
+      channel: true
+    }
+  });
+
+  const unreadCounts = await Promise.all(
+    userChannels.map(async ({ channel }) => {
+      const latestRead = await db
+        .select({
+          messageId: messageReads.messageId,
+          channelId: messages.channelId
+        })
+        .from(messageReads)
+        .innerJoin(messages, eq(messageReads.messageId, messages.id))
+        .where(and(
+          eq(messageReads.userId, userId),
+          eq(messages.channelId, channel.id)
+        ))
+        .orderBy(desc(messageReads.readAt))
+        .limit(1);
+
+      const unreadCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(and(
+          eq(messages.channelId, channel.id),
+          ne(messages.userId, userId),
+          latestRead.length > 0
+            ? gt(messages.id, latestRead[0].messageId)
+            : sql`TRUE`
+        ));
+
+      return {
+        channelId: channel.id,
+        unreadCount: Number(unreadCount[0]?.count || 0)
+      };
+    })
+  );
+
+  return unreadCounts;
+}
+
 const upload = multer({
   storage: multer.diskStorage({
-    destination: async (_req, _file, cb) => {
-      // Ensure uploads directory exists
-      await fs.mkdir("./uploads", { recursive: true });
-      cb(null, "./uploads");
-    },
+    destination: "./uploads",
     filename: (_req, file, cb) => {
       const uniqueSuffix = randomBytes(16).toString("hex");
       cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
     },
   }),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (_req, file, cb) => {
-    // Accept only images
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  }
 });
 
+(async () => {
+  await fs.mkdir("./uploads", { recursive: true });
+})();
+
+
+interface ExtendedWebSocket extends WebSocket {
+  userId?: number;
+  sessionId?: string;
+  isAlive?: boolean;
+}
+
+interface WebSocketMessageType {
+  type: 'message' | 'status_update' | 'typing';
+  content?: string;
+  channelId?: number;
+  userId?: number;
+  isOnline?: boolean;
+  hideActivity?: boolean;
+}
+
 export function registerRoutes(app: Express): Server {
-  // sets up /api/register, /api/login, /api/logout, /api/user
   setupAuth(app);
-
-  // Serve static files from uploads directory
-  app.use('/uploads', express.static('uploads'));
-
-  // Update profile endpoint to properly handle file uploads
-  app.put("/api/user/profile", upload.single('files'), async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const updateData: Partial<User> = {};
-
-      if (req.file) {
-        // Save the relative path that will be accessible via web
-        updateData.avatarUrl = `/uploads/${req.file.filename}`;
-      }
-
-      // Check if username exists when updating username
-      if (req.body.username && req.body.username !== req.user.username) {
-        const [existingUser] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, req.body.username))
-          .limit(1);
-
-        if (existingUser) {
-          return res.status(400).send("Username already exists");
-        }
-        updateData.username = req.body.username;
-      }
-
-      // Handle fields with proper validation
-      const fields = ['city', 'timezone', 'hideActivity'];
-      fields.forEach(field => {
-        if (req.body[field] !== undefined) {
-          if (field === 'hideActivity') {
-            updateData[field] = req.body[field] === 'true';
-          } else {
-            updateData[field] = req.body[field];
-          }
-        }
-      });
-
-      // Handle age field separately with validation
-      if (req.body.age !== undefined && req.body.age !== '') {
-        const age = parseInt(req.body.age);
-        if (!isNaN(age) && age >= 0) {
-          updateData.age = age;
-        }
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).send("No valid update data provided");
-      }
-
-      const [updatedUser] = await db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.id, req.user.id))
-        .returning();
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating user profile:", error);
-      res.status(500).send("Error updating user profile");
-    }
-  });
-
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
@@ -308,6 +295,67 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.put("/api/user/profile", upload.single('files'), async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const updateData: any = {};
+
+      if (req.file) {
+        updateData.avatarUrl = `/uploads/${req.file.filename}`;
+      }
+
+      // Check if username exists when updating username
+      if (req.body.username && req.body.username !== req.user.username) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, req.body.username))
+          .limit(1);
+
+        if (existingUser) {
+          return res.status(400).send("Username already exists");
+        }
+      }
+
+      // Handle fields with proper validation
+      const fields = ['username', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
+      fields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          if (field === 'hideActivity') {
+            updateData[field] = req.body[field] === 'true';
+          } else {
+            updateData[field] = req.body[field];
+          }
+        }
+      });
+
+      // Handle age field separately with validation
+      if (req.body.age !== undefined && req.body.age !== '') {
+        const age = parseInt(req.body.age);
+        if (!isNaN(age) && age >= 0) {
+          updateData.age = age;
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).send("No valid update data provided");
+      }
+
+      const [updatedUser] = await db
+        .update(users)
+        .set(updateData)
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).send("Error updating user profile");
+    }
+  });
 
   app.put("/api/user/status", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -1027,7 +1075,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {
+  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1046,11 +1094,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),
+            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),
+            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user1Id)
           )
         ))
@@ -1706,6 +1754,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
 
   app.post("/api/channels/:channelId/leave", async (req, res) => {
@@ -1984,7 +2033,7 @@ export function registerRoutes(app: Express): Server {
 
       const { username, email, password } = result.data;
 
-      // Check if user already exists with thesame username or email
+      // Check if user already exists with the same username or email
       const existingUser = await db.query.users.findFirst({
         where: or(
           eq(users.username, username),
@@ -2026,6 +2075,7 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
+
 
   app.get("/api/direct-messages/channel", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -2424,6 +2474,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
 
   app.post("/api/channels/:channelId/leave", async (req, res) => {
@@ -2702,7 +2753,7 @@ export function registerRoutes(app: Express): Server {
 
       const { username, email, password } = result.data;
 
-      // Check if user already exists with thesame username or email
+      // Check if user already exists with the same username or email
       const existingUser = await db.query.users.findFirst({
         where: or(
           eq(users.username, username),
@@ -2745,5 +2796,208 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+
+  app.get("/api/direct-messages/channel", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const friendId = parseInt(req.query.friendId as string);
+    if (isNaN(friendId)) {
+      return res.status(400).send("Invalid friend ID");
+    }
+
+    try {
+      // Find existing direct message channel
+      const [existingDM] = await db
+        .select({
+          channelId: directMessageChannels.channelId
+        })
+        .from(directMessageChannels)
+        .where(or(
+          and(
+            eq(directMessageChannels.user1Id, req.user.id),
+            eq(directMessageChannels.user2Id, friendId)
+          ),
+          and(
+            eq(directMessageChannels.user1Id, friendId),
+            eq(directMessageChannels.user2Id, req.user.id)
+          )
+        ))
+        .limit(1);
+
+      if (!existingDM) {
+        return res.status(404).send("Direct message channel not found");
+      }
+
+      res.json({ channelId: existingDM.channelId });
+    } catch (error) {
+      console.error("Error fetching direct message channel:", error);
+      res.status(500).send("Error fetching direct message channel");
+    }
+  });
+
+  app.get("/api/friends/recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      // First, get user's current friends
+      const userFriends = await db
+        .select({
+          friendId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(users.id, friends.user2Id)
+          ),
+          and(
+            eq(friends.user2Id, req.user.id),
+            eq(users.id, friends.user1Id)
+          )
+        ))
+        .where(or(
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
+        ));
+
+      // If user has no friends, return empty array
+      if (userFriends.length === 0) {
+        return res.json([]);
+      }
+
+      const friendIds = userFriends.map(f => f.friendId);
+
+      // Get friends of friends
+      const friendsOfFriends = await db
+        .select({
+          recommendedUserId: users.id
+        })
+        .from(friends)
+        .leftJoin(users, or(
+          eq(users.id, friends.user1Id),
+          eq(users.id, friends.user2Id)
+        ))
+        .where(
+          and(
+            or(
+              inArray(friends.user1Id, friendIds),
+              inArray(friends.user2Id, friendIds)
+            ),
+            not(eq(users.id, req.user.id)),
+            not(inArray(users.id, friendIds))
+          )
+        );
+
+      if (friendsOfFriends.length === 0) {
+        return res.json([]);
+      }
+
+      // Get recommendation details with mutual friend count
+      const recommendations = await Promise.all(
+        [...new Set(friendsOfFriends.map(f => f.recommendedUserId))].map(async (userId) => {
+          const [user] = await db
+            .select({
+              id: users.id,
+              username: users.username,
+              avatarUrl: users.avatarUrl
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+          const mutualFriends = await db
+            .select({
+              count: sql<number>`count(*)`
+            })
+            .from(friends as typeof friends)
+            .where(
+              and(
+                or(
+                  and(
+                    eq(friends.user1Id, userId),
+                    inArray(friends.user2Id, friendIds)
+                  ),
+                  and(
+                    eq(friends.user2Id, userId),
+                    inArray(friends.user1Id, friendIds)
+                  )
+                )
+              )
+            );
+
+          return {
+            ...user,
+            mutualFriendCount: Number(mutualFriends[0]?.count || 0)
+          };
+        })
+      );
+
+      // Sort by mutual friend count
+      recommendations.sort((a, b) => b.mutualFriendCount - a.mutualFriendCount);
+
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error getting friend recommendations:", error);
+      res.status(500).send("Error getting friend recommendations");
+    }
+  });
+
+  app.put("/api/channels/:channelId/color", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    const { backgroundColor } = req.body;
+
+    if (isNaN(channelId) || !backgroundColor) {
+      return res.status(400).send("Invalid channel ID or color");
+    }
+
+    try {
+      // Check if user is a member of the channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      // Update channel background color
+      const [updatedChannel] = await db
+        .update(channels)
+        .set({ backgroundColor })
+        .where(eq(channels.id, channelId))
+        .returning();
+
+      // Notify all clients about the color change via WebSocket
+      const colorUpdate = {
+        type: 'channel_color_update',
+        channelId,
+        backgroundColor,
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(colorUpdate));
+        }
+      });
+
+      res.json(updatedChannel);
+    } catch (error) {
+      console.error("Error updating channel color:", error);
+      res.status(500).send("Error updating channel color");
+    }
+  });
   return httpServer;
 }

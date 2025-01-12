@@ -211,21 +211,16 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
   };
 
   const handleCroppedImage = async (croppedBlob: Blob) => {
-    // Create a new File object with the correct name and type
-    const file = new File([croppedBlob], 'profile.jpg', {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    });
-
     const formData = new FormData();
-    formData.append('files', file);
+    formData.append('files', croppedBlob, 'profile.jpg');
 
     const formValues = form.getValues();
     Object.entries(formValues).forEach(([key, value]) => {
-      if (key !== 'files' && value !== null && value !== undefined) {
-        formData.append(key, value.toString());
+      if (key !== 'files') {
+        formData.append(key, value?.toString() || '');
       }
     });
+    formData.append('hideActivity', form.getValues('hideActivity').toString());
 
     setIsAutoSaving(true);
     try {
@@ -237,13 +232,7 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
 
       if (!response.ok) throw new Error(await response.text());
       const updatedUser = await response.json();
-
-      // Update the form with new values
-      form.setValue('avatarUrl', updatedUser.avatarUrl);
-
-      // Update the cache
       queryClient.setQueryData(['user'], updatedUser);
-
       toast({
         title: "Avatar updated",
         description: "Your profile photo has been updated successfully.",
