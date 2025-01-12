@@ -1084,6 +1084,38 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error searching users");
     }
   });
+  app.get("/api/friend-requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      // Get pending friend requests where the current user is the receiver
+      const pendingRequests = await db
+        .select({
+          id: friendRequests.id,
+          status: friendRequests.status,
+          createdAt: friendRequests.createdAt,
+          sender: {
+            id: users.id,
+            username: users.username,
+            avatarUrl: users.avatarUrl,
+          }
+        })
+        .from(friendRequests)
+        .leftJoin(users, eq(friendRequests.senderId, users.id))
+        .where(and(
+          eq(friendRequests.receiverId, req.user.id),
+          eq(friendRequests.status, 'pending')
+        ));
+
+      res.json(pendingRequests);
+    } catch (error) {
+      console.error("Error fetching friend requests:", error);
+      res.status(500).json({ message: "Error fetching friend requests" });
+    }
+  });
+
   app.post("/api/friend-requests", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
