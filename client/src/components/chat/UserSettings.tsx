@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { User } from "@db/schema";
 import { useDebouncedCallback } from "use-debounce";
-import { AvatarUpload } from "@/components/ui/avatar-upload";
+
+const avatarOptions = [
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix&backgroundColor=b6e3f4",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Luna&backgroundColor=ffdfbf",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Nova&backgroundColor=d1f4d1",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Orion&backgroundColor=ffd1f4",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Phoenix&backgroundColor=f4d1d1",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=Atlas&backgroundColor=f4f1d1",
+];
 
 const TIMEZONES = [
   { value: "UTC", label: "UTC (Coordinated Universal Time)" },
@@ -56,7 +64,7 @@ const formSchema = z.object({
   age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
   city: z.string().min(2, "City must be at least 2 characters").nullable(),
   hideActivity: z.boolean(),
-  avatarUrl: z.string().url("Invalid avatar URL").nullable(),
+  avatarUrl: z.string().url("Invalid avatar URL"),
   timezone: z.string().min(1, "Please select a timezone"),
 });
 
@@ -107,7 +115,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       age: user.age,
       city: user.city || "",
       hideActivity: user.hideActivity,
-      avatarUrl: user.avatarUrl || "",
+      avatarUrl: user.avatarUrl || avatarOptions[0],
       timezone: user.timezone || "UTC",
     },
   });
@@ -117,12 +125,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       const res = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          age: data.age || null,
-          city: data.city || null,
-          timezone: data.timezone
-        }),
+        body: JSON.stringify(data),
         credentials: 'include'
       });
 
@@ -137,7 +140,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
         age: updatedUser.age,
         city: updatedUser.city || "",
         hideActivity: updatedUser.hideActivity,
-        avatarUrl: updatedUser.avatarUrl || "",
+        avatarUrl: updatedUser.avatarUrl || avatarOptions[0],
         timezone: updatedUser.timezone || "UTC",
       }, { keepValues: true });
       setIsAutoSaving(false);
@@ -156,41 +159,6 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       setIsAutoSaving(false);
     }
   });
-
-  const handleAvatarUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append('files', file);
-    const formValues = form.getValues();
-    Object.entries(formValues).forEach(([key, value]) => {
-      if (key !== 'files') {
-        formData.append(key, value?.toString() || '');
-      }
-    });
-    formData.append('hideActivity', form.getValues('hideActivity').toString());
-
-    try {
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        body: formData,
-        credentials: 'include'
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-      const updatedUser = await response.json();
-      queryClient.setQueryData(['user'], updatedUser);
-      form.setValue('avatarUrl', updatedUser.avatarUrl || '');
-      toast({
-        title: "Avatar updated",
-        description: "Your profile photo has been updated successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
 
   const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
     setIsAutoSaving(true);
@@ -330,13 +298,28 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
                 />
 
                 <div className="space-y-4">
-                  <FormLabel>Profile Photo</FormLabel>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-20 w-20">
-                      <AvatarImage src={form.getValues("avatarUrl") || undefined} alt="Profile" />
-                      <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <AvatarUpload onUpload={handleAvatarUpload} />
+                  <FormLabel>Choose an avatar</FormLabel>
+                  <div className="grid grid-cols-3 gap-4">
+                    {avatarOptions.map((avatar) => (
+                      <Button
+                        key={avatar}
+                        type="button"
+                        variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
+                        className="p-2 relative overflow-hidden transition-all hover:scale-105"
+                        onClick={() => {
+                          form.setValue("avatarUrl", avatar);
+                          handleFormChange();
+                        }}
+                      >
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={avatar} alt="Avatar option" />
+                          <AvatarFallback>AV</AvatarFallback>
+                        </Avatar>
+                        {form.getValues("avatarUrl") === avatar && (
+                          <div className="absolute inset-0 bg-primary/10 rounded-md" />
+                        )}
+                      </Button>
+                    ))}
                   </div>
                 </div>
 
