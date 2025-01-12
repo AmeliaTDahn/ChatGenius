@@ -119,17 +119,22 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
         <div className="flex items-center gap-4">
           <Logo showText={false} />
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              onClick={handleProfileClick}
-              className="flex items-center gap-2 px-2 hover:bg-accent/10"
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.avatarUrl || ""} />
-                <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <span className="font-medium">{user.username}</span>
-            </Button>
+            <div className="relative">
+              <Button 
+                variant="ghost" 
+                onClick={handleProfileClick}
+                className="flex items-center gap-2 px-2 hover:bg-accent/10"
+              >
+                <div className="relative">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatarUrl || ""} />
+                    <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-background ${getStatusColor(user.isOnline, user.hideActivity)}`} />
+                </div>
+                <span className="font-medium">{user.username}</span>
+              </Button>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger className="text-xs text-muted-foreground hover:text-foreground">
                 {user.hideActivity ? 'Activity Hidden' : 'Online'}
@@ -154,9 +159,6 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="ml-auto">
-            <ThemeToggle />
-          </div>
         </div>
 
         {/* Right side: Action buttons */}
@@ -166,6 +168,9 @@ export function UserHeader({ user, onLogout, onAddFriend, onViewRequests, onView
 
       {/* Action buttons section */}
       <div className="flex flex-col border-t">
+        <div className="border-b p-2">
+          <ThemeToggle className="w-full justify-start px-2 font-medium" />
+        </div>
         <div className="flex items-center gap-3 px-6 py-3">
           <Button
             variant="ghost"
