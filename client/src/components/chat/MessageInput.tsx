@@ -13,10 +13,6 @@ import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
   onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
-};
-
-type MessageInputProps = {
-  onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
   isThread?: boolean;
 };
 
