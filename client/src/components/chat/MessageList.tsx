@@ -70,7 +70,7 @@ export function MessageList({ channelId }: MessageListProps) {
     };
 
     const isImageFile = (filename: string) => {
-      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'];
       return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
     };
 
