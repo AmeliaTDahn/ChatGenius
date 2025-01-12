@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ThreadView } from "./ThreadView";
-import { FileIcon, Download, Reply, MessageSquare } from "lucide-react";
+import { FileIcon, Download, Reply, MessageSquare, Loader2 } from "lucide-react";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 
