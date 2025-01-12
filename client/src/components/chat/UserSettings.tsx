@@ -34,15 +34,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { User } from "@db/schema";
 import { useDebouncedCallback } from "use-debounce";
-
-const avatarOptions = [
-  "https://api.dicebear.com/7.x/bottts/svg?seed=panda&backgroundColor=b6e3f4",
-  "https://api.dicebear.com/7.x/bottts/svg?seed=kitten&backgroundColor=ffdfbf",
-  "https://api.dicebear.com/7.x/bottts/svg?seed=puppy&backgroundColor=d1f4d1",
-  "https://api.dicebear.com/7.x/bottts/svg?seed=bunny&backgroundColor=ffd1f4",
-  "https://api.dicebear.com/7.x/bottts/svg?seed=penguin&backgroundColor=f4d1d1",
-  "https://api.dicebear.com/7.x/bottts/svg?seed=fox&backgroundColor=f4f1d1",
-];
+import { AvatarUpload } from "@/components/ui/avatar-upload";
 
 const TIMEZONES = [
   { value: "UTC", label: "UTC (Coordinated Universal Time)" },
@@ -64,7 +56,7 @@ const formSchema = z.object({
   age: z.coerce.number().min(13, "You must be at least 13 years old").max(120, "Invalid age").nullable(),
   city: z.string().min(2, "City must be at least 2 characters").nullable(),
   hideActivity: z.boolean(),
-  avatarUrl: z.string().url("Invalid avatar URL"),
+  avatarUrl: z.string().url("Invalid avatar URL").nullable(),
   timezone: z.string().min(1, "Please select a timezone"),
 });
 
@@ -115,7 +107,7 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       age: user.age,
       city: user.city || "",
       hideActivity: user.hideActivity,
-      avatarUrl: user.avatarUrl || avatarOptions[0],
+      avatarUrl: user.avatarUrl || "",
       timezone: user.timezone || "UTC",
     },
   });
@@ -137,24 +129,15 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ['user'] });
-      const previousData = queryClient.getQueryData(['user']);
-      queryClient.setQueryData(['user'], old => ({
-        ...old,
-        ...newData
-      }));
-      return { previousData };
-    },
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['user'], updatedUser);
-      queryClient.invalidateQueries(['user']);
+      queryClient.invalidateQueries({ queryKey: ['user'] });
       form.reset({
         username: updatedUser.username,
         age: updatedUser.age,
         city: updatedUser.city || "",
         hideActivity: updatedUser.hideActivity,
-        avatarUrl: updatedUser.avatarUrl || avatarOptions[0],
+        avatarUrl: updatedUser.avatarUrl || "",
         timezone: updatedUser.timezone || "UTC",
       }, { keepValues: true });
       setIsAutoSaving(false);
@@ -164,23 +147,50 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
         duration: 2000,
       });
     },
-    onError: (error: Error, _newData, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['user'], context.previousData);
-      }
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-    },
-    onSettled: () => {
       setIsAutoSaving(false);
-      queryClient.invalidateQueries({ queryKey: ['user'] });
     }
   });
 
-  
+  const handleAvatarUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('files', file);
+    const formValues = form.getValues();
+    Object.entries(formValues).forEach(([key, value]) => {
+      if (key !== 'files') {
+        formData.append(key, value?.toString() || '');
+      }
+    });
+    formData.append('hideActivity', form.getValues('hideActivity').toString());
+
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) throw new Error(await response.text());
+      const updatedUser = await response.json();
+      queryClient.setQueryData(['user'], updatedUser);
+      form.setValue('avatarUrl', updatedUser.avatarUrl || '');
+      toast({
+        title: "Avatar updated",
+        description: "Your profile photo has been updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const debouncedSave = useDebouncedCallback((data: UserSettingsFormData) => {
     setIsAutoSaving(true);
@@ -217,222 +227,161 @@ export function UserSettings({ user, onClose }: UserSettingsProps) {
 
           <ScrollArea className="pr-4 h-[70vh]">
             <Form {...form}>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const data = form.getValues();
-              updateProfile.mutate(data);
-            }} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="age"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Age</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Enter age"
-                        {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter city" {...field} value={field.value || ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="timezone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Timezone</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const data = form.getValues();
+                updateProfile.mutate(data);
+              }} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your timezone" />
-                        </SelectTrigger>
+                        <Input placeholder="Enter username" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {TIMEZONES.map((tz) => (
-                          <SelectItem key={tz.value} value={tz.value}>
-                            {tz.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="hideActivity"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Hide Activity</FormLabel>
-                      <div className="text-sm text-muted-foreground">
-                        Hide your online status from other users
+                <FormField
+                  control={form.control}
+                  name="age"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter age"
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter city" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="timezone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Timezone</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your timezone" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {TIMEZONES.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="hideActivity"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Hide Activity</FormLabel>
+                        <div className="text-sm text-muted-foreground">
+                          Hide your online status from other users
+                        </div>
                       </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
-              <div className="space-y-4">
-                <FormLabel>Choose an avatar or upload your own photo</FormLabel>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {avatarOptions.map((avatar) => (
-                    <Button
-                      key={avatar}
-                      type="button"
-                      variant={form.getValues("avatarUrl") === avatar ? "secondary" : "outline"}
-                      className="p-2 relative overflow-hidden transition-all hover:scale-105"
-                      onClick={() => {
-                        form.setValue("avatarUrl", avatar);
-                        handleFormChange();
-                      }}
-                    >
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={avatar} alt="Avatar option" />
-                        <AvatarFallback>A</AvatarFallback>
-                      </Avatar>
-                      {form.getValues("avatarUrl") === avatar && (
-                        <div className="absolute inset-0 bg-primary/10 rounded-md" />
-                      )}
+                <div className="space-y-4">
+                  <FormLabel>Profile Photo</FormLabel>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={form.getValues("avatarUrl") || undefined} alt="Profile" />
+                      <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <AvatarUpload onUpload={handleAvatarUpload} />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t">
+                  <Button type="submit" disabled={updateProfile.isPending}>
+                    {updateProfile.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+
+            <div className="mt-6 border-t pt-6">
+              <h3 className="text-lg font-semibold text-red-600">Danger Zone</h3>
+              <p className="text-sm text-gray-500 mt-2">Once you delete your account, there is no going back.</p>
+              <Button 
+                variant="destructive" 
+                className="mt-4"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                Delete Account
+              </Button>
+
+              <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Account</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete your account? This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                      Cancel
                     </Button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const formData = new FormData();
-                        formData.append('files', file);
-                        const formValues = form.getValues();
-                        Object.entries(formValues).forEach(([key, value]) => {
-                          if (key !== 'files') {
-                            formData.append(key, value?.toString() || '');
-                          }
-                        });
-                        formData.append('hideActivity', form.getValues('hideActivity').toString());
-
-                        setIsAutoSaving(true);
-                        try {
-                          const response = await fetch('/api/user/profile', {
-                            method: 'PUT',
-                            body: formData,
-                            credentials: 'include'
-                          });
-
-                          if (!response.ok) throw new Error(await response.text());
-                          const updatedUser = await response.json();
-                          queryClient.setQueryData(['user'], updatedUser);
-                          toast({
-                            title: "Avatar updated",
-                            description: "Your profile photo has been updated successfully.",
-                          });
-                        } catch (error: any) {
-                          toast({
-                            title: "Error",
-                            description: error.message,
-                            variant: "destructive",
-                          });
-                        } finally {
-                          setIsAutoSaving(false);
-                        }
-                      }
-                    }}
-                  />
-                </div>
-                
-              </div>
-
-              <div className="flex justify-end pt-4 border-t">
-                <Button type="submit" disabled={updateProfile.isPending}>
-                  {updateProfile.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-
-          <div className="mt-6 border-t pt-6">
-            <h3 className="text-lg font-semibold text-red-600">Danger Zone</h3>
-            <p className="text-sm text-gray-500 mt-2">Once you delete your account, there is no going back.</p>
-            <Button 
-              variant="destructive" 
-              className="mt-4"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              Delete Account
-            </Button>
-
-            <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Delete Account</DialogTitle>
-                  <DialogDescription>
-                    Are you sure you want to delete your account? This action cannot be undone.
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => deleteAccount.mutate()}
-                    disabled={deleteAccount.isPending}
-                  >
-                    {deleteAccount.isPending ? "Deleting..." : "Delete Account"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDeleteAccount}
+                      disabled={deleteAccount.isPending}
+                    >
+                      {deleteAccount.isPending ? "Deleting..." : "Delete Account"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
