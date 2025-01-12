@@ -343,37 +343,21 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
                       if (file) {
                         const formData = new FormData();
                         formData.append('files', file);
-                        const formValues = form.getValues();
-                        Object.entries(formValues).forEach(([key, value]) => {
-                          if (key !== 'files') {
-                            formData.append(key, value?.toString() || '');
-                          }
-                        });
-                        formData.append('hideActivity', form.getValues('hideActivity').toString());
 
-                        setIsAutoSaving(true);
                         try {
-                          const response = await fetch('/api/user/profile', {
-                            method: 'PUT',
+                          const response = await fetch('/api/upload', {
+                            method: 'POST',
                             body: formData,
                             credentials: 'include'
                           });
 
-                          if (!response.ok) throw new Error(await response.text());
-                          const updatedUser = await response.json();
-                          queryClient.setQueryData(['user'], updatedUser);
-                          toast({
-                            title: "Avatar updated",
-                            description: "Your profile photo has been updated successfully.",
-                          });
-                        } catch (error: any) {
-                          toast({
-                            title: "Error",
-                            description: error.message,
-                            variant: "destructive",
-                          });
-                        } finally {
-                          setIsAutoSaving(false);
+                          if (!response.ok) throw new Error('Upload failed');
+
+                          const [uploadedFile] = await response.json();
+                          form.setValue("avatarUrl", uploadedFile.fileUrl);
+                          handleFormChange();
+                        } catch (error) {
+                          console.error('Upload error:', error);
                         }
                       }
                     }}
