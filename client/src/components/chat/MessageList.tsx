@@ -160,7 +160,10 @@ export function MessageList({ channelId }: MessageListProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-xs relative"
+                className={cn(
+                  "h-6 px-2 text-xs relative",
+                  message.replyCount > 0 && "bg-accent/50"
+                )}
                 onClick={handleReply}
               >
                 <Reply className="h-3 w-3 mr-1" />
