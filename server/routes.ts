@@ -1084,6 +1084,79 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error searching users");
     }
   });
+  app.post("/api/friend-requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { receiverId } = req.body;
+      if (!receiverId) {
+        return res.status(400).json({ message: "Receiver ID is required" });
+      }
+
+      // Check if receiver exists
+      const [receiver] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, receiverId))
+        .limit(1);
+
+      if (!receiver) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if friend request already exists
+      const [existingRequest] = await db
+        .select()
+        .from(friendRequests)
+        .where(and(
+          eq(friendRequests.senderId, req.user.id),
+          eq(friendRequests.receiverId, receiverId),
+          eq(friendRequests.status, 'pending')
+        ))
+        .limit(1);
+
+      if (existingRequest) {
+        return res.status(400).json({ message: "Friend request already sent" });
+      }
+
+      // Check if they are already friends
+      const [existingFriendship] = await db
+        .select()
+        .from(friends)
+        .where(or(
+          and(
+            eq(friends.user1Id, req.user.id),
+            eq(friends.user2Id, receiverId)
+          ),
+          and(
+            eq(friends.user1Id, receiverId),
+            eq(friends.user2Id, req.user.id)
+          )
+        ))
+        .limit(1);
+
+      if (existingFriendship) {
+        return res.status(400).json({ message: "Already friends" });
+      }
+
+      // Create friend request
+      const [newRequest] = await db
+        .insert(friendRequests)
+        .values({
+          senderId: req.user.id,
+          receiverId: receiverId,
+          status: 'pending'
+        })
+        .returning();
+
+      res.json(newRequest);
+    } catch (error) {
+      console.error("Error creating friend request:", error);
+      res.status(500).json({ message: "Error creating friend request" });
+    }
+  });
 
   return httpServer;
 }
