@@ -295,6 +295,77 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete("/api/user/account", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const userId = req.user.id;
+
+      console.log(`Starting account deletion for userId: ${userId}`);
+
+      // Delete friend requests
+      await db.delete(friendRequests).where(
+        or(eq(friendRequests.senderId, userId), eq(friendRequests.receiverId, userId))
+      );
+
+      // Delete friend relationships
+      await db.delete(friends).where(
+        or(eq(friends.user1Id, userId), eq(friends.user2Id, userId))
+      );
+
+      // Get all channels the user is part of
+      const userChannels = await db.query.channelMembers.findMany({
+        where: eq(channelMembers.userId, userId),
+        columns: { channelId: true },
+      });
+
+      const channelIds = userChannels.map((c) => c.channelId);
+
+      // Delete messages and relationships in those channels
+      if (channelIds.length > 0) {
+        console.log("Deleting user messages and channel relationships");
+
+        await db.delete(messageAttachments).where(
+          inArray(
+            messageAttachments.messageId,
+            db.select({ id: messages.id }).from(messages).where(inArray(messages.channelId, channelIds))
+          )
+        );
+
+        await db.delete(messages).where(inArray(messages.channelId, channelIds));
+        await db.delete(channelMembers).where(inArray(channelMembers.channelId, channelIds));
+
+        await db.delete(channels).where(inArray(channels.id, channelIds));
+      }
+
+      // Delete the user
+      await db.delete(users).where(eq(users.id, userId));
+
+      console.log("Account deleted successfully for userId:", userId);
+
+      // Logout and clear session
+      req.logout((err) => {
+        if (err) {
+          console.error("Error logging out:", err);
+          return res.status(500).send("Error logging out after account deletion");
+        }
+        req.session.destroy((err) => {
+          if (err) {
+            console.error("Error destroying session:", err);
+            return res.status(500).send("Error destroying session");
+          }
+          res.clearCookie("connect.sid");
+          res.json({ message: "Account deleted successfully" });
+        });
+      });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).send("Error deleting account");
+    }
+  });
+
   app.put("/api/user/profile", upload.single('files'), async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1075,7 +1146,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
+  app.get("/api/friends", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1094,11 +1165,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user1Id, req.user.id),
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user2Id, req.user.id),
             eq(users.id, friends.user1Id)
           )
         ))
@@ -2076,7 +2147,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-
   app.get("/api/direct-messages/channel", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -2795,7 +2865,6 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
-
 
   app.get("/api/direct-messages/channel", async (req, res) => {
     if (!req.isAuthenticated()) {
