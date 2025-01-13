@@ -34,6 +34,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { User } from "@db/schema";
 import { useDebouncedCallback } from "use-debounce";
+import { Label } from "@/components/ui/label";
+import { UploadCloud } from "lucide-react";
 
 const avatarOptions = [
   "https://api.dicebear.com/7.x/bottts/svg?seed=panda&backgroundColor=b6e3f4",
@@ -79,6 +81,7 @@ type UserSettingsProps = {
 export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -311,7 +314,7 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
               />
 
               <div className="space-y-4">
-                <FormLabel>Choose an avatar or upload your own photo</FormLabel>
+                <FormLabel>Profile Photo</FormLabel>
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   {avatarOptions.map((avatar) => (
                     <Button
@@ -334,52 +337,64 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
                     </Button>
                   ))}
                 </div>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const formData = new FormData();
-                        formData.append('files', file);
-                        const formValues = form.getValues();
-                        Object.entries(formValues).forEach(([key, value]) => {
-                          if (key !== 'files') {
-                            formData.append(key, value?.toString() || '');
+
+                <div className="space-y-4">
+                  <Label>Or Upload Your Own Photo</Label>
+                  <div className="border-2 border-dashed rounded-lg p-4">
+                    <div className="flex flex-col items-center gap-2">
+                      <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        className="max-w-xs"
+                        disabled={isUploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploading(true);
+                            const formData = new FormData();
+                            formData.append('files', file);
+                            const formValues = form.getValues();
+                            Object.entries(formValues).forEach(([key, value]) => {
+                              if (key !== 'files') {
+                                formData.append(key, value?.toString() || '');
+                              }
+                            });
+                            formData.append('hideActivity', form.getValues('hideActivity').toString());
+
+                            try {
+                              const response = await fetch('/api/user/profile', {
+                                method: 'PUT',
+                                body: formData,
+                                credentials: 'include'
+                              });
+
+                              if (!response.ok) throw new Error(await response.text());
+                              const updatedUser = await response.json();
+                              queryClient.setQueryData(['user'], updatedUser);
+                              toast({
+                                title: "Profile photo updated",
+                                description: "Your photo has been uploaded successfully.",
+                              });
+                              form.setValue("avatarUrl", updatedUser.avatarUrl);
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsUploading(false);
+                            }
                           }
-                        });
-                        formData.append('hideActivity', form.getValues('hideActivity').toString());
-
-                        setIsAutoSaving(true);
-                        try {
-                          const response = await fetch('/api/user/profile', {
-                            method: 'PUT',
-                            body: formData,
-                            credentials: 'include'
-                          });
-
-                          if (!response.ok) throw new Error(await response.text());
-                          const updatedUser = await response.json();
-                          queryClient.setQueryData(['user'], updatedUser);
-                          toast({
-                            title: "Avatar updated",
-                            description: "Your profile photo has been updated successfully.",
-                          });
-                        } catch (error: any) {
-                          toast({
-                            title: "Error",
-                            description: error.message,
-                            variant: "destructive",
-                          });
-                        } finally {
-                          setIsAutoSaving(false);
-                        }
-                      }
-                    }}
-                  />
+                        }}
+                      />
+                      <p className="text-sm text-muted-foreground text-center">
+                        Upload a JPG, PNG, or GIF image (max 5MB)
+                      </p>
+                    </div>
+                  </div>
                 </div>
-
               </div>
 
               <div className="flex justify-end pt-4 border-t">
