@@ -790,15 +790,29 @@ export function registerRoutes(app: Express): Server {
           });
       }
 
+      // Get the updated message with all its relations including attachments
       const updatedMessage = await db.query.messages.findFirst({
         where: eq(messages.id, messageId),
         with: {
-          user: true,
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            }
+          },
           reactions: {
             with: {
-              user: true
+              user: {
+                columns: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                }
+              }
             }
-          }
+          },
+          attachments: true // Make sure to include attachments
         }
       });
 
@@ -2125,7 +2139,8 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // First, get user's current friends
-      const userFriends = await db        .select({
+      const userFriends = await db
+        .select({
           friendId: users.id
         })
         .from(friends)
