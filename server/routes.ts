@@ -304,6 +304,7 @@ export function registerRoutes(app: Express): Server {
       const updateData: any = {};
 
       if (req.file) {
+        // Use the full URL path for the avatar
         updateData.avatarUrl = `/uploads/${req.file.filename}`;
       }
 
@@ -321,7 +322,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Handle fields with proper validation
-      const fields = ['username', 'city', 'timezone', 'hideActivity', 'avatarUrl'];
+      const fields = ['username', 'city', 'timezone', 'hideActivity'];
       fields.forEach(field => {
         if (req.body[field] !== undefined) {
           if (field === 'hideActivity') {
@@ -2124,8 +2125,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // First, get user's current friends
-      const userFriends = await db
-        .select({
+      const userFriends = await db        .select({
           friendId: users.id
         })
         .from(friends)
