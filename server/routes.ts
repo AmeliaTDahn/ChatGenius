@@ -12,65 +12,8 @@ import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import express from "express";
-import crypto from 'crypto';
-import { sendPasswordResetEmail, generateResetToken } from './utils/email';
-import session, { SessionOptions } from 'express-session';
-import passport from 'passport';
 
-// Assuming sessionSettings is defined elsewhere, this is a placeholder
-const sessionSettings: SessionOptions = {
-  secret: 'your-secret-key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }
-};
-
-
-async function getUnreadMessageCounts(userId: number) {
-  const userChannels = await db.query.channelMembers.findMany({
-    where: eq(channelMembers.userId, userId),
-    with: {
-      channel: true
-    }
-  });
-
-  const unreadCounts = await Promise.all(
-    userChannels.map(async ({ channel }) => {
-      const latestRead = await db
-        .select({
-          messageId: messageReads.messageId,
-          channelId: messages.channelId
-        })
-        .from(messageReads)
-        .innerJoin(messages, eq(messageReads.messageId, messages.id))
-        .where(and(
-          eq(messageReads.userId, userId),
-          eq(messages.channelId, channel.id)
-        ))
-        .orderBy(desc(messageReads.readAt))
-        .limit(1);
-
-      const unreadCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(messages)
-        .where(and(
-          eq(messages.channelId, channel.id),
-          ne(messages.userId, userId),
-          latestRead.length > 0
-            ? gt(messages.id, latestRead[0].messageId)
-            : sql`TRUE`
-        ));
-
-      return {
-        channelId: channel.id,
-        unreadCount: Number(unreadCount[0]?.count || 0)
-      };
-    })
-  );
-
-  return unreadCounts;
-}
-
+// Configure multer for file uploads
 const upload = multer({
   storage: multer.diskStorage({
     destination: "./uploads",
@@ -85,23 +28,10 @@ const upload = multer({
   await fs.mkdir("./uploads", { recursive: true });
 })();
 
-
-interface ExtendedWebSocket extends WebSocket {
-  userId?: number;
-  sessionId?: string;
-  isAlive?: boolean;
-}
-
-interface WebSocketMessageType {
-  type: 'message' | 'status_update' | 'typing';
-  content?: string;
-  channelId?: number;
-  userId?: number;
-  isOnline?: boolean;
-  hideActivity?: boolean;
-}
-
 export function registerRoutes(app: Express): Server {
+  // Serve static files from the uploads directory
+  app.use('/uploads', express.static('uploads'));
+
   setupAuth(app);
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ noServer: true });
@@ -1090,7 +1020,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
+  app.get("/api/friends", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1109,11 +1039,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user1Id, req.user.id),
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user2Id, req.user.id),
             eq(users.id, friends.user1Id)
           )
         ))
@@ -1678,8 +1608,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.use("/uploads", express.static("uploads"));
-
   // Add the route for direct message file uploads
   app.post("/api/channels/:channelId/messages", upload.array('files'), async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -1768,9 +1696,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error creating message");
     }
   });
-
-  // Serve uploaded files
-  app.use('/uploads', express.static('uploads'));
 
   app.post("/api/channels/:channelId/leave", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -2090,7 +2015,6 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
-
 
   app.get("/api/direct-messages/channel", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -2398,8 +2322,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.use("/uploads", express.static("uploads"));
-
   // Add the route for direct message file uploads
   app.post("/api/channels/:channelId/messages", upload.array('files'), async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -2488,9 +2410,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error creating message");
     }
   });
-
-  // Serve uploaded files
-  app.use('/uploads', express.static('uploads'));
 
   app.post("/api/channels/:channelId/leave", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -2810,7 +2729,6 @@ export function registerRoutes(app: Express): Server {
       next(error);
     }
   });
-
 
   app.get("/api/direct-messages/channel", async (req, res) => {
     if (!req.isAuthenticated()) {

@@ -170,7 +170,7 @@ export function MessageList({ channelId }: MessageListProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <div className="flex items-center gap-2 mt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -180,30 +180,18 @@ export function MessageList({ channelId }: MessageListProps) {
               <Reply className="h-3 w-3 mr-1" />
               Reply
             </Button>
-            {message.replyCount > 0 && (
+            {Object.entries(reactionGroups).map(([emoji, count]) => (
               <Button
-                variant="ghost"
+                key={emoji}
+                variant="secondary"
                 size="sm"
-                className="h-6 px-2 text-xs text-muted-foreground"
-                onClick={handleReply}
+                className="h-6 px-2 text-xs"
+                onClick={() => handleReaction(emoji)}
               >
-                {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+                {emoji}
+                <span className="ml-1">{count}</span>
               </Button>
-            )}
-            <div className="flex gap-1 flex-wrap">
-              {Object.entries(reactionGroups).map(([emoji, count]) => (
-                <Button
-                  key={emoji}
-                  variant="secondary"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => handleReaction(emoji)}
-                >
-                  <span>{emoji}</span>
-                  <span className="ml-1">{count}</span>
-                </Button>
-              ))}
-            </div>
+            ))}
             <ReactionPicker onSelectEmoji={handleReaction} />
           </div>
         </div>
