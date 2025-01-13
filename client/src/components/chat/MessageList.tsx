@@ -81,7 +81,7 @@ export function MessageList({ channelId }: MessageListProps) {
     };
 
     return (
-      <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
+      <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200 p-2 hover:bg-muted/50 rounded-lg">
         <Avatar className="h-8 w-8 flex-shrink-0">
           {message.user.avatarUrl ? (
             <AvatarImage src={message.user.avatarUrl} alt={message.user.username} />
@@ -100,12 +100,14 @@ export function MessageList({ channelId }: MessageListProps) {
               {new Date(message.createdAt).toLocaleTimeString()}
             </span>
           </div>
-          <div 
-            className="text-sm mt-1 break-words"
-            dangerouslySetInnerHTML={{ 
-              __html: parseFormattedText(message.content)
-            }}
-          />
+          {message.content && (
+            <div 
+              className="text-sm mt-1 break-words"
+              dangerouslySetInnerHTML={{ 
+                __html: parseFormattedText(message.content)
+              }}
+            />
+          )}
 
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 space-y-2">
@@ -113,55 +115,55 @@ export function MessageList({ channelId }: MessageListProps) {
                 const isImage = isImageFile(attachment.filename, attachment.mimeType);
                 const showFallback = failedImages.has(attachment.fileUrl);
 
+                if (isImage && !showFallback) {
+                  return (
+                    <div key={attachment.id} className="relative group">
+                      <img
+                        src={attachment.fileUrl}
+                        alt={attachment.filename}
+                        className="max-w-md rounded-lg object-contain max-h-[500px] bg-secondary/50"
+                        onError={() => handleImageError(attachment.fileUrl)}
+                        loading="lazy"
+                      />
+                      <a
+                        href={attachment.fileUrl}
+                        download={attachment.filename}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Button variant="secondary" size="icon" className="h-8 w-8">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </a>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={attachment.id}
-                    className="flex flex-col gap-2"
+                    className="flex items-center gap-2 p-2 rounded-md bg-secondary/50"
                   >
-                    {isImage && !showFallback ? (
-                      <div className="relative group max-w-2xl">
-                        <img
-                          src={attachment.fileUrl}
-                          alt={attachment.filename}
-                          className="rounded-lg object-contain max-h-[500px] bg-secondary/50"
-                          onError={() => handleImageError(attachment.fileUrl)}
-                          loading="lazy"
-                        />
-                        <a
-                          href={attachment.fileUrl}
-                          download={attachment.filename}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Button variant="secondary" size="icon" className="h-8 w-8">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </a>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 p-2 rounded-md bg-secondary/50">
-                        <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {attachment.filename}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(attachment.fileSize)}
-                          </p>
-                        </div>
-                        <a
-                          href={attachment.fileUrl}
-                          download={attachment.filename}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </a>
-                      </div>
-                    )}
+                    <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {attachment.filename}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(attachment.fileSize)}
+                      </p>
+                    </div>
+                    <a
+                      href={attachment.fileUrl}
+                      download={attachment.filename}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </a>
                   </div>
                 );
               })}
