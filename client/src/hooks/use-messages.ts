@@ -36,7 +36,9 @@ export function useMessages(channelId: number, parentId?: number) {
       const formData = new FormData();
       formData.append('content', content);
       if (parentId) formData.append('parentId', parentId.toString());
-      if (files) files.forEach(file => formData.append('files', file));
+      if (files) {
+        files.forEach(file => formData.append('files', file));
+      }
 
       const res = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',

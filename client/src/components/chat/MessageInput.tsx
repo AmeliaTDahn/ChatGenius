@@ -27,6 +27,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
     italic: false,
     color: null
   });
+  const [isUploading, setIsUploading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,30 +43,41 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
     }
   }, [message]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() || files.length > 0) {
-      let finalMessage = message;
+      try {
+        setIsUploading(true);
+        let finalMessage = message;
 
-      // Apply formatting in reverse order to handle nested formats
-      if (currentFormat.color) {
-        finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
-      }
-      if (currentFormat.italic) {
-        finalMessage = `*${finalMessage}*`;
-      }
-      if (currentFormat.bold) {
-        finalMessage = `**${finalMessage}**`;
-      }
+        // Apply formatting in reverse order to handle nested formats
+        if (currentFormat.color) {
+          finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
+        }
+        if (currentFormat.italic) {
+          finalMessage = `*${finalMessage}*`;
+        }
+        if (currentFormat.bold) {
+          finalMessage = `**${finalMessage}**`;
+        }
 
-      onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
-      setMessage("");
-      setFiles([]);
-      setCurrentFormat({
-        bold: false,
-        italic: false,
-        color: null
-      });
+        await onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
+        setMessage("");
+        setFiles([]);
+        setCurrentFormat({
+          bold: false,
+          italic: false,
+          color: null
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -92,6 +104,8 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
       });
 
       setFiles(prev => [...prev, ...newFiles]);
+      // Reset the input value so the same file can be selected again
+      e.target.value = '';
     }
   };
 
@@ -103,7 +117,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
     if (type === 'color') {
       setCurrentFormat(prev => ({
         ...prev,
-        color: prev.color === value ? null : value
+        color: value === prev.color ? null : value
       }));
     } else {
       setCurrentFormat(prev => ({
@@ -164,6 +178,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             size="icon"
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -229,7 +244,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={!message.trim() && files.length === 0}>
+        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
