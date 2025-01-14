@@ -1,6 +1,6 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Hash, Plus } from "lucide-react";
+import { Hash, Plus, MessageSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
