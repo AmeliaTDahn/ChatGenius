@@ -25,13 +25,14 @@ export function AIChatChannel() {
         timestamp: new Date()
       }]);
 
-      // Call the external chatbot API
-      const response = await fetch("https://ai-chatbot-ameliadahn.replit.app/api/chat", {
+      // Call our proxy endpoint instead of the external API directly
+      const response = await fetch("/api/chat-proxy", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ message: content })
+        body: JSON.stringify({ message: content }),
+        credentials: 'include' // Important for authentication
       });
 
       if (!response.ok) {

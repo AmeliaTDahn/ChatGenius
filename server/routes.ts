@@ -2125,9 +2125,9 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // First, get user's current friends
-      const userFriends = await db        .select({
-          friendId: users.id
-        })
+      const userFriends = await db
+        .select({
+          friendId: users.id        })
         .from(friends)
         .leftJoin(users, or(
           and(
@@ -2279,6 +2279,41 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error updating channel color");
     }
   });
+  app.post("/api/chat-proxy", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const { message } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      const response = await fetch("https://ai-chatbot-ameliadahn.replit.app/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ message })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chatbot API responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Chatbot proxy error:", error);
+      res.status(500).json({ 
+        error: "Failed to get response from chatbot",
+        details: error.message
+      });
+    }
+  });
+
   app.post("/api/friends/ensure-dm-channels", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
