@@ -1,15 +1,7 @@
-
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { users, type User } from "@db/schema";
+import { users } from "@db/schema";
 import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
@@ -24,15 +16,18 @@ import crypto from 'crypto';
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
 import session, { SessionOptions } from 'express-session';
 import passport from 'passport';
+import OpenAI from 'openai';
 
-// Assuming sessionSettings is defined elsewhere, this is a placeholder
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
 const sessionSettings: SessionOptions = {
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: true,
   cookie: { secure: false }
 };
-
 
 async function getUnreadMessageCounts(userId: number) {
   const userChannels = await db.query.channelMembers.findMany({
@@ -47,29 +42,6 @@ async function getUnreadMessageCounts(userId: number) {
       const latestRead = await db
         .select({
           messageId: messageReads.messageId,
-
-  app.post("/api/chat", async (req, res) => {
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ error: "OpenAI API key not configured" });
-    }
-
-    try {
-      const { message } = req.body;
-      
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: message }],
-      });
-
-      const response = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
-      res.json({ message: response });
-    } catch (error) {
-      console.error("OpenAI API error:", error);
-      res.status(500).json({ error: "Failed to get response from AI" });
-    }
-  });
-
-
           channelId: messages.channelId
         })
         .from(messageReads)
@@ -1107,7 +1079,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
+  app.get("/api/friends", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1126,11 +1098,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user1Id, req.user.id),
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user2Id, req.user.id),
             eq(users.id, friends.user1Id)
           )
         ))
@@ -2156,7 +2128,8 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // First, get user's current friends
-      const userFriends = await db        .select({
+      const userFriends = await db
+        .select({
           friendId: users.id
         })
         .from(friends)
