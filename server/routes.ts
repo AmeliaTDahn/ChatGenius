@@ -1,12 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { db } from "@db";
-import { users, type User } from "@db/schema";
-import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
-import { setupAuth } from "./auth";
-import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import { WebSocketServer, WebSocket } from 'ws';
+import { db } from "@db";
+import { messages } from "@db/schema";
 import type { Message } from "@db/schema";
+import { eq } from "drizzle-orm";
+import session from 'express-session';
+import { users, type User } from "@db/schema";
+import { and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
+import { setupAuth } from "./auth";
+import { channels, channelMembers, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import path from "path";
@@ -14,91 +17,26 @@ import fs from "fs/promises";
 import express from "express";
 import crypto from 'crypto';
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
-import session, { SessionOptions } from 'express-session';
 import passport from 'passport';
 
-// Assuming sessionSettings is defined elsewhere, this is a placeholder
-const sessionSettings: SessionOptions = {
-  secret: 'your-secret-key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }
-};
-
-
-async function getUnreadMessageCounts(userId: number) {
-  const userChannels = await db.query.channelMembers.findMany({
-    where: eq(channelMembers.userId, userId),
-    with: {
-      channel: true
-    }
-  });
-
-  const unreadCounts = await Promise.all(
-    userChannels.map(async ({ channel }) => {
-      const latestRead = await db
-        .select({
-          messageId: messageReads.messageId,
-          channelId: messages.channelId
-        })
-        .from(messageReads)
-        .innerJoin(messages, eq(messageReads.messageId, messages.id))
-        .where(and(
-          eq(messageReads.userId, userId),
-          eq(messages.channelId, channel.id)
-        ))
-        .orderBy(desc(messageReads.readAt))
-        .limit(1);
-
-      const unreadCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(messages)
-        .where(and(
-          eq(messages.channelId, channel.id),
-          ne(messages.userId, userId),
-          latestRead.length > 0
-            ? gt(messages.id, latestRead[0].messageId)
-            : sql`TRUE`
-        ));
-
-      return {
-        channelId: channel.id,
-        unreadCount: Number(unreadCount[0]?.count || 0)
-      };
-    })
-  );
-
-  return unreadCounts;
-}
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: "./uploads",
-    filename: (_req, file, cb) => {
-      const uniqueSuffix = randomBytes(16).toString("hex");
-      cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
-    },
-  }),
+// Setup multer for file uploads
+const storage = multer.diskStorage({
+  destination: async (_req, _file, cb) => {
+    await fs.mkdir("./uploads", { recursive: true });
+    cb(null, "./uploads");
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = randomBytes(16).toString("hex");
+    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
 });
 
-(async () => {
-  await fs.mkdir("./uploads", { recursive: true });
-})();
-
+const upload = multer({ storage });
 
 interface ExtendedWebSocket extends WebSocket {
   userId?: number;
-  sessionId?: string;
+  tabId?: string;
   isAlive?: boolean;
-}
-
-interface WebSocketMessageType {
-  type: 'message' | 'status_update' | 'typing';
-  content?: string;
-  channelId?: number;
-  userId?: number;
-  isOnline?: boolean;
-  hideActivity?: boolean;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -120,14 +58,20 @@ export function registerRoutes(app: Express): Server {
     clearInterval(pingInterval);
   });
 
+  // Session middleware configuration
+  const sessionMiddleware = session({
+    secret: 'your-secret-key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false }
+  });
+
   httpServer.on('upgrade', (request, socket, head) => {
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
 
-    // Parse the session from the request
-    const sessionParser = session(sessionSettings);
-    sessionParser(request as any, {} as any, () => {
+    sessionMiddleware(request as any, {} as any, () => {
       // @ts-ignore - passport.session() types are not complete
       passport.session()(request as any, {} as any, () => {
         if (!(request as any).user) {
@@ -139,7 +83,7 @@ export function registerRoutes(app: Express): Server {
         wss.handleUpgrade(request, socket, head, (ws) => {
           const extWs = ws as ExtendedWebSocket;
           extWs.userId = (request as any).user.id;
-          extWs.sessionId = (request as any).sessionID;
+          extWs.isAlive = true;
           wss.emit('connection', extWs, request);
         });
       });
@@ -155,93 +99,86 @@ export function registerRoutes(app: Express): Server {
 
     ws.on('message', async (data: Buffer) => {
       try {
-        const message = JSON.parse(data.toString()) as WebSocketMessageType;
+        const message = JSON.parse(data.toString());
+        console.log('Received message:', message); // Debug log
 
         switch (message.type) {
           case 'message': {
-            // Ensure the message is sent with the correct user ID from the WebSocket connection
-            const userId = ws.userId;
-            if (!userId) {
+            if (!message.content || !message.channelId || !ws.userId) {
               ws.send(JSON.stringify({
                 type: 'error',
-                message: 'Not authenticated',
+                message: 'Invalid message format'
               }));
               return;
             }
 
-            const [newMessage] = await db.insert(messages)
-              .values({
-                content: message.content,
-                channelId: message.channelId,
-                userId: userId, // Use the WebSocket's authenticated user ID
-              })
-              .returning();
+            try {
+              const [newMessage] = await db.insert(messages)
+                .values({
+                  content: message.content,
+                  channelId: message.channelId,
+                  userId: ws.userId
+                })
+                .returning();
 
-            const fullMessage = await db.query.messages.findFirst({
-              where: eq(messages.id, newMessage.id),
-              with: {
-                user: {
-                  columns: {
-                    id: true,
-                    username: true,
-                    avatarUrl: true,
-                  }
-                },
-                reactions: {
-                  with: {
-                    user: {
-                      columns: {
-                        id: true,
-                        username: true,
-                        avatarUrl: true,
+              // Fetch the complete message with relations
+              const fullMessage = await db.query.messages.findFirst({
+                where: eq(messages.id, newMessage.id),
+                with: {
+                  user: {
+                    columns: {
+                      id: true,
+                      username: true,
+                      avatarUrl: true,
+                    }
+                  },
+                  reactions: {
+                    with: {
+                      user: {
+                        columns: {
+                          id: true,
+                          username: true,
+                          avatarUrl: true,
+                        }
                       }
                     }
                   }
-                },
-              }
-            });
+                }
+              });
 
-            // Broadcast to all clients except those with the same session ID
-            const broadcastMessage = JSON.stringify({
-              type: 'new_message',
-              message: fullMessage,
-              channelId: message.channelId,
-              senderId: userId,
-            });
-
-            wss.clients.forEach((client: ExtendedWebSocket) => {
-              if (client.readyState === WebSocket.OPEN && client.sessionId !== ws.sessionId) {
-                client.send(broadcastMessage);
+              if (fullMessage) {
+                // Broadcast to all clients
+                wss.clients.forEach((client: ExtendedWebSocket) => {
+                  if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({
+                      type: 'message',
+                      message: fullMessage,
+                      channelId: message.channelId
+                    }));
+                  }
+                });
               }
-            });
-            break;
-          }
-          case 'status_update': {
-            const statusUpdate = JSON.stringify({
-              type: 'status_update',
-              userId: message.userId,
-              isOnline: message.isOnline,
-              hideActivity: message.hideActivity,
-            });
-
-            wss.clients.forEach((client) => {
-              if (client.readyState === WebSocket.OPEN) {
-                client.send(statusUpdate);
-              }
-            });
+            } catch (error) {
+              console.error('Error saving message:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to save message'
+              }));
+            }
             break;
           }
 
           case 'typing': {
-            const typingUpdate = JSON.stringify({
+            // Broadcast typing status
+            const typingUpdate = {
               type: 'typing',
               channelId: message.channelId,
-              userId: message.userId,
-            });
+              userId: ws.userId
+            };
 
-            wss.clients.forEach((client) => {
-              if (client.readyState === WebSocket.OPEN) {
-                client.send(typingUpdate);
+            wss.clients.forEach((client: ExtendedWebSocket) => {
+              if (client.readyState === WebSocket.OPEN && client !== ws) {
+                client.send(JSON.stringify(typingUpdate));
               }
             });
             break;
@@ -251,7 +188,7 @@ export function registerRoutes(app: Express): Server {
         console.error('WebSocket message error:', error);
         ws.send(JSON.stringify({
           type: 'error',
-          message: 'Failed to process message',
+          message: 'Failed to process message'
         }));
       }
     });
@@ -618,6 +555,7 @@ export function registerRoutes(app: Express): Server {
       }
     });
 
+
     const unreadCounts = await getUnreadMessageCounts(req.user.id);
 
     const channelsWithUnread = userChannels.map(uc => ({
@@ -627,6 +565,51 @@ export function registerRoutes(app: Express): Server {
 
     res.json(channelsWithUnread);
   });
+
+  async function getUnreadMessageCounts(userId: number) {
+    const userChannels = await db.query.channelMembers.findMany({
+      where: eq(channelMembers.userId, userId),
+      with: {
+        channel: true
+      }
+    });
+
+    const unreadCounts = await Promise.all(
+      userChannels.map(async ({ channel }) => {
+        const latestRead = await db
+          .select({
+            messageId: messageReads.messageId,
+            channelId: messages.channelId
+          })
+          .from(messageReads)
+          .innerJoin(messages, eq(messageReads.messageId, messages.id))
+          .where(and(
+            eq(messageReads.userId, userId),
+            eq(messages.channelId, channel.id)
+          ))
+          .orderBy(desc(messageReads.readAt))
+          .limit(1);
+
+        const unreadCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(messages)
+          .where(and(
+            eq(messages.channelId, channel.id),
+            ne(messages.userId, userId),
+            latestRead.length > 0
+              ? gt(messages.id, latestRead[0].messageId)
+              : sql`TRUE`
+          ));
+
+        return {
+          channelId: channel.id,
+          unreadCount: Number(unreadCount[0]?.count || 0)
+        };
+      })
+    );
+
+    return unreadCounts;
+  }
 
   app.post("/api/channels", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -1076,7 +1059,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
+  app.get("/api/friends", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1095,11 +1078,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user1Id, req.user.id),
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
+            eq(friends.user2Id, req.user.id),
             eq(users.id, friends.user1Id)
           )
         ))
@@ -2141,8 +2124,7 @@ export function registerRoutes(app: Express): Server {
           )
         ))
         .where(or(
-          eq(friends.user1Id, req.user.id),
-          eq(friends.user2Id, req.user.id)
+          eq(friends.user1Id, req.user.id),          eq(friends.user2Id, req.user.id)
         ));
 
       // If user has no friends, return empty array

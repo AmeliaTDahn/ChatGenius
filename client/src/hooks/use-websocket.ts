@@ -3,27 +3,19 @@ import type { User, Message } from '@db/schema';
 import { useToast } from '@/hooks/use-toast';
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request';
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'error';
   channelId?: number;
   content?: string;
   userId?: number;
   tabId?: string;
   isOnline?: boolean;
   message?: Message;
-  friendRequest?: {
-    id: number;
-    sender: {
-      id: number;
-      username: string;
-      avatarUrl?: string;
-    };
-  };
+  error?: string;
 };
 
 export function useWebSocket(user: User | null, onMessage?: (message: Message) => void) {
   const ws = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-
   const tabId = useRef<string | null>(null);
 
   if (!tabId.current) {
@@ -38,37 +30,60 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${tabId.current}`;
+    console.log('Connecting to WebSocket:', wsUrl);
+
     ws.current = new WebSocket(wsUrl);
 
-    ws.current.onmessage = (event) => {
-      const data: WSMessage = JSON.parse(event.data);
+    ws.current.onopen = () => {
+      console.log('WebSocket connected');
+    };
 
-      switch (data.type) {
-        case 'message':
-          if (data.message && onMessage) {
-            onMessage(data.message);
-          }
-          break;
-        case 'presence':
-          break;
-        case 'friend_request':
-          if (data.friendRequest) {
-            toast({
-              title: 'New Friend Request',
-              description: `${data.friendRequest.sender.username} sent you a friend request!`,
-              duration: 5000,
-            });
-          }
-          break;
+    ws.current.onmessage = (event) => {
+      try {
+        const data: WSMessage = JSON.parse(event.data);
+        console.log('Received WebSocket message:', data);
+
+        switch (data.type) {
+          case 'message':
+            if (data.message && onMessage) {
+              onMessage(data.message);
+            }
+            break;
+          case 'error':
+            if (data.error) {
+              toast({
+                title: 'Error',
+                description: data.error,
+                variant: 'destructive',
+              });
+            }
+            break;
+          case 'typing':
+            // Handle typing indicator if needed
+            break;
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
       }
     };
 
-    ws.current.onclose = () => {
+    ws.current.onclose = (event) => {
+      console.log('WebSocket closed:', event);
       setTimeout(() => {
         if (user) {
+          console.log('Attempting to reconnect WebSocket...');
           ws.current = new WebSocket(wsUrl);
         }
       }, 1000);
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      toast({
+        title: 'Connection Error',
+        description: 'Failed to connect to chat server. Retrying...',
+        variant: 'destructive',
+      });
     };
 
     const pingInterval = setInterval(() => {
@@ -79,15 +94,25 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
 
     return () => {
       clearInterval(pingInterval);
-      ws.current?.close();
+      if (ws.current) {
+        ws.current.close();
+      }
     };
   }, [user, onMessage, toast]);
 
-  const sendMessage = useCallback((message: WSMessage & { userId: number }) => {
+  const sendMessage = useCallback((message: WSMessage) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      console.log('Sending WebSocket message:', message);
       ws.current.send(JSON.stringify({ ...message, tabId: tabId.current }));
+    } else {
+      console.error('WebSocket is not connected');
+      toast({
+        title: 'Connection Error',
+        description: 'Not connected to chat server. Please try again.',
+        variant: 'destructive',
+      });
     }
-  }, []);
+  }, [toast]);
 
   return { sendMessage };
 }
