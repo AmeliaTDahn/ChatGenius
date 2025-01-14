@@ -206,7 +206,15 @@ export default function ChatPage() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedChannel?.id === -1 ? (
-            <div className="flex-1 h-full">
+            <div className="flex-1 h-full bg-background">
+              <div className="p-4 border-b flex items-center">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback>AI</AvatarFallback>
+                  </Avatar>
+                  <h2 className="font-semibold text-lg">Chat Assistant</h2>
+                </div>
+              </div>
               <ChatBot />
             </div>
           ) : selectedChannel ? (

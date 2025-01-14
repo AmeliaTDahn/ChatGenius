@@ -59,6 +59,18 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
 
   return (
     <div className="space-y-2 p-2">
+      <Button
+        variant="ghost"
+        className="w-full justify-start"
+        onClick={() => onSelectChannel({ id: -1, name: "Chat Assistant" } as Channel)}
+      >
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarFallback>AI</AvatarFallback>
+          </Avatar>
+          <span className="text-sm">Chat Assistant</span>
+        </div>
+      </Button>
       {directMessages.map((dm) => (
         <Button
           key={dm.id}
