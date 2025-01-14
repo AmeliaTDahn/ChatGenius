@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUser } from "@/hooks/use-user";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useMessages } from "@/hooks/use-messages";
+import { ChatBot } from "@/components/chat/ChatBot";
 import { UserHeader } from "@/components/chat/UserHeader";
 import { ChannelList } from "@/components/chat/ChannelList";
 import { MessageList } from "@/components/chat/MessageList";
