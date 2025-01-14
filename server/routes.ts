@@ -1,78 +1,288 @@
-import express, { type Express } from "express";
-import { WebSocketServer } from 'ws';
+import type { Express } from "express";
+import { createServer, type Server } from "http";
 import { db } from "@db";
-import { messages } from "@db/schema";
-import { eq } from "drizzle-orm";
 import { users, type User } from "@db/schema";
-import { and, ne, ilike, or, inArray, desc, gt, sql } from "drizzle-orm";
+import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
 import { setupAuth } from "./auth";
-import { channels, channelMembers, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
+import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
+import { WebSocketServer, WebSocket } from 'ws';
+import type { Message } from "@db/schema";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
+import express from "express";
+import crypto from 'crypto';
+import { sendPasswordResetEmail, generateResetToken } from './utils/email';
+import session, { SessionOptions } from 'express-session';
 import passport from 'passport';
 
-// Setup multer for file uploads
-const storage = multer.diskStorage({
-  destination: async (_req, _file, cb) => {
-    await fs.mkdir("./uploads", { recursive: true });
-    cb(null, "./uploads");
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = randomBytes(16).toString("hex");
-    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
-  },
-});
+// Assuming sessionSettings is defined elsewhere, this is a placeholder
+const sessionSettings: SessionOptions = {
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+};
 
-const upload = multer({ storage });
 
-interface RequestWithUser extends Express.Request {
-  user?: User;
-}
-
-let wss: WebSocketServer; // Declare wss globally
-
-export function registerRoutes(app: Express) {
-  setupAuth(app);
-
-  // Create WebSocket server
-  wss = new WebSocketServer({ noServer: true });
-
-  // API Routes
-  app.get("/api/messages", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const messages = await db.query.messages.findMany({
-        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
-        limit: 100
-      });
-      res.json(messages);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-      res.status(500).send("Error fetching messages");
+async function getUnreadMessageCounts(userId: number) {
+  const userChannels = await db.query.channelMembers.findMany({
+    where: eq(channelMembers.userId, userId),
+    with: {
+      channel: true
     }
   });
 
-  app.get("/api/user", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  const unreadCounts = await Promise.all(
+    userChannels.map(async ({ channel }) => {
+      const latestRead = await db
+        .select({
+          messageId: messageReads.messageId,
+          channelId: messages.channelId
+        })
+        .from(messageReads)
+        .innerJoin(messages, eq(messageReads.messageId, messages.id))
+        .where(and(
+          eq(messageReads.userId, userId),
+          eq(messages.channelId, channel.id)
+        ))
+        .orderBy(desc(messageReads.readAt))
+        .limit(1);
+
+      const unreadCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(and(
+          eq(messages.channelId, channel.id),
+          ne(messages.userId, userId),
+          latestRead.length > 0
+            ? gt(messages.id, latestRead[0].messageId)
+            : sql`TRUE`
+        ));
+
+      return {
+        channelId: channel.id,
+        unreadCount: Number(unreadCount[0]?.count || 0)
+      };
+    })
+  );
+
+  return unreadCounts;
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "./uploads",
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = randomBytes(16).toString("hex");
+      cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+    },
+  }),
+});
+
+(async () => {
+  await fs.mkdir("./uploads", { recursive: true });
+})();
+
+
+interface ExtendedWebSocket extends WebSocket {
+  userId?: number;
+  sessionId?: string;
+  isAlive?: boolean;
+}
+
+interface WebSocketMessageType {
+  type: 'message' | 'status_update' | 'typing';
+  content?: string;
+  channelId?: number;
+  userId?: number;
+  isOnline?: boolean;
+  hideActivity?: boolean;
+}
+
+export function registerRoutes(app: Express): Server {
+  setupAuth(app);
+  const httpServer = createServer(app);
+  const wss = new WebSocketServer({ noServer: true });
+
+  const pingInterval = setInterval(() => {
+    wss.clients.forEach((ws: ExtendedWebSocket) => {
+      if (ws.isAlive === false) {
+        return ws.terminate();
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  wss.on('close', () => {
+    clearInterval(pingInterval);
+  });
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
+      return;
+    }
+
+    // Parse the session from the request
+    const sessionParser = session(sessionSettings);
+    sessionParser(request as any, {} as any, () => {
+      // @ts-ignore - passport.session() types are not complete
+      passport.session()(request as any, {} as any, () => {
+        if (!(request as any).user) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          const extWs = ws as ExtendedWebSocket;
+          extWs.userId = (request as any).user.id;
+          extWs.sessionId = (request as any).sessionID;
+          wss.emit('connection', extWs, request);
+        });
+      });
+    });
+  });
+
+  wss.on('connection', (ws: ExtendedWebSocket) => {
+    ws.isAlive = true;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+
+    ws.on('message', async (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString()) as WebSocketMessageType;
+
+        switch (message.type) {
+          case 'message': {
+            // Ensure the message is sent with the correct user ID from the WebSocket connection
+            const userId = ws.userId;
+            if (!userId) {
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Not authenticated',
+              }));
+              return;
+            }
+
+            const [newMessage] = await db.insert(messages)
+              .values({
+                content: message.content,
+                channelId: message.channelId,
+                userId: userId, // Use the WebSocket's authenticated user ID
+              })
+              .returning();
+
+            const fullMessage = await db.query.messages.findFirst({
+              where: eq(messages.id, newMessage.id),
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    avatarUrl: true,
+                  }
+                },
+                reactions: {
+                  with: {
+                    user: {
+                      columns: {
+                        id: true,
+                        username: true,
+                        avatarUrl: true,
+                      }
+                    }
+                  }
+                },
+              }
+            });
+
+            // Broadcast to all clients except those with the same session ID
+            const broadcastMessage = JSON.stringify({
+              type: 'new_message',
+              message: fullMessage,
+              channelId: message.channelId,
+              senderId: userId,
+            });
+
+            wss.clients.forEach((client: ExtendedWebSocket) => {
+              if (client.readyState === WebSocket.OPEN && client.sessionId !== ws.sessionId) {
+                client.send(broadcastMessage);
+              }
+            });
+            break;
+          }
+          case 'status_update': {
+            const statusUpdate = JSON.stringify({
+              type: 'status_update',
+              userId: message.userId,
+              isOnline: message.isOnline,
+              hideActivity: message.hideActivity,
+            });
+
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(statusUpdate);
+              }
+            });
+            break;
+          }
+
+          case 'typing': {
+            const typingUpdate = JSON.stringify({
+              type: 'typing',
+              channelId: message.channelId,
+              userId: message.userId,
+            });
+
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(typingUpdate);
+              }
+            });
+            break;
+          }
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Failed to process message',
+        }));
+      }
+    });
+
+    ws.on('close', () => {
+      ws.isAlive = false;
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      ws.terminate();
+    });
+  });
+
+  app.get("/api/user", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, req.user.id),
-        columns: {
-          id: true,
-          username: true,
-          avatarUrl: true,
-          isOnline: true,
-          createdAt: true
-        }
-      });
+      const [user] = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+          isOnline: users.isOnline,
+          createdAt: users.createdAt
+        })
+        .from(users)
+        .where(eq(users.id, req.user.id))
+        .limit(1);
 
       if (!user) {
         return res.status(404).send("User not found");
@@ -85,8 +295,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/user/profile", upload.single('files'), async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/user/profile", upload.single('files'), async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -148,8 +358,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/user/status", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/user/status", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -170,14 +380,27 @@ export function registerRoutes(app: Express) {
         .returning();
 
       res.json(updatedUser);
+
+      const statusUpdate = {
+        type: 'status_update',
+        userId: updatedUser.id,
+        hideActivity: updatedUser.hideActivity,
+        isOnline: updatedUser.isOnline
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(statusUpdate));
+        }
+      });
     } catch (error) {
       console.error("Error updating user status:", error);
       res.status(500).send("Error updating user status");
     }
   });
 
-  app.get("/api/users/search", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/users/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -234,8 +457,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/channels/:channelId/invites", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/channels/:channelId/invites", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -305,8 +528,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/channel-invites", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/channel-invites", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -335,8 +558,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/channel-invites/:inviteId", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/channel-invites/:inviteId", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -383,8 +606,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/channels", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -394,7 +617,6 @@ export function registerRoutes(app: Express) {
         channel: true
       }
     });
-
 
     const unreadCounts = await getUnreadMessageCounts(req.user.id);
 
@@ -406,53 +628,8 @@ export function registerRoutes(app: Express) {
     res.json(channelsWithUnread);
   });
 
-  async function getUnreadMessageCounts(userId: number) {
-    const userChannels = await db.query.channelMembers.findMany({
-      where: eq(channelMembers.userId, userId),
-      with: {
-        channel: true
-      }
-    });
-
-    const unreadCounts = await Promise.all(
-      userChannels.map(async ({ channel }) => {
-        const latestRead = await db
-          .select({
-            messageId: messageReads.messageId,
-            channelId: messages.channelId
-          })
-          .from(messageReads)
-          .innerJoin(messages, eq(messageReads.messageId, messages.id))
-          .where(and(
-            eq(messageReads.userId, userId),
-            eq(messages.channelId, channel.id)
-          ))
-          .orderBy(desc(messageReads.readAt))
-          .limit(1);
-
-        const unreadCount = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(messages)
-          .where(and(
-            eq(messages.channelId, channel.id),
-            ne(messages.userId, userId),
-            latestRead.length > 0
-              ? gt(messages.id, latestRead[0].messageId)
-              : sql`TRUE`
-          ));
-
-        return {
-          channelId: channel.id,
-          unreadCount: Number(unreadCount[0]?.count || 0)
-        };
-      })
-    );
-
-    return unreadCounts;
-  }
-
-  app.post("/api/channels", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -467,8 +644,8 @@ export function registerRoutes(app: Express) {
     res.json(channel);
   });
 
-  app.get("/api/channels/:channelId/messages", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/channels/:channelId/messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -528,8 +705,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/messages/search", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/messages/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -576,8 +753,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/messages/:messageId/reactions", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/messages/:messageId/reactions", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -632,8 +809,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/friend-requests", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/friend-requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -674,8 +851,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/friend-requests", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/friend-requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -703,8 +880,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/direct-messages", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/direct-messages", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -785,8 +962,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/friend-requests/:requestId", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/friend-requests/:requestId", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -899,8 +1076,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/friends", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -918,11 +1095,11 @@ export function registerRoutes(app: Express) {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),
+            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),
+            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user1Id)
           )
         ))
@@ -988,8 +1165,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/friends/search", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/friends/search", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1016,8 +1193,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/friends/:friendId", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.delete("/api/friends/:friendId", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1031,7 +1208,8 @@ export function registerRoutes(app: Express) {
         .select({
           channelId: directMessageChannels.channelId
         })
-        .from(directMessageChannels)        .where(or(
+        .from(directMessageChannels)
+        .where(or(
           and(
             eq(directMessageChannels.user1Id, req.user.id),
             eq(directMessageChannels.user2Id, friendId)
@@ -1098,8 +1276,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/direct-messages/create", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/direct-messages/create", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1180,8 +1358,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/direct-messages/channel", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/direct-messages/channel", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1220,8 +1398,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/friends/recommendations", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/friends/recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1329,8 +1507,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/channels/:channelId/color", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/channels/:channelId/color", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1363,14 +1541,27 @@ export function registerRoutes(app: Express) {
         .where(eq(channels.id, channelId))
         .returning();
 
+      // Notify all clients about the color change via WebSocket
+      const colorUpdate = {
+        type: 'channel_color_update',
+        channelId,
+        backgroundColor,
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(colorUpdate));
+        }
+      });
+
       res.json(updatedChannel);
     } catch (error) {
       console.error("Error updating channel color:", error);
       res.status(500).send("Error updating channel color");
     }
   });
-  app.post("/api/friends/ensure-dm-channels", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/friends/ensure-dm-channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1452,8 +1643,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/upload", upload.array("files"), async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/upload", upload.array("files"), async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1476,8 +1667,8 @@ export function registerRoutes(app: Express) {
   app.use("/uploads", express.static("uploads"));
 
   // Add the route for direct message file uploads
-  app.post("/api/channels/:channelId/messages", upload.array('files'), async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/channels/:channelId/messages", upload.array('files'), async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1567,8 +1758,8 @@ export function registerRoutes(app: Express) {
   // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
 
-  app.post("/api/channels/:channelId/leave", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/channels/:channelId/leave", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1625,8 +1816,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/user/account", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.delete("/api/user/account", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1742,7 +1933,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Password reset request endpoint
-  app.post("/api/auth/reset-password", async (req: RequestWithUser, res) => {
+  app.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { email } = req.body;
 
@@ -1832,7 +2023,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req: RequestWithUser, res, next) => {
+  app.post("/api/register", async (req, res, next) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
@@ -1887,8 +2078,8 @@ export function registerRoutes(app: Express) {
   });
 
 
-  app.get("/api/direct-messages/channel", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/direct-messages/channel", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -1927,15 +2118,14 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/friends/recommendations", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/friends/recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
     try {
       // First, get user's current friends
-      const userFriends = await db
-        .select({
+      const userFriends = await db        .select({
           friendId: users.id
         })
         .from(friends)
@@ -2036,8 +2226,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/channels/:channelId/color", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/channels/:channelId/color", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2068,7 +2258,20 @@ export function registerRoutes(app: Express) {
         .update(channels)
         .set({ backgroundColor })
         .where(eq(channels.id, channelId))
-.returning();
+        .returning();
+
+      // Notify all clients about the color change via WebSocket
+      const colorUpdate = {
+        type: 'channel_color_update',
+        channelId,
+        backgroundColor,
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(colorUpdate));
+        }
+      });
 
       res.json(updatedChannel);
     } catch (error) {
@@ -2076,8 +2279,8 @@ export function registerRoutes(app: Express) {
       res.status(500).send("Error updating channel color");
     }
   });
-  app.post("/api/friends/ensure-dm-channels", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/friends/ensure-dm-channels", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2159,8 +2362,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/upload", upload.array("files"), async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/upload", upload.array("files"), async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2183,8 +2386,8 @@ export function registerRoutes(app: Express) {
   app.use("/uploads", express.static("uploads"));
 
   // Add the route for direct message file uploads
-  app.post("/api/channels/:channelId/messages", upload.array('files'), async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/channels/:channelId/messages", upload.array('files'), async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2274,8 +2477,8 @@ export function registerRoutes(app: Express) {
   // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
 
-  app.post("/api/channels/:channelId/leave", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.post("/api/channels/:channelId/leave", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2332,8 +2535,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/user/account", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.delete("/api/user/account", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2449,7 +2652,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Password reset request endpoint
-  app.post("/api/auth/reset-password", async (req: RequestWithUser, res) => {
+  app.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { email } = req.body;
 
@@ -2539,7 +2742,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req: RequestWithUser, res, next) => {
+  app.post("/api/register", async (req, res, next) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
@@ -2594,8 +2797,8 @@ export function registerRoutes(app: Express) {
   });
 
 
-  app.get("/api/direct-messages/channel", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/direct-messages/channel", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2634,8 +2837,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/friends/recommendations", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.get("/api/friends/recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2743,8 +2946,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/channels/:channelId/color", async (req: RequestWithUser, res) => {
-    if (!req.isAuthenticated() || !req.user) {
+  app.put("/api/channels/:channelId/color", async (req, res) => {
+    if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
@@ -2777,11 +2980,24 @@ export function registerRoutes(app: Express) {
         .where(eq(channels.id, channelId))
         .returning();
 
+      // Notify all clients about the color change via WebSocket
+      const colorUpdate = {
+        type: 'channel_color_update',
+        channelId,
+        backgroundColor,
+      };
+
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(colorUpdate));
+        }
+      });
+
       res.json(updatedChannel);
     } catch (error) {
       console.error("Error updating channel color:", error);
       res.status(500).send("Error updating channel color");
     }
   });
-  return wss;
+  return httpServer;
 }

@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   HoverCard,
@@ -11,29 +9,38 @@ import {
 } from "@/components/ui/hover-card";
 import { UserProfileView } from "./UserProfileView";
 import type { Channel, User } from "@db/schema";
-import { ChatBot } from './ChatBot';
 
 type DirectMessage = Channel & {
   otherUser: User;
 };
 
 export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (channel: Channel) => void }) {
-  const [showChatBot, setShowChatBot] = useState(false);
   const { data: directMessages, isLoading } = useQuery<DirectMessage[]>({
     queryKey: ['/api/direct-messages'],
-    refetchInterval: 5000,
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
+    if (hideActivity || !isOnline) {
+      return 'bg-gray-500';
+    }
+    return 'bg-green-500';
+  };
+
   const handleSelectChannel = async (dm: DirectMessage) => {
     try {
+      // Mark messages as read when selecting the channel
       await fetch(`/api/channels/${dm.id}/read`, {
         method: 'POST',
         credentials: 'include'
       });
+
+      // Invalidate both queries to refresh the status
       queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+
       onSelectChannel(dm);
     } catch (error) {
       toast({
@@ -59,18 +66,6 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
 
   return (
     <div className="space-y-2 p-2">
-      <Button
-        variant="ghost"
-        className="w-full justify-start"
-        onClick={() => onSelectChannel({ id: -1, name: "Chat Assistant" } as Channel)}
-      >
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarFallback>AI</AvatarFallback>
-          </Avatar>
-          <span className="text-sm">Chat Assistant</span>
-        </div>
-      </Button>
       {directMessages.map((dm) => (
         <Button
           key={dm.id}

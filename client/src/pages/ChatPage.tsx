@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useUser } from "@/hooks/use-user";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useMessages } from "@/hooks/use-messages";
-import { ChatBot } from "@/components/chat/ChatBot";
 import { UserHeader } from "@/components/chat/UserHeader";
 import { ChannelList } from "@/components/chat/ChannelList";
 import { MessageList } from "@/components/chat/MessageList";
@@ -74,22 +73,6 @@ export default function ChatPage() {
         variant: "destructive",
       });
     }
-  };
-
-  const handleAIAssistant = () => {
-    const aiChannel: ExtendedChannel = {
-      id: -1, // Special ID for AI Assistant
-      name: "AI Assistant",
-      description: "Chat with AI Assistant",
-      isDirectMessage: true,
-      createdAt: new Date().toISOString(),
-      otherUser: {
-        id: -1,
-        username: "AI Assistant",
-        avatarUrl: null,
-      },
-    };
-    setSelectedChannel(aiChannel);
   };
 
   const handleColorChange = async (color: string) => {
@@ -206,19 +189,7 @@ export default function ChatPage() {
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {selectedChannel?.id === -1 ? (
-            <div className="flex-1 h-full bg-background">
-              <div className="p-4 border-b flex items-center">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback>AI</AvatarFallback>
-                  </Avatar>
-                  <h2 className="font-semibold text-lg">Chat Assistant</h2>
-                </div>
-              </div>
-              <ChatBot />
-            </div>
-          ) : selectedChannel ? (
+          {selectedChannel ? (
             <>
               <div className="p-4 border-b flex items-center justify-between bg-background">
                 <div>

@@ -8,13 +8,18 @@ import SuggestedFriends from "./pages/suggested-friends";
 function App() {
   const { user, isLoading } = useUser();
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {isLoading ? (
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : user ? (
+      {/* Protected routes */}
+      {user ? (
         <Switch>
           <Route path="/" component={ChatPage} />
           <Route path="/suggested-friends" component={SuggestedFriends} />
