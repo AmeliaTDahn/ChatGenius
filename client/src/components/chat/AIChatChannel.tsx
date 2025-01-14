@@ -26,7 +26,7 @@ export function AIChatChannel() {
       }]);
 
       // Call your AI chatbot API
-      const response = await fetch("YOUR_OTHER_REPL_URL/api/chat", {
+      const response = await fetch("https://ai-chatbot-ameliadahn.replit.app/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
