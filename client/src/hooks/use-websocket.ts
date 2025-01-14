@@ -26,25 +26,13 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
   }
 
   useEffect(() => {
-    if (!user || !user.id || !tabId.current) {
-      console.log('Missing required connection parameters:', { userId: user?.id, tabId: tabId.current });
-      return;
-    }
+    if (!user) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}?userId=${user.id}&tabId=${tabId.current}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${tabId.current}`;
     console.log('Connecting to WebSocket:', wsUrl);
 
-    try {
-      ws.current = new WebSocket(wsUrl);
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
-      toast({
-        title: 'Connection Error',
-        description: 'Failed to establish WebSocket connection',
-        variant: 'destructive',
-      });
-    }
+    ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       console.log('WebSocket connected');
@@ -79,18 +67,14 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
       }
     };
 
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 3;
-
     ws.current.onclose = (event) => {
       console.log('WebSocket closed:', event);
-      if (reconnectAttempts < maxReconnectAttempts && user) {
-        setTimeout(() => {
-          console.log(`Attempting to reconnect WebSocket... (${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+      setTimeout(() => {
+        if (user) {
+          console.log('Attempting to reconnect WebSocket...');
           ws.current = new WebSocket(wsUrl);
-          reconnectAttempts++;
-        }, 1000 * Math.pow(2, reconnectAttempts));
-      }
+        }
+      }, 1000);
     };
 
     ws.current.onerror = (error) => {

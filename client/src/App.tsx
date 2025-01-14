@@ -16,10 +16,6 @@ function App() {
     );
   }
 
-  if (!user && !isLoading) {
-    return <AuthPage />;
-  }
-
   return (
     <Switch>
       {/* Protected routes */}

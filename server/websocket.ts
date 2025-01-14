@@ -49,17 +49,16 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
     try {
       console.log('New WebSocket connection attempt');
       const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
-      const userIdStr = urlParams.get('userId');
+      const userId = parseInt(urlParams.get('userId') || '0', 10);
       const tabId = urlParams.get('tabId');
-      const userId = userIdStr ? parseInt(userIdStr, 10) : null;
 
-      if (!userId || userId <= 0 || !tabId) {
-        console.log('Invalid connection parameters:', { userId, tabId, url: req.url });
+      if (!userId || !tabId) {
+        console.log('Invalid connection parameters:', { userId, tabId });
         ws.send(JSON.stringify({ 
           type: 'error', 
-          error: 'Invalid connection parameters. Please ensure you are logged in.' 
+          error: 'Invalid connection parameters' 
         }));
-        ws.close(1008, 'Invalid or missing userId/tabId');
+        ws.close(1008, 'Missing userId or tabId');
         return;
       }
 
@@ -195,29 +194,17 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
-
-    // Handle WebSocket upgrade directly
-
-    try {
-      const url = new URL(request.url!, `http://${request.headers.host}`);
-      const userId = url.searchParams.get('userId');
-      const tabId = url.searchParams.get('tabId');
-
-      if (!userId || !tabId) {
-        console.log('Missing WebSocket parameters:', { userId, tabId });
-        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
-    } catch (error) {
-      console.error('WebSocket upgrade error:', error);
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+    
+    const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
+    if (pathname !== '/ws') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
       socket.destroy();
+      return;
     }
+
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
   });
 
   return wss;
