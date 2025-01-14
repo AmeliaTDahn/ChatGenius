@@ -44,7 +44,10 @@ export function registerRoutes(app: Express) {
     cookie: { secure: false }
   });
 
-    ws.on('message', async (data: Buffer) => {
+  app.use(sessionMiddleware);
+
+  // API Routes start here
+  app.get("/api/messages", async (req, res) => {
       try {
         const message = JSON.parse(data.toString());
         console.log('Received message:', message); // Debug log
