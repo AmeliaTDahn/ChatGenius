@@ -59,61 +59,52 @@ export function registerRoutes(app: Express) {
       });
       res.json(messages);
 
-            try {
-              const [newMessage] = await db.insert(messages)
-                .values({
-                  content: message.content,
-                  channelId: message.channelId,
-                  userId: ws.userId
-                })
-                .returning();
+            const [newMessage] = await db.insert(messages)
+              .values({
+                content: message.content,
+                channelId: message.channelId,
+                userId: ws.userId
+              })
+              .returning();
 
-              // Fetch the complete message with relations
-              const fullMessage = await db.query.messages.findFirst({
-                where: eq(messages.id, newMessage.id),
-                with: {
-                  user: {
-                    columns: {
-                      id: true,
-                      username: true,
-                      avatarUrl: true,
-                    }
-                  },
-                  reactions: {
-                    with: {
-                      user: {
-                        columns: {
-                          id: true,
-                          username: true,
-                          avatarUrl: true,
-                        }
+            // Fetch the complete message with relations
+            const fullMessage = await db.query.messages.findFirst({
+              where: eq(messages.id, newMessage.id),
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    avatarUrl: true,
+                  }
+                },
+                reactions: {
+                  with: {
+                    user: {
+                      columns: {
+                        id: true,
+                        username: true,
+                        avatarUrl: true,
                       }
                     }
                   }
                 }
-              });
-
-              if (fullMessage) {
-                // Broadcast to all clients
-                wss.clients.forEach((client: ExtendedWebSocket) => {
-                  if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({
-                      type: 'message',
-                      message: fullMessage,
-                      channelId: message.channelId
-                    }));
-                  }
-                });
               }
-            } catch (error) {
-              console.error('Error saving message:', error);
-              ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Failed to save message'
-              }));
+            });
+
+            if (fullMessage) {
+              // Broadcast to all clients
+              wss.clients.forEach((client: ExtendedWebSocket) => {
+                if (client.readyState === WebSocket.OPEN) {
+                  client.send(JSON.stringify({
+                    type: 'message',
+                    message: fullMessage,
+                    channelId: message.channelId
+                  }));
+                }
+              });
             }
             break;
-          }
 
           case 'typing': {
             // Broadcast typing status
