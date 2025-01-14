@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { setupWebSocket } from './websocket';
+import { WebSocketServer } from 'ws';
 
 const app = express();
 app.use(express.json());
@@ -40,8 +40,17 @@ app.use((req, res, next) => {
 (async () => {
   const server = registerRoutes(app);
   
-  // Setup WebSocket server
-  setupWebSocket(server);
+  // Handle WebSocket upgrade
+  server.on('upgrade', (request, socket, head) => {
+    if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
+      return;
+    }
+    
+    const wss = new WebSocketServer({ noServer: true });
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
