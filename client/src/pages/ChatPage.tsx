@@ -30,6 +30,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { AIChatChannel } from "@/components/chat/AIChatChannel";
 
 // Extended Channel type to include otherUser for direct messages
 type ExtendedChannel = Channel & {
@@ -194,7 +195,9 @@ export default function ChatPage() {
             <>
               <div className="p-4 border-b flex items-center justify-between bg-background">
                 <div>
-                  {selectedChannel.isDirectMessage ? (
+                  {selectedChannel.id === -1 ? (
+                    <h2 className="font-semibold text-lg">AI Assistant</h2>
+                  ) : selectedChannel.isDirectMessage ? (
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
                         <AvatarImage
@@ -221,42 +224,52 @@ export default function ChatPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsMessageSearchOpen(true)}
-                    title="Search Messages"
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                  {!selectedChannel.isDirectMessage && (
+                  {selectedChannel.id !== -1 && (
                     <>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setIsInviteOpen(true)}
-                        title="Invite to Channel"
+                        onClick={() => setIsMessageSearchOpen(true)}
+                        title="Search Messages"
                       >
-                        <UserPlus className="h-4 w-4" />
+                        <Search className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleLeaveChannel}
-                        title="Leave Channel"
-                      >
-                        <LogOut className="h-4 w-4" />
-                      </Button>
+                      {!selectedChannel.isDirectMessage && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsInviteOpen(true)}
+                            title="Invite to Channel"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleLeaveChannel}
+                            title="Leave Channel"
+                          >
+                            <LogOut className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
               </div>
               <div className="flex-1 min-h-0 chat-container">
-                <MessageList channelId={selectedChannel.id} />
+                {selectedChannel.id === -1 ? (
+                  <AIChatChannel />
+                ) : (
+                  <MessageList channelId={selectedChannel.id} />
+                )}
               </div>
-              <div className="p-4 border-t bg-background">
-                <MessageInput onSendMessage={handleSendMessage} />
-              </div>
+              {selectedChannel.id !== -1 && (
+                <div className="p-4 border-t bg-background">
+                  <MessageInput onSendMessage={handleSendMessage} />
+                </div>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">

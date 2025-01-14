@@ -1,6 +1,6 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Hash, Plus } from "lucide-react";
+import { Hash, Plus, MessageSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,6 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   const regularChannels = channels.filter(channel => !channel.isDirectMessage);
 
   useEffect(() => {
-    // Use secure WebSocket (wss://) when the page is loaded over HTTPS
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws?userId=${user?.id}`);
 
@@ -124,22 +123,24 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         </div>
 
         <Button
-  variant="ghost"
-  className="w-full justify-start px-2"
-  onClick={() => {
-    const aiChannel = {
-      id: 'ai-chat',
-      name: 'AI Assistant',
-      isAIChat: true,
-      backgroundColor: '#f0f0f0'
-    };
-    onSelectChannel(aiChannel);
-  }}
->
-  <MessageSquare className="mr-2 h-4 w-4" />
-  AI Assistant
-</Button>
-<Separator className="my-2 mx-2" />
+          variant="ghost"
+          className="w-full justify-start px-2"
+          onClick={() => {
+            onSelectChannel({
+              id: -1,
+              name: 'AI Assistant',
+              isDirectMessage: false,
+              createdAt: new Date(),
+              description: 'Chat with the AI Assistant',
+              backgroundColor: null
+            });
+          }}
+        >
+          <MessageSquare className="mr-2 h-4 w-4" />
+          AI Assistant
+        </Button>
+
+        <Separator className="my-2 mx-2" />
 
         <div className="p-2">
           <h3 className="text-sm font-medium mb-2 px-2">Direct Messages</h3>
