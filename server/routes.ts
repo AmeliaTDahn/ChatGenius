@@ -47,6 +47,36 @@ async function getUnreadMessageCounts(userId: number) {
           eq(messageReads.userId, userId),
           eq(messages.channelId, channel.id)
         ))
+
+  // AI chat endpoint
+  app.post("/api/ai/chat", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const { message } = req.body;
+      const response = await fetch("https://ai-chatbot-ameliadahn.replit.app/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ message })
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI API responded with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error calling AI service:", error);
+      res.status(500).json({ error: "Failed to get AI response" });
+    }
+  });
+
+
         .orderBy(desc(messageReads.readAt))
         .limit(1);
 

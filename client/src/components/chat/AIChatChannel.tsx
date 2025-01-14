@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,7 +18,7 @@ export function AIChatChannel() {
   const handleSendMessage = async (content: string) => {
     try {
       setIsLoading(true);
-      
+
       // Add user message
       setMessages(prev => [...prev, {
         content,
@@ -28,14 +27,11 @@ export function AIChatChannel() {
       }]);
 
       // Call your AI chatbot API
-      const response = await fetch("https://ai-chatbot-ameliadahn.replit.app/api/chat", {
+      const response = await fetch(window.location.protocol + "//" + window.location.host + "/api/ai/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Origin": window.location.origin
+          "Content-Type": "application/json"
         },
-        credentials: "include",
         body: JSON.stringify({ message: content })
       });
 

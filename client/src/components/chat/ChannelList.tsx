@@ -128,7 +128,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   className="w-full justify-start px-2"
   onClick={() => {
     const aiChannel = {
-      id: 'ai-chat',
+      id: -999, // Using a special numeric ID for AI chat
       name: 'AI Assistant',
       isAIChat: true,
       backgroundColor: '#f0f0f0'
