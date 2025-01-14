@@ -66,29 +66,7 @@ export function registerRoutes(app: Express) {
     cookie: { secure: false }
   });
 
-  httpServer.on('upgrade', (request, socket, head) => {
-    if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
-      return;
-    }
-
-    sessionMiddleware(request as any, {} as any, () => {
-      // @ts-ignore - passport.session() types are not complete
-      passport.session()(request as any, {} as any, () => {
-        if (!(request as any).user) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-
-        wss.handleUpgrade(request, socket, head, (ws) => {
-          const extWs = ws as ExtendedWebSocket;
-          extWs.userId = (request as any).user.id;
-          extWs.isAlive = true;
-          wss.emit('connection', extWs, request);
-        });
-      });
-    });
-  });
+  // WebSocket upgrade handling is now in websocket.ts
 
   wss.on('connection', (ws: ExtendedWebSocket) => {
     ws.isAlive = true;
