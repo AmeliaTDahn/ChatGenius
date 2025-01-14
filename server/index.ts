@@ -4,9 +4,19 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupWebSocket } from './websocket';
 import session from 'express-session';
+import type { User } from "@db/schema";
+
+// Declare session type to include user
+declare module 'express-session' {
+  interface SessionData {
+    user?: User;
+  }
+}
 
 const app = express();
+const server = createServer(app);
 
+// Session middleware configuration
 const sessionMiddleware = session({
   secret: process.env.REPL_ID || "chat-app-secret",
   resave: false,
@@ -18,6 +28,7 @@ app.use(sessionMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -30,55 +41,49 @@ app.use((req, res, next) => {
   };
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path} ${res.statusCode} in ${Date.now() - start}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
-
       log(logLine);
     }
   });
-
   next();
 });
 
-(async () => {
-  // Create single server instance
-  const server = createServer(app);
-  
-  // Register routes
-  registerRoutes(app);
-  
-  // Setup WebSocket with the server
-  setupWebSocket(server, sessionMiddleware);
+// Register routes before error handling
+registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+// Setup WebSocket with session handling
+setupWebSocket(server, sessionMiddleware);
 
-    res.status(status).json({ message });
-    throw err;
-  });
+interface AppError extends Error {
+  status?: number;
+  statusCode?: number;
+}
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+// Error handling middleware
+app.use((err: AppError, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Error:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+  // Don't throw error here, just log it
+});
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
-  });
-})();
+// Setup Vite or serve static files
+if (app.get("env") === "development") {
+  setupVite(app, server);
+} else {
+  serveStatic(app);
+}
+
+// Start server
+const PORT = parseInt(process.env.PORT || '5000', 10);
+server.listen(PORT, "0.0.0.0", () => {
+  log(`Server running at http://0.0.0.0:${PORT}`);
+});

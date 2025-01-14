@@ -1,4 +1,3 @@
-
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
@@ -7,6 +6,7 @@ import { db } from '@db';
 import { eq } from 'drizzle-orm';
 import { messages } from '@db/schema';
 import type { RequestHandler } from 'express';
+import type { SessionData } from 'express-session';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -26,47 +26,57 @@ type WSMessage = {
 };
 
 export const wss = new WebSocketServer({ noServer: true });
+const authenticatedClients = new Set<AuthenticatedWebSocket>();
 
 export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler) {
-  console.log('WebSocket server created');
-
+  // Setup ping interval for connection maintenance
   const pingInterval = setInterval(() => {
-    wss.clients.forEach((ws: AuthenticatedWebSocket) => {
-      if (ws.isAlive === false) {
-        console.log('Terminating inactive WebSocket connection');
-        return ws.terminate();
+    authenticatedClients.forEach((ws) => {
+      if (!ws.isAlive) {
+        authenticatedClients.delete(ws);
+        ws.terminate();
+        return;
       }
       ws.isAlive = false;
       ws.ping();
     });
-  }, 30000);
+  }, 30000); // Check every 30 seconds
 
   wss.on('close', () => {
-    console.log('WebSocket server closing');
     clearInterval(pingInterval);
   });
 
+  // Handle new WebSocket connections
   wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
-      console.log('New WebSocket connection attempt');
-      const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
-      const userId = parseInt(urlParams.get('userId') || '0', 10);
-      const tabId = urlParams.get('tabId');
+      const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+      const userId = parseInt(url.searchParams.get('userId') || '0');
+      const tabId = url.searchParams.get('tabId');
+
+      if (!userId || !tabId) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          error: 'Invalid connection parameters'
+        }));
+        ws.close(1008, 'Missing userId or tabId');
+        return;
+      }
 
       ws.userId = userId;
       ws.tabId = tabId;
       ws.isAlive = true;
 
-      console.log(`WebSocket connected for user ${userId} with tabId ${tabId}`);
+      authenticatedClients.add(ws);
 
+      // Handle ping responses to maintain connection
       ws.on('pong', () => {
         ws.isAlive = true;
       });
 
+      // Handle incoming messages
       ws.on('message', async (data: Buffer) => {
         try {
           const message: WSMessage = JSON.parse(data.toString());
-          console.log('Received message:', message);
 
           switch (message.type) {
             case 'message': {
@@ -79,6 +89,7 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
               }
 
               try {
+                // Save message to database
                 const [newMessage] = await db.insert(messages)
                   .values({
                     content: message.content,
@@ -87,6 +98,11 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
                   })
                   .returning();
 
+                if (!newMessage) {
+                  throw new Error('Failed to create message');
+                }
+
+                // Get full message details with user info
                 const fullMessage = await db.query.messages.findFirst({
                   where: eq(messages.id, newMessage.id),
                   with: {
@@ -96,24 +112,13 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
                         username: true,
                         avatarUrl: true,
                       }
-                    },
-                    reactions: {
-                      with: {
-                        user: {
-                          columns: {
-                            id: true,
-                            username: true,
-                            avatarUrl: true,
-                          }
-                        }
-                      }
                     }
                   }
                 });
 
                 if (fullMessage) {
-                  console.log('Broadcasting message to all clients');
-                  wss.clients.forEach((client: AuthenticatedWebSocket) => {
+                  // Broadcast message to all connected clients
+                  authenticatedClients.forEach((client) => {
                     if (client.readyState === WebSocket.OPEN) {
                       client.send(JSON.stringify({
                         type: 'message',
@@ -124,30 +129,12 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
                   });
                 }
               } catch (error) {
-                console.error('Error saving message:', error);
+                console.error('Error handling message:', error);
                 ws.send(JSON.stringify({
                   type: 'error',
-                  error: 'Failed to save message'
+                  error: 'Failed to process message'
                 }));
               }
-              break;
-            }
-
-            case 'typing': {
-              if (!message.channelId || !ws.userId) {
-                return;
-              }
-
-              console.log('Broadcasting typing status');
-              wss.clients.forEach((client: AuthenticatedWebSocket) => {
-                if (client.readyState === WebSocket.OPEN && client.tabId !== ws.tabId) {
-                  client.send(JSON.stringify({
-                    type: 'typing',
-                    channelId: message.channelId,
-                    userId: ws.userId
-                  }));
-                }
-              });
               break;
             }
 
@@ -155,6 +142,12 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
               ws.isAlive = true;
               break;
             }
+
+            default:
+              ws.send(JSON.stringify({
+                type: 'error',
+                error: 'Unknown message type'
+              }));
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
@@ -165,13 +158,16 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
         }
       });
 
+      // Handle connection errors
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
+        authenticatedClients.delete(ws);
         ws.terminate();
       });
 
+      // Handle connection close
       ws.on('close', () => {
-        console.log(`WebSocket closed for user ${userId}`);
+        authenticatedClients.delete(ws);
         ws.isAlive = false;
       });
 
@@ -181,13 +177,19 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
     }
   });
 
-  server.on('upgrade', (request, socket, head) => {
+  // Handle WebSocket upgrade requests
+  server.on('upgrade', (request: IncomingMessage, socket, head) => {
+    // Ignore Vite HMR requests
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
 
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
+    // Apply session middleware before handling the WebSocket upgrade
+    sessionMiddleware(request as any, {} as any, () => {
+      // Check session authentication here if needed
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
     });
   });
 
