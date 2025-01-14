@@ -16,18 +16,28 @@ export function ChatBot() {
     { content: "Hello! I'm your AI assistant. How can I help you today?", isBot: true }
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
     const userMessage = { content: input, isBot: false };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setIsLoading(true);
 
-    // Here you can integrate with your AI backend
-    const botResponse = { content: 'This is a sample response. Integrate with your AI backend.', isBot: true };
-    setMessages(prev => [...prev, botResponse]);
+    try {
+      // Mock response for now
+      const botResponse = { content: "I'm a demo chatbot. In the future, I'll be connected to a real AI service.", isBot: true };
+      setTimeout(() => {
+        setMessages(prev => [...prev, botResponse]);
+        setIsLoading(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error:', error);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -60,10 +70,11 @@ export function ChatBot() {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask anything..."
+          placeholder="Type your message..."
           className="flex-1"
+          disabled={isLoading}
         />
-        <Button type="submit" size="icon">
+        <Button type="submit" size="icon" disabled={isLoading}>
           <MessageSquare className="h-4 w-4" />
         </Button>
       </form>
