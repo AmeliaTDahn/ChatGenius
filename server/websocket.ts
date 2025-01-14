@@ -25,7 +25,10 @@ type WSMessage = {
 };
 
 export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler) {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ 
+    noServer: true,
+    perMessageDeflate: false
+  });
   console.log('WebSocket server created');
 
   const pingInterval = setInterval(() => {
@@ -190,8 +193,11 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
   });
 
   server.on('upgrade', (request, socket, head) => {
-    wss.handleUpgrade(request, socket, head, (socket) => {
-      wss.emit('connection', socket, request);
+    if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
+      return;
+    }
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
     });
   });
 
