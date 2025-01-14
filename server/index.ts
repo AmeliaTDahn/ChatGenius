@@ -48,9 +48,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = registerRoutes(app);
-  
-  // Setup WebSocket server with session middleware
+  const server = createServer(app);
   setupWebSocket(server, sessionMiddleware);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -29,7 +29,7 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
     if (!user) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${tabId.current}`;
+    const wsUrl = `${protocol}//${window.location.host}?userId=${user.id}&tabId=${tabId.current}`;
     console.log('Connecting to WebSocket:', wsUrl);
 
     ws.current = new WebSocket(wsUrl);

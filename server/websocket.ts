@@ -1,4 +1,3 @@
-
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
@@ -25,8 +24,9 @@ type WSMessage = {
   error?: string;
 };
 
+const wss = new WebSocketServer({ noServer: true });
+
 export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler) {
-  const wss = new WebSocketServer({ noServer: true });
   console.log('WebSocket server created');
 
   const pingInterval = setInterval(() => {
@@ -192,13 +192,6 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
 
   server.on('upgrade', (request, socket, head) => {
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
-      return;
-    }
-    
-    const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
-    if (pathname !== '/ws') {
-      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-      socket.destroy();
       return;
     }
 
