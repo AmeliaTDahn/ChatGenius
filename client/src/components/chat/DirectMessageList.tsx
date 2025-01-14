@@ -14,7 +14,10 @@ type DirectMessage = Channel & {
   otherUser: User;
 };
 
+import { ChatBot } from './ChatBot';
+
 export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (channel: Channel) => void }) {
+  const [showChatBot, setShowChatBot] = useState(false);
   const { data: directMessages, isLoading } = useQuery<DirectMessage[]>({
     queryKey: ['/api/direct-messages'],
     refetchInterval: 5000, // Refresh every 5 seconds
@@ -66,7 +69,21 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
 
   return (
     <div className="space-y-2 p-2">
-      {directMessages.map((dm) => (
+      <Button
+        variant="ghost"
+        className="w-full justify-start"
+        onClick={() => setShowChatBot(!showChatBot)}
+      >
+        <Bot className="h-4 w-4 mr-2" />
+        <span>Chat Assistant</span>
+      </Button>
+      
+      {showChatBot ? (
+        <div className="h-[300px] border rounded-lg">
+          <ChatBot />
+        </div>
+      ) : (
+        directMessages.map((dm) => (
         <Button
           key={dm.id}
           variant="ghost"
@@ -96,6 +113,7 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
           </div>
         </Button>
       ))}
+      )}
     </div>
   );
 }
