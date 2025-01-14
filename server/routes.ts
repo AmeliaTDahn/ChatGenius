@@ -64,13 +64,15 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // WebSocket message handling
-  ws.on('message', async (data) => {
-    try {
-      const message = JSON.parse(data.toString());
-      switch (message.type) {
-        case 'message': {
-          const [newMessage] = await db.insert(messages)
+  const wss = new WebSocketServer({ server });
+
+  wss.on('connection', (ws: ExtendedWebSocket) => {
+    ws.on('message', async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        switch (message.type) {
+          case 'message': {
+            const [newMessage] = await db.insert(messages)
               .values({
                 content: message.content,
                 channelId: message.channelId,
