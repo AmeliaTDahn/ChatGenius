@@ -38,6 +38,18 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = registerRoutes(app);
+  
+  // Handle WebSocket upgrade
+  server.on('upgrade', (request, socket, head) => {
+    if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
+      return;
+    }
+    
+    const wss = new WebSocketServer({ noServer: true });
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
