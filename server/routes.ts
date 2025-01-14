@@ -58,8 +58,19 @@ export function registerRoutes(app: Express) {
         limit: 100
       });
       res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).send("Error fetching messages");
+    }
+  });
 
-            const [newMessage] = await db.insert(messages)
+  // WebSocket message handling
+  ws.on('message', async (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      switch (message.type) {
+        case 'message': {
+          const [newMessage] = await db.insert(messages)
               .values({
                 content: message.content,
                 channelId: message.channelId,
