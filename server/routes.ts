@@ -2074,7 +2074,8 @@ export function registerRoutes(app: Express) {
           )
         ))
         .where(or(
-          eq(friends.user1Id, req.user.id),          eq(friends.user2Id, req.user.id)
+          eq(friends.user1Id, req.user.id),
+          eq(friends.user2Id, req.user.id)
         ));
 
       // If user has no friends, return empty array
@@ -2213,3 +2214,4 @@ export function registerRoutes(app: Express) {
     }
   });
   }
+}

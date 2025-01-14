@@ -49,11 +49,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Register routes before creating server
-  registerRoutes(app);
-  
   // Create single server instance
   const server = createServer(app);
+  
+  // Register routes
+  registerRoutes(app);
   
   // Setup WebSocket with the server
   setupWebSocket(server, sessionMiddleware);
