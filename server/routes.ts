@@ -39,10 +39,8 @@ interface ExtendedWebSocket extends WebSocket {
   isAlive?: boolean;
 }
 
-export function registerRoutes(app: Express): Server {
+export function registerRoutes(app: Express) {
   setupAuth(app);
-  const httpServer = createServer(app);
-  const wss = new WebSocketServer({ noServer: true });
 
   const pingInterval = setInterval(() => {
     wss.clients.forEach((ws: ExtendedWebSocket) => {
@@ -2262,5 +2260,4 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error updating channel color");
     }
   });
-  return httpServer;
-}
+  }
