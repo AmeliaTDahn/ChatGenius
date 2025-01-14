@@ -84,35 +84,35 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
         </div>
       ) : (
         directMessages.map((dm) => (
-        <Button
-          key={dm.id}
-          variant="ghost"
-          className="w-full justify-start relative"
-          onClick={() => handleSelectChannel(dm)}
-        >
-          <div className="flex items-center gap-2 flex-1">
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <div className="relative">
-                  <Avatar className="h-6 w-6">
-                    {dm.otherUser.avatarUrl ? (
-                      <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
-                    ) : (
-                      <AvatarFallback>
-                        {dm.otherUser.username[0].toUpperCase()}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                </div>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80" align="start">
-                <UserProfileView user={dm.otherUser} asChild />
-              </HoverCardContent>
-            </HoverCard>
-            <span className="text-sm truncate">{dm.otherUser.username}</span>
-          </div>
-        </Button>
-      ))}
+          <Button
+            key={dm.id}
+            variant="ghost"
+            className="w-full justify-start relative"
+            onClick={() => handleSelectChannel(dm)}
+          >
+            <div className="flex items-center gap-2 flex-1">
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <div className="relative">
+                    <Avatar className="h-6 w-6">
+                      {dm.otherUser.avatarUrl ? (
+                        <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
+                      ) : (
+                        <AvatarFallback>
+                          {dm.otherUser.username[0].toUpperCase()}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                  </div>
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80" align="start">
+                  <UserProfileView user={dm.otherUser} asChild />
+                </HoverCardContent>
+              </HoverCard>
+              <span className="text-sm truncate">{dm.otherUser.username}</span>
+            </div>
+          </Button>
+        ))
       )}
     </div>
   );
