@@ -75,6 +75,22 @@ export default function ChatPage() {
     }
   };
 
+  const handleAIAssistant = () => {
+    const aiChannel: ExtendedChannel = {
+      id: -1, // Special ID for AI Assistant
+      name: "AI Assistant",
+      description: "Chat with AI Assistant",
+      isDirectMessage: true,
+      createdAt: new Date().toISOString(),
+      otherUser: {
+        id: -1,
+        username: "AI Assistant",
+        avatarUrl: null,
+      },
+    };
+    setSelectedChannel(aiChannel);
+  };
+
   const handleColorChange = async (color: string) => {
     if (!selectedChannel) return;
 
@@ -189,7 +205,11 @@ export default function ChatPage() {
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {selectedChannel ? (
+          {selectedChannel?.id === -1 ? (
+            <div className="flex-1 h-full">
+              <ChatBot />
+            </div>
+          ) : selectedChannel ? (
             <>
               <div className="p-4 border-b flex items-center justify-between bg-background">
                 <div>
