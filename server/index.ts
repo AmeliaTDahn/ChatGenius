@@ -40,8 +40,8 @@ app.use((req, res, next) => {
 (async () => {
   const server = registerRoutes(app);
   
-  // Setup WebSocket server
-  setupWebSocket(server);
+  // Setup WebSocket server with session middleware
+  setupWebSocket(server, sessionMiddleware);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

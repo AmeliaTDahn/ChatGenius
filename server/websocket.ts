@@ -1,3 +1,4 @@
+
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
@@ -25,10 +26,7 @@ type WSMessage = {
 };
 
 export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler) {
-  const wss = new WebSocketServer({ 
-    noServer: true,
-    perMessageDeflate: false
-  });
+  const wss = new WebSocketServer({ noServer: true });
   console.log('WebSocket server created');
 
   const pingInterval = setInterval(() => {
