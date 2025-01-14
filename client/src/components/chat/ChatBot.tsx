@@ -35,14 +35,26 @@ export function ChatBot() {
     setIsLoading(true);
 
     try {
-      // Mock response for now
-      const botResponse = { content: "I'm a demo chatbot. In the future, I'll be connected to a real AI service.", isBot: true };
-      setTimeout(() => {
-        setMessages(prev => [...prev, botResponse]);
-        setIsLoading(false);
-      }, 1000);
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: input }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      const botResponse = { content: data.message, isBot: true };
+      setMessages(prev => [...prev, botResponse]);
     } catch (error) {
       console.error('Error:', error);
+      const errorMessage = { content: "Sorry, I encountered an error. Please try again.", isBot: true };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
     }
   };
