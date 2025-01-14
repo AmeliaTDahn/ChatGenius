@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { db } from "@db";
 import { messages, type Message } from "@db/schema";
 import { eq } from "drizzle-orm";
