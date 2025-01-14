@@ -1,13 +1,11 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { setupWebSocket } from './websocket';
 import session from 'express-session';
 import type { User } from "@db/schema";
 import createMemoryStore from "memorystore";
 
-// Declare session type to include user
 declare module 'express-session' {
   interface SessionData {
     user?: User;
@@ -17,26 +15,21 @@ declare module 'express-session' {
 const app = express();
 const server = createServer(app);
 
-// Create a MemoryStore instance for session storage
+// Create memory store
 const MemoryStore = createMemoryStore(session);
 
-// Session middleware configuration with improved security
+// Session middleware
 const sessionMiddleware = session({
   secret: process.env.REPL_ID || "chat-app-secret",
   resave: false,
   saveUninitialized: false,
-  name: 'sessionId', // Set a specific cookie name
-  proxy: true,
+  store: new MemoryStore({
+    checkPeriod: 86400000
+  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    httpOnly: true,
-  },
-  store: new MemoryStore({
-    checkPeriod: 86400000, // Prune expired entries every 24h
-    stale: false, // Don't serve stale data
-  })
+    maxAge: 24 * 60 * 60 * 1000
+  }
 });
 
 // Apply middleware
@@ -56,11 +49,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// Register routes before error handling
-registerRoutes(app);
+// Setup WebSocket and routes
+const wss = registerRoutes(app);
 
-// Setup WebSocket with session handling
-setupWebSocket(server, sessionMiddleware);
+// Handle WebSocket upgrade
+server.on('upgrade', (request, socket, head) => {
+  if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
+    return;
+  }
+
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit('connection', ws, request);
+  });
+});
+
 
 // Error handling middleware
 interface AppError extends Error {
@@ -68,7 +70,7 @@ interface AppError extends Error {
   statusCode?: number;
 }
 
-app.use((err: AppError, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: AppError, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Error:', err);
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
@@ -83,7 +85,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Start server
-const PORT = parseInt(process.env.PORT || '5000', 10);
+const PORT = parseInt(process.env.PORT || '3000', 10); // Use 3000 as default from edited code
 server.listen(PORT, "0.0.0.0", () => {
-  log(`Server running at http://0.0.0.0:${PORT}`);
+  log(`Server running on port ${PORT}`);
 });

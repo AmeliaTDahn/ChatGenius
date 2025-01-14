@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
+import { WebSocketServer } from 'ws';
 import { db } from "@db";
-import { messages, type Message } from "@db/schema";
+import { messages } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { users, type User } from "@db/schema";
 import { and, ne, ilike, or, inArray, desc, gt, sql } from "drizzle-orm";
@@ -30,8 +31,13 @@ interface RequestWithUser extends Express.Request {
   user?: User;
 }
 
+let wss: WebSocketServer; // Declare wss globally
+
 export function registerRoutes(app: Express) {
   setupAuth(app);
+
+  // Create WebSocket server
+  wss = new WebSocketServer({ noServer: true });
 
   // API Routes
   app.get("/api/messages", async (req: RequestWithUser, res) => {
@@ -1025,8 +1031,7 @@ export function registerRoutes(app: Express) {
         .select({
           channelId: directMessageChannels.channelId
         })
-        .from(directMessageChannels)
-        .where(or(
+        .from(directMessageChannels)        .where(or(
           and(
             eq(directMessageChannels.user1Id, req.user.id),
             eq(directMessageChannels.user2Id, friendId)
@@ -1827,7 +1832,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", async (req: RequestWithUser, res, next) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
@@ -2056,14 +2061,14 @@ export function registerRoutes(app: Express) {
 
       if (!membership) {
         return res.status(403).send("You are not a member of this channel");
-}
+      }
 
       // Update channel background color
       const [updatedChannel] = await db
         .update(channels)
         .set({ backgroundColor })
         .where(eq(channels.id, channelId))
-        .returning();
+.returning();
 
       res.json(updatedChannel);
     } catch (error) {
@@ -2778,4 +2783,5 @@ export function registerRoutes(app: Express) {
       res.status(500).send("Error updating channel color");
     }
   });
+  return wss;
 }
