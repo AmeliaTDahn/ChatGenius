@@ -33,30 +33,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-interface ExtendedWebSocket extends WebSocket {
-  userId?: number;
-  tabId?: string;
-  isAlive?: boolean;
-}
-
-const wss = new WebSocketServer({ noServer: true });
-
 export function registerRoutes(app: Express) {
   setupAuth(app);
-
-  const pingInterval = setInterval(() => {
-    wss.clients.forEach((ws: ExtendedWebSocket) => {
-      if (ws.isAlive === false) {
-        return ws.terminate();
-      }
-      ws.isAlive = false;
-      ws.ping();
-    });
-  }, 30000);
-
-  wss.on('close', () => {
-    clearInterval(pingInterval);
-  });
 
   // Session middleware configuration
   const sessionMiddleware = session({
@@ -65,15 +43,6 @@ export function registerRoutes(app: Express) {
     saveUninitialized: true,
     cookie: { secure: false }
   });
-
-  // WebSocket upgrade handling is now in websocket.ts
-
-  wss.on('connection', (ws: ExtendedWebSocket) => {
-    ws.isAlive = true;
-
-    ws.on('pong', () => {
-      ws.isAlive = true;
-    });
 
     ws.on('message', async (data: Buffer) => {
       try {

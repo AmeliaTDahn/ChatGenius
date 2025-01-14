@@ -1,3 +1,4 @@
+
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
@@ -24,7 +25,7 @@ type WSMessage = {
   error?: string;
 };
 
-const wss = new WebSocketServer({ noServer: true });
+export const wss = new WebSocketServer({ noServer: true });
 
 export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler) {
   console.log('WebSocket server created');
@@ -51,9 +52,6 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
       const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
       const userId = parseInt(urlParams.get('userId') || '0', 10);
       const tabId = urlParams.get('tabId');
-
-      // Allow connection even without params initially
-      console.log('Connection parameters:', { userId, tabId });
 
       ws.userId = userId;
       ws.tabId = tabId;
