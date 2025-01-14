@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 interface AIChatMessage {
   content: string;
@@ -13,6 +14,7 @@ interface AIChatMessage {
 export function AIChatChannel() {
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleSendMessage = async (content: string) => {
     try {
@@ -29,10 +31,17 @@ export function AIChatChannel() {
       const response = await fetch("https://ai-chatbot-ameliadahn.replit.app/api/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Origin": window.location.origin
         },
+        credentials: "include",
         body: JSON.stringify({ message: content })
       });
+
+      if (!response.ok) {
+        throw new Error(`API responded with status ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -44,6 +53,11 @@ export function AIChatChannel() {
       }]);
     } catch (error) {
       console.error("Error sending message to AI:", error);
+      toast({
+        title: "Error",
+        description: "Failed to get response from AI assistant. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -56,11 +70,7 @@ export function AIChatChannel() {
           {messages.map((message, index) => (
             <div key={index} className="flex items-start gap-3">
               <Avatar className="h-8 w-8">
-                {message.isBot ? (
-                  <AvatarFallback>AI</AvatarFallback>
-                ) : (
-                  <AvatarFallback>ME</AvatarFallback>
-                )}
+                <AvatarFallback>{message.isBot ? "AI" : "ME"}</AvatarFallback>
               </Avatar>
               <div>
                 <div className="flex items-baseline gap-2">
@@ -78,7 +88,7 @@ export function AIChatChannel() {
         </div>
       </ScrollArea>
       <div className="p-4 border-t mt-auto">
-        <MessageInput onSendMessage={handleSendMessage} />
+        <MessageInput onSendMessage={handleSendMessage} disabled={isLoading} />
       </div>
     </div>
   );
