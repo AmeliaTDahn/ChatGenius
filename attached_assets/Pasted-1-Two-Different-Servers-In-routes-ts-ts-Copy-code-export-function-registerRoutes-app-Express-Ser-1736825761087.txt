@@ -1,0 +1,61 @@
+1. Two Different Servers
+In routes.ts
+ts
+Copy code
+export function registerRoutes(app: Express): Server {
+  // ...
+  const httpServer = createServer(app); // <-- 1) A brand new server is created here
+  const wss = new WebSocketServer({ noServer: true }); // ...
+  ...
+  return httpServer; // <-- returns that new server
+}
+In index.ts
+ts
+Copy code
+(async () => {
+  const server = createServer(app); // <-- 2) Another brand new server is created here
+  setupWebSocket(server, sessionMiddleware);
+  // ...
+  server.listen(PORT, "0.0.0.0", () => { ... });
+})();
+Notice that:
+
+routes.ts returns httpServer but you never actually use that returned server in index.ts.
+In index.ts, you create a different HTTP server with createServer(app) and then call setupWebSocket on it.
+Result: The routes and the WebSocket in routes.ts run on a completely separate server instance that is never .listen(...). Meanwhile, your index.ts server listens on port 5000, but it does not have any of those registerRoutes logic or that WebSocket code from routes.ts.
+
+How to Fix
+Pick one place to create your HTTP server and your WebSocket server. The typical pattern is:
+
+Remove the createServer(app) from inside routes.ts. Instead, just define your routes on app.
+Only do const server = createServer(app) in your main index.ts file.
+After you registerRoutes(app), you still have the same app instance with all the routes. Then you pass the resulting server to your setupWebSocket if you want, or do the “upgrade” logic there.
+For example:
+
+ts
+Copy code
+// routes.ts
+export function registerRoutes(app: Express) {
+  // just register your routes
+  // e.g. app.get('/api/user', ...)
+  // do NOT create or return any new server here
+}
+
+// index.ts
+(async () => {
+  // Make your Express app
+  const app = express();
+  // attach session, etc.
+  registerRoutes(app);
+
+  // create the server
+  const server = createServer(app);
+
+  // set up the web socket on that same server
+  setupWebSocket(server, sessionMiddleware);
+
+  // then listen
+  server.listen(PORT, () => {...});
+})();
+Now you have one server that listens for HTTP requests and can handle WebSocket upgrades.
+
