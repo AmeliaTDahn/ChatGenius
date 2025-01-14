@@ -48,21 +48,20 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
   wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
       console.log('New WebSocket connection attempt');
-      try {
-        const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
-        const userIdStr = urlParams.get('userId');
-        const tabId = urlParams.get('tabId');
-        const userId = userIdStr ? parseInt(userIdStr, 10) : null;
+      const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
+      const userIdStr = urlParams.get('userId');
+      const tabId = urlParams.get('tabId');
+      const userId = userIdStr ? parseInt(userIdStr, 10) : null;
 
-        if (!userId || userId <= 0 || !tabId) {
-          console.log('Invalid connection parameters:', { userId, tabId, url: req.url });
-          ws.send(JSON.stringify({ 
-            type: 'error', 
-            error: 'Invalid connection parameters. Please ensure you are logged in.' 
-          }));
-          ws.close(1008, 'Invalid or missing userId/tabId');
-          return;
-        }
+      if (!userId || userId <= 0 || !tabId) {
+        console.log('Invalid connection parameters:', { userId, tabId, url: req.url });
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          error: 'Invalid connection parameters. Please ensure you are logged in.' 
+        }));
+        ws.close(1008, 'Invalid or missing userId/tabId');
+        return;
+      }
 
       ws.userId = userId;
       ws.tabId = tabId;
