@@ -39,6 +39,8 @@ interface ExtendedWebSocket extends WebSocket {
   isAlive?: boolean;
 }
 
+const wss = new WebSocketServer({ noServer: true });
+
 export function registerRoutes(app: Express) {
   setupAuth(app);
 
