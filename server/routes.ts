@@ -48,19 +48,16 @@ export function registerRoutes(app: Express) {
 
   // API Routes start here
   app.get("/api/messages", async (req, res) => {
-      try {
-        const message = JSON.parse(data.toString());
-        console.log('Received message:', message); // Debug log
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
 
-        switch (message.type) {
-          case 'message': {
-            if (!message.content || !message.channelId || !ws.userId) {
-              ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Invalid message format'
-              }));
-              return;
-            }
+    try {
+      const messages = await db.query.messages.findMany({
+        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+        limit: 100
+      });
+      res.json(messages);
 
             try {
               const [newMessage] = await db.insert(messages)
@@ -147,10 +144,10 @@ export function registerRoutes(app: Express) {
       ws.isAlive = false;
     });
 
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-      ws.terminate();
-    });
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).send("Error fetching messages");
+    }
   });
 
   app.get("/api/user", async (req, res) => {
