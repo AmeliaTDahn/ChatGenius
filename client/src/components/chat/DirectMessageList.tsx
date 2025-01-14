@@ -11,41 +11,29 @@ import {
 } from "@/components/ui/hover-card";
 import { UserProfileView } from "./UserProfileView";
 import type { Channel, User } from "@db/schema";
+import { ChatBot } from './ChatBot';
 
 type DirectMessage = Channel & {
   otherUser: User;
 };
 
-import { ChatBot } from './ChatBot';
-
 export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (channel: Channel) => void }) {
   const [showChatBot, setShowChatBot] = useState(false);
   const { data: directMessages, isLoading } = useQuery<DirectMessage[]>({
     queryKey: ['/api/direct-messages'],
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 5000,
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const getStatusColor = (isOnline: boolean, hideActivity: boolean) => {
-    if (hideActivity || !isOnline) {
-      return 'bg-gray-500';
-    }
-    return 'bg-green-500';
-  };
-
   const handleSelectChannel = async (dm: DirectMessage) => {
     try {
-      // Mark messages as read when selecting the channel
       await fetch(`/api/channels/${dm.id}/read`, {
         method: 'POST',
         credentials: 'include'
       });
-
-      // Invalidate both queries to refresh the status
       queryClient.invalidateQueries({ queryKey: ['/api/direct-messages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
-
       onSelectChannel(dm);
     } catch (error) {
       toast({
@@ -71,37 +59,36 @@ export function DirectMessageList({ onSelectChannel }: { onSelectChannel: (chann
 
   return (
     <div className="space-y-2 p-2">
-        directMessages.map((dm) => (
-          <Button
-            key={dm.id}
-            variant="ghost"
-            className="w-full justify-start relative"
-            onClick={() => handleSelectChannel(dm)}
-          >
-            <div className="flex items-center gap-2 flex-1">
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <div className="relative">
-                    <Avatar className="h-6 w-6">
-                      {dm.otherUser.avatarUrl ? (
-                        <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
-                      ) : (
-                        <AvatarFallback>
-                          {dm.otherUser.username[0].toUpperCase()}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                  </div>
-                </HoverCardTrigger>
-                <HoverCardContent className="w-80" align="start">
-                  <UserProfileView user={dm.otherUser} asChild />
-                </HoverCardContent>
-              </HoverCard>
-              <span className="text-sm truncate">{dm.otherUser.username}</span>
-            </div>
-          </Button>
-        ))
-      )}
+      {directMessages.map((dm) => (
+        <Button
+          key={dm.id}
+          variant="ghost"
+          className="w-full justify-start relative"
+          onClick={() => handleSelectChannel(dm)}
+        >
+          <div className="flex items-center gap-2 flex-1">
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <div className="relative">
+                  <Avatar className="h-6 w-6">
+                    {dm.otherUser.avatarUrl ? (
+                      <AvatarImage src={dm.otherUser.avatarUrl} alt={dm.otherUser.username} />
+                    ) : (
+                      <AvatarFallback>
+                        {dm.otherUser.username[0].toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                </div>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80" align="start">
+                <UserProfileView user={dm.otherUser} asChild />
+              </HoverCardContent>
+            </HoverCard>
+            <span className="text-sm truncate">{dm.otherUser.username}</span>
+          </div>
+        </Button>
+      ))}
     </div>
   );
 }
