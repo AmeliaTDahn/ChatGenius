@@ -1,3 +1,11 @@
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
@@ -39,6 +47,29 @@ async function getUnreadMessageCounts(userId: number) {
       const latestRead = await db
         .select({
           messageId: messageReads.messageId,
+
+  app.post("/api/chat", async (req, res) => {
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: "OpenAI API key not configured" });
+    }
+
+    try {
+      const { message } = req.body;
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: message }],
+      });
+
+      const response = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
+      res.json({ message: response });
+    } catch (error) {
+      console.error("OpenAI API error:", error);
+      res.status(500).json({ error: "Failed to get response from AI" });
+    }
+  });
+
+
           channelId: messages.channelId
         })
         .from(messageReads)
