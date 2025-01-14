@@ -5,6 +5,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { setupWebSocket } from './websocket';
 import session from 'express-session';
 import type { User } from "@db/schema";
+import createMemoryStore from "memorystore";
 
 // Declare session type to include user
 declare module 'express-session' {
@@ -16,14 +17,29 @@ declare module 'express-session' {
 const app = express();
 const server = createServer(app);
 
-// Session middleware configuration
+// Create a MemoryStore instance for session storage
+const MemoryStore = createMemoryStore(session);
+
+// Session middleware configuration with improved security
 const sessionMiddleware = session({
   secret: process.env.REPL_ID || "chat-app-secret",
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }
+  name: 'sessionId', // Set a specific cookie name
+  proxy: true,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+  },
+  store: new MemoryStore({
+    checkPeriod: 86400000, // Prune expired entries every 24h
+    stale: false, // Don't serve stale data
+  })
 });
 
+// Apply middleware
 app.use(sessionMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -31,25 +47,10 @@ app.use(express.urlencoded({ extended: false }));
 // Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
   res.on("finish", () => {
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${Date.now() - start}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-      log(logLine);
+    const duration = Date.now() - start;
+    if (req.path.startsWith("/api")) {
+      log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
     }
   });
   next();
@@ -61,22 +62,21 @@ registerRoutes(app);
 // Setup WebSocket with session handling
 setupWebSocket(server, sessionMiddleware);
 
+// Error handling middleware
 interface AppError extends Error {
   status?: number;
   statusCode?: number;
 }
 
-// Error handling middleware
 app.use((err: AppError, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   res.status(status).json({ message });
-  // Don't throw error here, just log it
 });
 
 // Setup Vite or serve static files
-if (app.get("env") === "development") {
+if (process.env.NODE_ENV === "development") {
   setupVite(app, server);
 } else {
   serveStatic(app);

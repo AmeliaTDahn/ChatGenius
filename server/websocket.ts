@@ -25,7 +25,7 @@ type WSMessage = {
   error?: string;
 };
 
-export const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true });
 const authenticatedClients = new Set<AuthenticatedWebSocket>();
 
 export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler) {
@@ -46,7 +46,6 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
     clearInterval(pingInterval);
   });
 
-  // Handle new WebSocket connections
   wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
       const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
@@ -68,12 +67,10 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
 
       authenticatedClients.add(ws);
 
-      // Handle ping responses to maintain connection
       ws.on('pong', () => {
         ws.isAlive = true;
       });
 
-      // Handle incoming messages
       ws.on('message', async (data: Buffer) => {
         try {
           const message: WSMessage = JSON.parse(data.toString());
@@ -89,8 +86,7 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
               }
 
               try {
-                // Save message to database
-                const [newMessage] = await db.insert(messages)
+                const inserted = await db.insert(messages)
                   .values({
                     content: message.content,
                     channelId: message.channelId,
@@ -98,11 +94,12 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
                   })
                   .returning();
 
-                if (!newMessage) {
+                if (!inserted || !inserted[0]) {
                   throw new Error('Failed to create message');
                 }
 
-                // Get full message details with user info
+                const newMessage = inserted[0];
+
                 const fullMessage = await db.query.messages.findFirst({
                   where: eq(messages.id, newMessage.id),
                   with: {
@@ -117,7 +114,6 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
                 });
 
                 if (fullMessage) {
-                  // Broadcast message to all connected clients
                   authenticatedClients.forEach((client) => {
                     if (client.readyState === WebSocket.OPEN) {
                       client.send(JSON.stringify({
@@ -158,14 +154,12 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
         }
       });
 
-      // Handle connection errors
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
         authenticatedClients.delete(ws);
         ws.terminate();
       });
 
-      // Handle connection close
       ws.on('close', () => {
         authenticatedClients.delete(ws);
         ws.isAlive = false;
@@ -177,16 +171,13 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
     }
   });
 
-  // Handle WebSocket upgrade requests
   server.on('upgrade', (request: IncomingMessage, socket, head) => {
     // Ignore Vite HMR requests
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
 
-    // Apply session middleware before handling the WebSocket upgrade
     sessionMiddleware(request as any, {} as any, () => {
-      // Check session authentication here if needed
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
