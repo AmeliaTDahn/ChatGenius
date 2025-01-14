@@ -79,14 +79,18 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
       }
     };
 
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
+
     ws.current.onclose = (event) => {
       console.log('WebSocket closed:', event);
-      setTimeout(() => {
-        if (user) {
-          console.log('Attempting to reconnect WebSocket...');
+      if (reconnectAttempts < maxReconnectAttempts && user) {
+        setTimeout(() => {
+          console.log(`Attempting to reconnect WebSocket... (${reconnectAttempts + 1}/${maxReconnectAttempts})`);
           ws.current = new WebSocket(wsUrl);
-        }
-      }, 1000);
+          reconnectAttempts++;
+        }, 1000 * Math.pow(2, reconnectAttempts));
+      }
     };
 
     ws.current.onerror = (error) => {
