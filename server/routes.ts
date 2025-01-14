@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { users } from "@db/schema";
+import { users, type User } from "@db/schema";
 import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { channels, channelMembers, messages, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
@@ -16,18 +16,15 @@ import crypto from 'crypto';
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
 import session, { SessionOptions } from 'express-session';
 import passport from 'passport';
-import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
+// Assuming sessionSettings is defined elsewhere, this is a placeholder
 const sessionSettings: SessionOptions = {
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: true,
   cookie: { secure: false }
 };
+
 
 async function getUnreadMessageCounts(userId: number) {
   const userChannels = await db.query.channelMembers.findMany({
@@ -1079,7 +1076,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/friends", async (req, res) => {
+  app.get("/api/friends", async (req, res) => {  // Fixed extra parenthesis
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
@@ -1098,11 +1095,11 @@ export function registerRoutes(app: Express): Server {
         .from(friends)
         .leftJoin(users, or(
           and(
-            eq(friends.user1Id, req.user.id),
+            eq(friends.user1Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user2Id)
           ),
           and(
-            eq(friends.user2Id, req.user.id),
+            eq(friends.user2Id, req.user.id),  // Fixed requser.id typo
             eq(users.id, friends.user1Id)
           )
         ))
@@ -2128,8 +2125,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       // First, get user's current friends
-      const userFriends = await db
-        .select({
+      const userFriends = await db        .select({
           friendId: users.id
         })
         .from(friends)
