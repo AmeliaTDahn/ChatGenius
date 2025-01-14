@@ -194,6 +194,14 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
     if (request.headers['sec-websocket-protocol'] === 'vite-hmr') {
       return;
     }
+    
+    const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
+    if (pathname !== '/ws') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
