@@ -196,6 +196,8 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
       return;
     }
 
+    // Handle WebSocket upgrade directly
+
     try {
       const url = new URL(request.url!, `http://${request.headers.host}`);
       const userId = url.searchParams.get('userId');
