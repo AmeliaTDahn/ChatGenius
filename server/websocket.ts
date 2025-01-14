@@ -52,15 +52,8 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
       const userId = parseInt(urlParams.get('userId') || '0', 10);
       const tabId = urlParams.get('tabId');
 
-      if (!userId || !tabId) {
-        console.log('Invalid connection parameters:', { userId, tabId });
-        ws.send(JSON.stringify({ 
-          type: 'error', 
-          error: 'Invalid connection parameters' 
-        }));
-        ws.close(1008, 'Missing userId or tabId');
-        return;
-      }
+      // Allow connection even without params initially
+      console.log('Connection parameters:', { userId, tabId });
 
       ws.userId = userId;
       ws.tabId = tabId;
