@@ -48,19 +48,21 @@ export function setupWebSocket(server: Server, sessionMiddleware: RequestHandler
   wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
       console.log('New WebSocket connection attempt');
-      const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
-      const userId = parseInt(urlParams.get('userId') || '0', 10);
-      const tabId = urlParams.get('tabId');
+      try {
+        const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
+        const userIdStr = urlParams.get('userId');
+        const tabId = urlParams.get('tabId');
+        const userId = userIdStr ? parseInt(userIdStr, 10) : null;
 
-      if (!userId || !tabId) {
-        console.log('Invalid connection parameters:', { userId, tabId });
-        ws.send(JSON.stringify({ 
-          type: 'error', 
-          error: 'Invalid connection parameters' 
-        }));
-        ws.close(1008, 'Missing userId or tabId');
-        return;
-      }
+        if (!userId || userId <= 0 || !tabId) {
+          console.log('Invalid connection parameters:', { userId, tabId, url: req.url });
+          ws.send(JSON.stringify({ 
+            type: 'error', 
+            error: 'Invalid connection parameters. Please ensure you are logged in.' 
+          }));
+          ws.close(1008, 'Invalid or missing userId/tabId');
+          return;
+        }
 
       ws.userId = userId;
       ws.tabId = tabId;

@@ -26,13 +26,25 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
   }
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.id || !tabId.current) {
+      console.log('Missing required connection parameters:', { userId: user?.id, tabId: tabId.current });
+      return;
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${tabId.current}`;
     console.log('Connecting to WebSocket:', wsUrl);
 
-    ws.current = new WebSocket(wsUrl);
+    try {
+      ws.current = new WebSocket(wsUrl);
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      toast({
+        title: 'Connection Error',
+        description: 'Failed to establish WebSocket connection',
+        variant: 'destructive',
+      });
+    }
 
     ws.current.onopen = () => {
       console.log('WebSocket connected');
