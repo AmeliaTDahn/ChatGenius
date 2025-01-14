@@ -1,6 +1,6 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Hash, Plus, MessageSquare } from "lucide-react";
+import { Hash, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -128,7 +128,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
   className="w-full justify-start px-2"
   onClick={() => {
     const aiChannel = {
-      id: -999, // Using a special numeric ID for AI chat
+      id: 'ai-chat',
       name: 'AI Assistant',
       isAIChat: true,
       backgroundColor: '#f0f0f0'
