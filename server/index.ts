@@ -2,8 +2,18 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupWebSocket } from './websocket';
+import session from 'express-session';
 
 const app = express();
+
+const sessionMiddleware = session({
+  secret: process.env.REPL_ID || "chat-app-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false }
+});
+
+app.use(sessionMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
