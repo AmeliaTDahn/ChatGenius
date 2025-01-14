@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 type ExtendedChannel = Channel & {
   otherUser?: User;
   backgroundColor?: string;
+  isAIChat?: boolean;
 };
 
 export default function ChatPage() {

@@ -123,7 +123,23 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
           ))}
         </div>
 
-        <Separator className="my-2 mx-2" />
+        <Button
+  variant="ghost"
+  className="w-full justify-start px-2"
+  onClick={() => {
+    const aiChannel = {
+      id: 'ai-chat',
+      name: 'AI Assistant',
+      isAIChat: true,
+      backgroundColor: '#f0f0f0'
+    };
+    onSelectChannel(aiChannel);
+  }}
+>
+  <MessageSquare className="mr-2 h-4 w-4" />
+  AI Assistant
+</Button>
+<Separator className="my-2 mx-2" />
 
         <div className="p-2">
           <h3 className="text-sm font-medium mb-2 px-2">Direct Messages</h3>
