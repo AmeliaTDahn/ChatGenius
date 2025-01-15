@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,8 +13,14 @@ interface AIChatMessage {
   timestamp: Date;
 }
 
+const WELCOME_MESSAGE = "👋 Hi! I'm your AI Assistant. I'm here to help answer your questions and assist with tasks. How can I help you today?";
+
 export function AIChatChannel() {
-  const [messages, setMessages] = useState<AIChatMessage[]>([]);
+  const [messages, setMessages] = useState<AIChatMessage[]>([{
+    content: WELCOME_MESSAGE,
+    isBot: true,
+    timestamp: new Date()
+  }]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -29,15 +36,13 @@ export function AIChatChannel() {
   const handleSendMessage = async (content: string) => {
     try {
       setIsLoading(true);
-
-      // Add user message to the local state
+      
       setMessages(prev => [...prev, {
         content,
         isBot: false,
         timestamp: new Date()
       }]);
 
-      // Send message to AI endpoint
       const response = await fetch('/api/chat/ai', {
         method: 'POST',
         headers: {
@@ -52,8 +57,7 @@ export function AIChatChannel() {
       }
 
       const data = await response.json();
-
-      // Add AI response to messages
+      
       setMessages(prev => [...prev, {
         content: data.response,
         isBot: true,
@@ -81,31 +85,20 @@ export function AIChatChannel() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+    <div className="flex flex-col h-full bg-background">
+      <ScrollArea className="flex-1 px-4 py-6">
+        <div className="space-y-6 max-w-2xl mx-auto">
           {messages.map((message, index) => (
-            <div key={index} className="flex items-start gap-3">
+            <div key={index} className={`flex items-start gap-3 ${message.isBot ? '' : 'flex-row-reverse'}`}>
               <Avatar className="h-8 w-8">
-                {message.isBot ? (
-                  <AvatarFallback className="bg-primary/10 text-primary">AI</AvatarFallback>
-                ) : (
-                  <AvatarFallback>ME</AvatarFallback>
-                )}
+                <AvatarFallback className={message.isBot ? "bg-primary text-primary-foreground" : "bg-muted"}>
+                  {message.isBot ? "AI" : "ME"}
+                </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-medium text-sm">
-                    {message.isBot ? "AI Assistant" : "You"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {message.timestamp.toLocaleTimeString()}
-                  </span>
+              <div className={`flex-1 ${message.isBot ? 'mr-12' : 'ml-12'}`}>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <div dangerouslySetInnerHTML={renderMessage(message.content)} />
                 </div>
-                <div 
-                  className="text-sm mt-1 prose-sm max-w-none"
-                  dangerouslySetInnerHTML={renderMessage(message.content)}
-                />
               </div>
             </div>
           ))}
@@ -118,7 +111,7 @@ export function AIChatChannel() {
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
-      <div className="p-4 border-t mt-auto">
+      <div className="p-4 border-t mt-auto max-w-2xl mx-auto w-full">
         <MessageInput 
           onSendMessage={handleSendMessage}
           disabled={isLoading}
