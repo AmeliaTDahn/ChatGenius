@@ -27,7 +27,7 @@ export function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const tabId = useRef<string | null>(null);
   const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = Infinity;
 
   if (!tabId.current) {
     if (!localStorage.getItem('tabId')) {
@@ -85,10 +85,12 @@ export function useWebSocket() {
       ws.current.onclose = () => {
         if (reconnectAttempts.current < maxReconnectAttempts) {
           console.log('WebSocket connection closed, attempting to reconnect...');
+          const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts.current), 30000);
+          console.log(`Attempting to reconnect in ${delay/1000} seconds...`);
           setTimeout(() => {
             reconnectAttempts.current++;
             connect();
-          }, Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000));
+          }, delay);
         } else {
           toast({
             title: 'Connection Error',
