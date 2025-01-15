@@ -111,7 +111,7 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         <div className="p-2">
           <Button
             variant={selectedChannel?.id === -1 ? "secondary" : "ghost"}
-            className="w-full justify-start mb-2"
+            className="w-full justify-start mb-4"
             onClick={() => {
               onSelectChannel({
                 id: -1,
@@ -140,12 +140,11 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
               </Button>
             ))}
           </div>
-
-        <Separator className="my-2 mx-2" />
-
-        <div className="p-2">
-          <h3 className="text-sm font-medium mb-2 px-2">Direct Messages</h3>
-          <DirectMessageList onSelectChannel={handleChannelSelect} />
+          <Separator className="my-2 mx-2" />
+          <div className="p-2">
+            <h3 className="text-sm font-medium mb-2 px-2">Direct Messages</h3>
+            <DirectMessageList onSelectChannel={handleChannelSelect} />
+          </div>
         </div>
       </ScrollArea>
     </div>

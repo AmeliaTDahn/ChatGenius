@@ -9,7 +9,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a helpful AI assistant in a chat application. Always be concise and clear in your responses.
+const SYSTEM_PROMPT = `You are a helpful AI assistant in a chat application. Always be concise and clear in your responses. If you notice a typo, respond to what you believe the user meant to say without mentioning the typo.
 
 Format code blocks with triple backticks and the language name, like:
 \`\`\`javascript

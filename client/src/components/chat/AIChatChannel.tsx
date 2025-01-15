@@ -13,7 +13,7 @@ interface AIChatMessage {
   timestamp: Date;
 }
 
-const WELCOME_MESSAGE = "👋 Hi! I'm your AI Assistant. I'm here to help answer your questions and assist with tasks. How can I help you today?";
+const WELCOME_MESSAGE = "👋 Hello! I'm your AI Assistant. I'm here to help with any questions or tasks you have. Feel free to ask me anything, and I'll do my best to assist you!";
 
 export function AIChatChannel() {
   const [messages, setMessages] = useState<AIChatMessage[]>([{
