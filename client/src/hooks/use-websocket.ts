@@ -3,7 +3,7 @@ import type { User, Message } from '@db/schema';
 import { useToast } from '@/hooks/use-toast';
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request';
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request' | 'ai_message'; // Added ai_message type
   channelId?: number;
   content?: string;
   userId?: number;
@@ -18,9 +18,10 @@ type WSMessage = {
       avatarUrl?: string;
     };
   };
+  aiResponse?: string; // Added aiResponse for AI messages
 };
 
-export function useWebSocket(user: User | null, onMessage?: (message: Message) => void) {
+export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const { toast } = useToast();
 
@@ -34,20 +35,19 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
   }
 
   useEffect(() => {
-    if (!user) return;
-
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${tabId.current}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?tabId=${tabId.current}`;
     ws.current = new WebSocket(wsUrl);
+
+    const lastMessage = useRef<WSMessage | null>(null);
 
     ws.current.onmessage = (event) => {
       const data: WSMessage = JSON.parse(event.data);
+      lastMessage.current = data;
 
       switch (data.type) {
         case 'message':
-          if (data.message && onMessage) {
-            onMessage(data.message);
-          }
+          // Handle the message in the component using the lastMessage
           break;
         case 'presence':
           break;
@@ -60,14 +60,15 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
             });
           }
           break;
+        case 'ai_message': // Handle AI messages
+          // Access AI response using data.aiResponse
+          break;
       }
     };
 
     ws.current.onclose = () => {
       setTimeout(() => {
-        if (user) {
-          ws.current = new WebSocket(wsUrl);
-        }
+        ws.current = new WebSocket(wsUrl);
       }, 1000);
     };
 
@@ -81,13 +82,13 @@ export function useWebSocket(user: User | null, onMessage?: (message: Message) =
       clearInterval(pingInterval);
       ws.current?.close();
     };
-  }, [user, onMessage, toast]);
+  }, [toast]);
 
-  const sendMessage = useCallback((message: WSMessage & { userId: number }) => {
+  const sendMessage = useCallback((message: Partial<WSMessage>) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ ...message, tabId: tabId.current }));
     }
   }, []);
 
-  return { sendMessage };
+  return { sendMessage, lastMessage: lastMessage.current };
 }

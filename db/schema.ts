@@ -32,6 +32,24 @@ export const insertUserSchema = createInsertSchema(users, {
 });
 export const selectUserSchema = createSelectSchema(users);
 
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Document = typeof documents.$inferSelect;
+
+export const documentEmbeddings = pgTable("document_embeddings", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  embedding: text("embedding").notNull(), 
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const channels = pgTable("channels", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -50,6 +68,7 @@ export const messages = pgTable("messages", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   parentId: integer("parent_id").references(() => messages.id),
   replyCount: integer("reply_count").default(0).notNull(),
+  isAIMessage: boolean("is_ai_message").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -78,7 +97,6 @@ export const channelMembers = pgTable("channel_members", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
 });
 
-// Relations
 export const userRelations = relations(users, ({ many }) => ({
   messages: many(messages),
   channelMembers: many(channelMembers),
@@ -128,7 +146,20 @@ export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
   }),
 }));
 
-// Export schemas for validation
+export const documentRelations = relations(documents, ({ one }) => ({
+  user: one(users, {
+    fields: [documents.userId],
+    references: [users.id],
+  }),
+}));
+
+export const documentEmbeddingRelations = relations(documentEmbeddings, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentEmbeddings.documentId],
+    references: [documents.id],
+  }),
+}));
+
 
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
@@ -144,7 +175,7 @@ export const channelInvites = pgTable("channel_invites", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), // pending, accepted, rejected
+  status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -152,7 +183,7 @@ export const friendRequests = pgTable("friend_requests", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), // pending, accepted, rejected
+  status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -163,7 +194,6 @@ export const friends = pgTable("friends", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Relations
 export const friendRequestRelations = relations(friendRequests, ({ one }) => ({
   sender: one(users, {
     fields: [friendRequests.senderId],
@@ -190,8 +220,6 @@ export const channelInviteRelations = relations(channelInvites, ({ one }) => ({
   }),
 }));
 
-
-// Added Direct Message Channel Table and Relations
 export const directMessageChannels = pgTable("direct_message_channels", {
   id: serial("id").primaryKey(),
   user1Id: integer("user1_id").references(() => users.id).notNull(),
@@ -215,7 +243,6 @@ export const directMessageChannelRelations = relations(directMessageChannels, ({
   }),
 }));
 
-// Export schemas for validation
 export const insertFriendRequestSchema = createInsertSchema(friendRequests);
 export const selectFriendRequestSchema = createSelectSchema(friendRequests);
 
@@ -231,7 +258,6 @@ export const messageReads = pgTable("message_reads", {
 
 export type MessageRead = typeof messageReads.$inferSelect;
 export type InsertMessageRead = typeof messageReads.$inferInsert;
-
 
 export const messageReadRelations = relations(messageReads, ({ one }) => ({
   message: one(messages, {
@@ -260,7 +286,6 @@ export const messageAttachments = pgTable("message_attachments", {
 export type MessageAttachment = typeof messageAttachments.$inferSelect;
 export type InsertMessageAttachment = typeof messageAttachments.$inferInsert;
 
-
 export const messageAttachmentRelations = relations(messageAttachments, ({ one }) => ({
   message: one(messages, {
     fields: [messageAttachments.messageId],
@@ -270,3 +295,9 @@ export const messageAttachmentRelations = relations(messageAttachments, ({ one }
 
 export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments);
 export const selectMessageAttachmentSchema = createSelectSchema(messageAttachments);
+
+export const insertDocumentSchema = createInsertSchema(documents);
+export const selectDocumentSchema = createSelectSchema(documents);
+
+export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddings);
+export const selectDocumentEmbeddingSchema = createSelectSchema(documentEmbeddings);

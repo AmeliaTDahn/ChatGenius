@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 interface AIChatMessage {
   content: string;
@@ -10,55 +12,57 @@ interface AIChatMessage {
   timestamp: Date;
 }
 
+interface MessageInputProps {
+  onSendMessage: (content: string) => Promise<void>;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
 export function AIChatChannel() {
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const { sendMessage, lastMessage } = useWebSocket();
 
   const handleSendMessage = async (content: string) => {
     try {
       setIsLoading(true);
 
-      // Add user message
+      // Add user message to the local state
       setMessages(prev => [...prev, {
         content,
         isBot: false,
         timestamp: new Date()
       }]);
 
-      // Call our proxy endpoint instead of the external API directly
-      const response = await fetch("/api/chat-proxy", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message: content }),
-        credentials: 'include' // Important for authentication
+      // Send message through WebSocket
+      sendMessage({
+        type: 'message',
+        channelId: -1, // Special AI channel ID
+        content,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to get response from chatbot");
-      }
-
-      const data = await response.json();
-
-      // Add bot response
-      setMessages(prev => [...prev, {
-        content: data.response || "Sorry, I couldn't process that request.",
-        isBot: true,
-        timestamp: new Date()
-      }]);
     } catch (error) {
       console.error("Error sending message to AI:", error);
-      // Add error message
-      setMessages(prev => [...prev, {
-        content: "Sorry, I encountered an error. Please try again.",
-        isBot: true,
-        timestamp: new Date()
-      }]);
-    } finally {
-      setIsLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
     }
   };
+
+  // Handle incoming WebSocket messages
+  useEffect(() => {
+    if (lastMessage?.type === 'message' && lastMessage.channelId === -1 && lastMessage.message) {
+      setMessages(prev => [...prev, {
+        content: lastMessage.message.content,
+        isBot: true,
+        timestamp: new Date(lastMessage.message.createdAt)
+      }]);
+      setIsLoading(false);
+    }
+  }, [lastMessage]);
 
   return (
     <div className="flex flex-col h-full">

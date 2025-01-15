@@ -5,6 +5,7 @@ import type { User, Message } from '@db/schema';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
 import { users, messages } from '@db/schema';
+import { aiService } from './services/ai';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -56,10 +57,10 @@ export function setupWebSocket(server: Server) {
     });
   }, 30000);
 
-  const broadcastToChannel = async (channelId: number, message: WSMessage, senderTabId: string, senderId: number) => {
+  const broadcastToChannel = async (channelId: number, message: WSMessage, senderTabId: string, senderId?: number) => {
     wss.clients.forEach((ws) => {
       const client = ws as AuthenticatedWebSocket;
-      if (client.readyState === WebSocket.OPEN && client.userId !== senderId) {
+      if (client.readyState === WebSocket.OPEN && (!senderId || client.userId !== senderId)) {
         client.send(JSON.stringify(message));
       }
     });
@@ -75,7 +76,7 @@ export function setupWebSocket(server: Server) {
     });
   };
 
-  wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
+  wss.on('connection', async (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
     try {
       const urlParams = new URL(req.url!, `http://${req.headers.host}`).searchParams;
       const userId = parseInt(urlParams.get('userId') || '0');
@@ -99,17 +100,63 @@ export function setupWebSocket(server: Server) {
 
       ws.on('message', async (data) => {
         const message: WSMessage = JSON.parse(data.toString());
+
         switch (message.type) {
           case 'message':
             if (message.channelId && message.content && ws.userId) {
-              await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!, ws.userId);
+              // Handle AI channel messages
+              if (message.channelId === -1) {
+                try {
+                  // Process message with AI service
+                  const aiResponse = await aiService.processMessage(message.channelId, message.content);
+
+                  // Create AI message in database
+                  const [newMessage] = await db.insert(messages)
+                    .values({
+                      content: aiResponse,
+                      channelId: message.channelId,
+                      userId: -1, // Special AI user ID
+                      isAIMessage: true
+                    })
+                    .returning();
+
+                  // Broadcast AI response
+                  await broadcastToChannel(
+                    message.channelId,
+                    {
+                      type: 'message',
+                      channelId: message.channelId,
+                      message: {
+                        ...newMessage,
+                        user: {
+                          id: -1,
+                          username: 'AI Assistant',
+                          avatarUrl: null
+                        }
+                      }
+                    },
+                    ws.tabId!
+                  );
+                } catch (error) {
+                  console.error('Error processing AI message:', error);
+                  ws.send(JSON.stringify({
+                    type: 'error',
+                    message: 'Failed to process AI message'
+                  }));
+                }
+              } else {
+                // Handle regular messages
+                await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!, ws.userId);
+              }
             }
             break;
+
           case 'typing':
             if (message.channelId) {
               await broadcastToChannel(message.channelId, { type: 'typing', channelId: message.channelId, userId: ws.userId }, ws.tabId!);
             }
             break;
+
           case 'ping':
             ws.isAlive = true;
             break;
