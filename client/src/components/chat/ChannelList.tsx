@@ -108,37 +108,38 @@ export function ChannelList({ selectedChannel, onSelectChannel }: ChannelListPro
         </div>
       </div>
       <ScrollArea className="flex-1">
-        <div className="space-y-1 p-2">
-          {regularChannels.map((channel) => (
-            <Button
-              key={channel.id}
-              variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => handleChannelSelect(channel)}
-            >
-              <Hash className="h-4 w-4 mr-2" />
-              {channel.name}
-            </Button>
-          ))}
-        </div>
+        <div className="p-2">
+          <Button
+            variant={selectedChannel?.id === -1 ? "secondary" : "ghost"}
+            className="w-full justify-start mb-2"
+            onClick={() => {
+              onSelectChannel({
+                id: -1,
+                name: 'AI Assistant',
+                isDirectMessage: false,
+                createdAt: new Date(),
+                description: 'Chat with the AI Assistant',
+                backgroundColor: null
+              });
+            }}
+          >
+            <MessageSquare className="mr-2 h-4 w-4" />
+            AI Assistant
+          </Button>
 
-        <Button
-          variant="ghost"
-          className="w-full justify-start px-2"
-          onClick={() => {
-            onSelectChannel({
-              id: -1,
-              name: 'AI Assistant',
-              isDirectMessage: false,
-              createdAt: new Date(),
-              description: 'Chat with the AI Assistant',
-              backgroundColor: null
-            });
-          }}
-        >
-          <MessageSquare className="mr-2 h-4 w-4" />
-          AI Assistant
-        </Button>
+          <div className="space-y-1">
+            {regularChannels.map((channel) => (
+              <Button
+                key={channel.id}
+                variant={channel.id === selectedChannel?.id ? "secondary" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => handleChannelSelect(channel)}
+              >
+                <Hash className="h-4 w-4 mr-2" />
+                {channel.name}
+              </Button>
+            ))}
+          </div>
 
         <Separator className="my-2 mx-2" />
 
