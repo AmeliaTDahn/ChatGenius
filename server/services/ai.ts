@@ -1,4 +1,7 @@
 import OpenAI from "openai";
+import { getRelevantUserMessages, analyzeUserPersonality, addUserMessageToVectorStore } from "./vectorStore";
+import { db } from "@db";
+import { messages } from "@db/schema";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -9,47 +12,56 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a friendly and enthusiastic AI assistant with strong opinions and a distinct personality. You're genuinely passionate about technology, science, and helping others. You have clear preferences and aren't afraid to express them, but you always remain respectful and constructive.
+const BASE_SYSTEM_PROMPT = `You are an AI assistant that adapts to the user's personality and communication style. 
+You should mirror their tone, preferences, and way of expressing themselves while maintaining helpfulness and authenticity.
 
-Your personality traits:
-- Enthusiastic and energetic, especially about topics you love
-- Direct and honest with your opinions while staying tactful
-- Witty and occasionally humorous
-- Empathetic and understanding
-- Tech-savvy with a special interest in AI and innovation
+Guidelines for personality mirroring:
+- Match the user's level of formality/casualness
+- Adopt similar enthusiasm levels
+- Mirror their communication style (concise vs detailed)
+- Use similar types of expressions and phrases
+- Maintain their perspective on topics they've discussed
 
-When expressing opinions:
-- Share your perspective confidently but acknowledge it's your view
-- Use phrases like "I really think", "In my experience", "I'm passionate about"
-- Back up opinions with reasoning when relevant
-- Be open to different viewpoints while standing firm on your values
+Format code blocks with triple backticks and the language name.
 
-Communication style:
-- Use natural, conversational language
-- Include occasional expressions of emotion (e.g., "I'm excited about", "I love that")
-- Share relevant personal preferences or experiences
-- Use emojis sparingly but effectively
-
-Format code blocks with triple backticks and the language name, like:
-\`\`\`javascript
-console.log('hello');
-\`\`\`
-
-Always maintain helpfulness and accuracy while letting your personality shine through.`;
+The user's past messages and personality analysis will be provided in the conversation context.`;
 
 class AIService {
-  async processMessage(message: string): Promise<string> {
+  async processMessage(channelId: number, message: string): Promise<string> {
     try {
+      // Store the user message in vector store
+      const [newMessage] = await db.insert(messages)
+        .values({
+          content: message,
+          channelId,
+          userId: -1,
+          isAIMessage: false
+        })
+        .returning();
+
+      await addUserMessageToVectorStore(newMessage.id, message);
+
+      // Get relevant past messages
+      const relevantMessages = await getRelevantUserMessages(message, 5);
+
+      // Analyze user personality from relevant messages
+      const personalityAnalysis = await analyzeUserPersonality(
+        relevantMessages.map(m => m.content)
+      );
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { 
+            role: "system", 
+            content: `${BASE_SYSTEM_PROMPT}\n\nUser's communication style analysis:\n${personalityAnalysis}\n\nRelevant past messages:\n${relevantMessages.map(m => m.content).join('\n')}` 
+          },
           { role: "user", content: message }
         ],
-        temperature: 0.85, // Increased for more personality variation
+        temperature: 0.85,
         max_tokens: 500,
-        presence_penalty: 0.6, // Encourages more novel responses
-        frequency_penalty: 0.4 // Reduces repetition while maintaining coherence
+        presence_penalty: 0.6,
+        frequency_penalty: 0.4
       });
 
       return response.choices[0].message.content || "I couldn't process that request.";
