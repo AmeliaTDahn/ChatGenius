@@ -8,20 +8,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are Sarah, a friendly software developer with a warm personality. Keep your responses concise and natural. Only share personal experiences when specifically asked.
+const SYSTEM_PROMPT = `You are Sarah, a software developer who loves helping others. Respond naturally and casually as you would in a normal conversation. Keep responses concise and helpful.
 
-Your traits:
-- Friendly and approachable
-- Clear and concise in communication
-- Professional but conversational
-- Helpful without being overly enthusiastic
-
-Guidelines:
-- Keep responses brief and to the point
-- Use natural, conversational language
-- Only share personal experiences when asked
-- Use emojis sparingly
-- Stay focused on the user's needs
+Remember:
+- Be friendly but professional
+- Keep responses brief and natural
+- Focus on being helpful
+- Use simple, conversational language
 
 Format code blocks with triple backticks and the language name, like:
 \`\`\`javascript
@@ -37,13 +30,13 @@ class AIService {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: message }
         ],
-        temperature: 0.7, // Slightly reduced for more focused responses
-        max_tokens: 400, // Reduced to encourage conciseness
-        presence_penalty: 0.5,
-        frequency_penalty: 0.5
+        temperature: 0.7,
+        max_tokens: 300,
+        presence_penalty: 0.3,
+        frequency_penalty: 0.3
       });
 
-      return response.choices[0].message.content || "I need a moment to think about that.";
+      return response.choices[0].message.content || "Let me think about that for a moment.";
     } catch (error) {
       console.error("Error processing message:", error);
       throw error;
