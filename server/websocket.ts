@@ -105,8 +105,11 @@ export function setupWebSocket(server: Server) {
           case 'message':
             if (message.channelId && message.content && ws.userId) {
               try {
+                console.log('Processing message for channel:', message.channelId);
+
                 // Process message with AI service
                 const aiResponse = await aiService.processMessage(message.channelId, message.content);
+                console.log('Got AI response');
 
                 // Create AI message in database
                 const [newMessage] = await db.insert(messages)
@@ -117,6 +120,8 @@ export function setupWebSocket(server: Server) {
                     isAIMessage: true
                   })
                   .returning();
+
+                console.log('Stored AI response in database');
 
                 // Broadcast AI response
                 await broadcastToChannel(
@@ -135,6 +140,8 @@ export function setupWebSocket(server: Server) {
                   },
                   ws.tabId!
                 );
+
+                console.log('Broadcasted AI response to channel');
               } catch (error) {
                 console.error('Error processing AI message:', error);
                 ws.send(JSON.stringify({

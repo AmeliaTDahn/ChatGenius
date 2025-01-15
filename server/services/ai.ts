@@ -35,34 +35,36 @@ class AIService {
       }
 
       // Store the user message
-      const newMessage = await db.insert(messages).values({
-        content: message,
-        channelId: channelId,
-        userId: -1, // Special AI user ID
-        isAIMessage: false
-      });
+      const [userMessage] = await db.insert(messages)
+        .values({
+          content: message,
+          channelId: channelId,
+          userId: -1, // Special AI user ID
+          isAIMessage: false
+        })
+        .returning();
 
-      // Get the inserted message
-      const [insertedMessage] = await db
-        .select()
-        .from(messages)
-        .where(eq(messages.id, newMessage.insertId))
-        .limit(1);
-
-      if (!insertedMessage) {
-        throw new Error('Failed to insert message');
+      if (!userMessage || !userMessage.id) {
+        console.error('Failed to insert user message');
+        throw new Error('Failed to store message in database');
       }
 
+      console.log('Successfully stored user message:', userMessage.id);
+
       // Add message to vector store for analysis
-      await addUserMessageToVectorStore(insertedMessage.id, message);
+      await addUserMessageToVectorStore(userMessage.id, message);
+      console.log('Successfully added message to vector store');
 
       // Get relevant past messages
       const relevantMessages = await getRelevantUserMessages(message, 5);
+      console.log('Retrieved relevant messages:', relevantMessages.length);
 
       // Analyze user personality from relevant messages
       const personalityAnalysis = await analyzeUserPersonality(
         relevantMessages.map(m => m.content)
       );
+
+      console.log('Generated personality analysis');
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
