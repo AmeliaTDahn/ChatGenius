@@ -107,8 +107,8 @@ export function setupWebSocket(server: Server) {
               // Handle AI channel messages
               if (message.channelId === -1) {
                 try {
-                  // Process message with AI service
-                  const aiResponse = await aiService.processMessage(message.channelId, message.content);
+                  // Process message with AI service - fix: remove channelId argument
+                  const aiResponse = await aiService.processMessage(message.content!);
 
                   // Create AI message in database
                   const [newMessage] = await db.insert(messages)
@@ -130,7 +130,7 @@ export function setupWebSocket(server: Server) {
                         ...newMessage,
                         user: {
                           id: -1,
-                          username: 'AI Assistant',
+                          username: 'Sarah',
                           avatarUrl: null
                         }
                       }
@@ -141,7 +141,7 @@ export function setupWebSocket(server: Server) {
                   console.error('Error processing AI message:', error);
                   ws.send(JSON.stringify({
                     type: 'error',
-                    message: 'Failed to process AI message'
+                    message: 'Failed to process message'
                   }));
                 }
               } else {
