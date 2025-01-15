@@ -25,12 +25,13 @@ interface ExtendedWebSocket extends WebSocket {
 }
 
 interface WebSocketMessageType {
-  type: 'message' | 'status_update' | 'typing';
+  type: 'message' | 'status_update' | 'typing' | 'ai_status';
   content?: string;
   channelId?: number;
   userId?: number;
   isOnline?: boolean;
   hideActivity?: boolean;
+  status?: 'thinking';
 }
 
 async function getUnreadMessageCounts(userId: number) {
@@ -138,6 +139,7 @@ export function registerRoutes(app: Express): Server {
           const extWs = ws as ExtendedWebSocket;
           extWs.userId = (request as any).user.id;
           extWs.sessionId = (request as any).sessionID;
+          extWs.isAlive = true;
           wss.emit('connection', extWs, request);
         });
       });
@@ -170,6 +172,12 @@ export function registerRoutes(app: Express): Server {
             // Handle AI channel messages
             if (message.channelId === -1) {
               try {
+                // Send initial AI thinking status
+                ws.send(JSON.stringify({
+                  type: 'ai_status',
+                  status: 'thinking'
+                }));
+
                 // Process message with AI service
                 const aiResponse = await aiService.processMessage(message.channelId, message.content!);
 
@@ -1070,7 +1078,7 @@ export function registerRoutes(app: Express): Server {
             hideActivity: users.hideActivity,
           })
           .from(users)
-          .where(eq(users.id, request.senderId))
+                    .where(eq(users.id, request.senderId))
           .limit(1);
 
         res.json({
@@ -1378,7 +1386,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Find existing direct message channel
+            // Find existing direct message channel
       const [existingDM] = await db
         .select({
           channelId: directMessageChannels.channelId
@@ -2127,7 +2135,7 @@ export function registerRoutes(app: Express): Server {
       return res.status(401).send("Not authenticated");
     }
 
-    const friendId = parseInt(req.query.friendId as string);
+    const friendId= parseInt(req.query.friendId as string);
     if (isNaN(friendId)) {
       return res.status(400).send("Invalid friend ID");
     }

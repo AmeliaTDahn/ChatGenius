@@ -13,12 +13,6 @@ interface AIChatMessage {
   timestamp: Date;
 }
 
-interface MessageInputProps {
-  onSendMessage: (content: string) => Promise<void>;
-  placeholder?: string;
-  disabled?: boolean;
-}
-
 export function AIChatChannel() {
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,18 +59,32 @@ export function AIChatChannel() {
 
   // Handle incoming WebSocket messages
   useEffect(() => {
-    if (lastMessage?.type === 'message' && lastMessage.channelId === -1 && lastMessage.message) {
+    if (!lastMessage) return;
+
+    if (lastMessage.type === 'message' && lastMessage.channelId === -1 && lastMessage.message) {
       setMessages(prev => [...prev, {
         content: lastMessage.message.content,
         isBot: true,
         timestamp: new Date(lastMessage.message.createdAt)
       }]);
       setIsLoading(false);
+    } else if (lastMessage.type === 'error') {
+      toast({
+        title: "Error",
+        description: lastMessage.message || "Something went wrong",
+        variant: "destructive",
+      });
+      setIsLoading(false);
     }
-  }, [lastMessage]);
+  }, [lastMessage, toast]);
 
   const renderMessage = (content: string) => {
-    return { __html: marked.parse(content) };
+    try {
+      return { __html: marked.parse(content) };
+    } catch (error) {
+      console.error('Error parsing markdown:', error);
+      return { __html: content };
+    }
   };
 
   return (
