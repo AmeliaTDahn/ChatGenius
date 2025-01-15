@@ -89,7 +89,7 @@ export function AIChatChannel() {
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-2xl mx-auto">
           {messages.map((message, index) => (
-            <div key={index} className={`flex items-start gap-3 ${message.isBot ? '' : 'flex-row-reverse'}`}>
+            <div key={index} className={`flex items-start gap-3 ${!message.isBot ? 'flex-row-reverse' : ''}`}>
               <Avatar className="h-8 w-8">
                 <AvatarFallback className={message.isBot ? "bg-primary text-primary-foreground" : "bg-muted"}>
                   {message.isBot ? "AI" : "ME"}
