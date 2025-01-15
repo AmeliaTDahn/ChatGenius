@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { getRelevantUserMessages, analyzeUserPersonality, addUserMessageToVectorStore } from "./vectorStore";
 import { db } from "@db";
 import { messages } from "@db/schema";
+import { eq } from 'drizzle-orm';
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -29,17 +30,31 @@ The user's past messages and personality analysis will be provided in the conver
 class AIService {
   async processMessage(channelId: number, message: string): Promise<string> {
     try {
-      // Store the user message in vector store
-      const [newMessage] = await db.insert(messages)
-        .values({
-          content: message,
-          channelId,
-          userId: -1,
-          isAIMessage: false
-        })
-        .returning();
+      if (typeof channelId !== 'number' || isNaN(channelId)) {
+        throw new Error('Invalid channel ID');
+      }
 
-      await addUserMessageToVectorStore(newMessage.id, message);
+      // Store the user message
+      const newMessage = await db.insert(messages).values({
+        content: message,
+        channelId: channelId,
+        userId: -1, // Special AI user ID
+        isAIMessage: false
+      });
+
+      // Get the inserted message
+      const [insertedMessage] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, newMessage.insertId))
+        .limit(1);
+
+      if (!insertedMessage) {
+        throw new Error('Failed to insert message');
+      }
+
+      // Add message to vector store for analysis
+      await addUserMessageToVectorStore(insertedMessage.id, message);
 
       // Get relevant past messages
       const relevantMessages = await getRelevantUserMessages(message, 5);
