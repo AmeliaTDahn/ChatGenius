@@ -104,50 +104,49 @@ export function setupWebSocket(server: Server) {
         switch (message.type) {
           case 'message':
             if (message.channelId && message.content && ws.userId) {
-              try {
-                console.log('Processing message for channel:', message.channelId);
+              // Handle AI channel messages
+              if (message.channelId === -1) {
+                try {
+                  // Process message with AI service
+                  const aiResponse = await aiService.processMessage(message.channelId, message.content);
 
-                // Process message with AI service
-                const aiResponse = await aiService.processMessage(message.channelId, message.content);
-                console.log('Got AI response');
+                  // Create AI message in database
+                  const [newMessage] = await db.insert(messages)
+                    .values({
+                      content: aiResponse,
+                      channelId: message.channelId,
+                      userId: -1, // Special AI user ID
+                      isAIMessage: true
+                    })
+                    .returning();
 
-                // Create AI message in database
-                const [newMessage] = await db.insert(messages)
-                  .values({
-                    content: aiResponse,
-                    channelId: message.channelId,
-                    userId: -1, // Special AI user ID
-                    isAIMessage: true
-                  })
-                  .returning();
-
-                console.log('Stored AI response in database');
-
-                // Broadcast AI response
-                await broadcastToChannel(
-                  message.channelId,
-                  {
-                    type: 'message',
-                    channelId: message.channelId,
-                    message: {
-                      ...newMessage,
-                      user: {
-                        id: -1,
-                        username: 'AI Assistant',
-                        avatarUrl: null
+                  // Broadcast AI response
+                  await broadcastToChannel(
+                    message.channelId,
+                    {
+                      type: 'message',
+                      channelId: message.channelId,
+                      message: {
+                        ...newMessage,
+                        user: {
+                          id: -1,
+                          username: 'AI Assistant',
+                          avatarUrl: null
+                        }
                       }
-                    }
-                  },
-                  ws.tabId!
-                );
-
-                console.log('Broadcasted AI response to channel');
-              } catch (error) {
-                console.error('Error processing AI message:', error);
-                ws.send(JSON.stringify({
-                  type: 'error',
-                  message: 'Failed to process AI message'
-                }));
+                    },
+                    ws.tabId!
+                  );
+                } catch (error) {
+                  console.error('Error processing AI message:', error);
+                  ws.send(JSON.stringify({
+                    type: 'error',
+                    message: 'Failed to process AI message'
+                  }));
+                }
+              } else {
+                // Handle regular messages
+                await broadcastToChannel(message.channelId, { ...message, userId: ws.userId }, ws.tabId!, ws.userId);
               }
             }
             break;

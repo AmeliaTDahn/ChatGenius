@@ -32,6 +32,24 @@ export const insertUserSchema = createInsertSchema(users, {
 });
 export const selectUserSchema = createSelectSchema(users);
 
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Document = typeof documents.$inferSelect;
+
+export const documentEmbeddings = pgTable("document_embeddings", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").references(() => documents.id).notNull(),
+  embedding: text("embedding").notNull(), 
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const channels = pgTable("channels", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -128,29 +146,20 @@ export const channelMemberRelations = relations(channelMembers, ({ one }) => ({
   }),
 }));
 
-
-export const messageEmbeddings = pgTable("message_embeddings", {
-  id: serial("id").primaryKey(),
-  messageId: integer("message_id").references(() => messages.id).notNull(),
-  embedding: text("embedding").notNull(),
-  sentimentScore: integer("sentiment_score"),
-  topicTags: text("topic_tags"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type MessageEmbedding = typeof messageEmbeddings.$inferSelect;
-export type InsertMessageEmbedding = typeof messageEmbeddings.$inferInsert;
-
-export const messageEmbeddingRelations = relations(messageEmbeddings, ({ one }) => ({
-  message: one(messages, {
-    fields: [messageEmbeddings.messageId],
-    references: [messages.id],
+export const documentRelations = relations(documents, ({ one }) => ({
+  user: one(users, {
+    fields: [documents.userId],
+    references: [users.id],
   }),
 }));
 
-// Add schema validation
-export const insertMessageEmbeddingSchema = createInsertSchema(messageEmbeddings);
-export const selectMessageEmbeddingSchema = createSelectSchema(messageEmbeddings);
+export const documentEmbeddingRelations = relations(documentEmbeddings, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentEmbeddings.documentId],
+    references: [documents.id],
+  }),
+}));
+
 
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
@@ -166,7 +175,7 @@ export const channelInvites = pgTable("channel_invites", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'),
+  status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -174,7 +183,7 @@ export const friendRequests = pgTable("friend_requests", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'),
+  status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -286,3 +295,9 @@ export const messageAttachmentRelations = relations(messageAttachments, ({ one }
 
 export const insertMessageAttachmentSchema = createInsertSchema(messageAttachments);
 export const selectMessageAttachmentSchema = createSelectSchema(messageAttachments);
+
+export const insertDocumentSchema = createInsertSchema(documents);
+export const selectDocumentSchema = createSelectSchema(documents);
+
+export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddings);
+export const selectDocumentEmbeddingSchema = createSelectSchema(documentEmbeddings);
