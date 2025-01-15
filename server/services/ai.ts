@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { queryVectorStore } from "./vectorStore";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -10,73 +9,31 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a helpful AI assistant in a chat application. You have access to relevant documents and conversation history to provide accurate and contextual responses. Always be concise and clear in your responses.
-
-When referencing information from documents, cite the source naturally in your response.
+const SYSTEM_PROMPT = `You are a helpful AI assistant in a chat application. Always be concise and clear in your responses.
 
 Format code blocks with triple backticks and the language name, like:
 \`\`\`javascript
 console.log('hello');
 \`\`\``;
 
-interface Message {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
 class AIService {
-  private conversationHistory: Map<number, Message[]> = new Map();
-
-  constructor() {
-    this.conversationHistory = new Map();
-  }
-
-  private getChannelHistory(channelId: number): Message[] {
-    if (!this.conversationHistory.has(channelId)) {
-      this.conversationHistory.set(channelId, [
-        { role: "system", content: SYSTEM_PROMPT },
-      ]);
-    }
-    return this.conversationHistory.get(channelId)!;
-  }
-
-  async processMessage(channelId: number, message: string): Promise<string> {
+  async processMessage(message: string): Promise<string> {
     try {
-      const relevantDocs = await queryVectorStore(message);
-      const contextFromDocs = relevantDocs
-        .map((doc) => doc.pageContent)
-        .join("\n\n");
-
-      const messageWithContext = relevantDocs.length > 0
-        ? `${message}\n\nRelevant context:\n${contextFromDocs}`
-        : message;
-
-      const history = this.getChannelHistory(channelId);
-      history.push({ role: "user", content: messageWithContext });
-
-      const recentHistory = history.slice(-10);
-
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
-        messages: recentHistory,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: message }
+        ],
         temperature: 0.7,
         max_tokens: 500,
       });
 
-      const aiResponse = response.choices[0].message.content || "I couldn't process that request.";
-      history.push({ role: "assistant", content: aiResponse });
-
-      return aiResponse;
+      return response.choices[0].message.content || "I couldn't process that request.";
     } catch (error) {
       console.error("Error processing message:", error);
       throw error;
     }
-  }
-
-  clearChannelHistory(channelId: number) {
-    this.conversationHistory.set(channelId, [
-      { role: "system", content: SYSTEM_PROMPT },
-    ]);
   }
 }
 

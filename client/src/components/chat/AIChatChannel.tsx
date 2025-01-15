@@ -4,7 +4,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWebSocket } from "@/hooks/use-websocket";
 import { marked } from 'marked';
 
 interface AIChatMessage {
@@ -17,7 +16,6 @@ export function AIChatChannel() {
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { sendMessage, lastMessage } = useWebSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -39,44 +37,39 @@ export function AIChatChannel() {
         timestamp: new Date()
       }]);
 
-      // Send message through WebSocket
-      sendMessage({
-        type: 'message',
-        channelId: -1, // Special AI channel ID
-        content,
+      // Send message to AI endpoint
+      const response = await fetch('/api/chat/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: content }),
+        credentials: 'include',
       });
 
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Add AI response to messages
+      setMessages(prev => [...prev, {
+        content: data.response,
+        isBot: true,
+        timestamp: new Date()
+      }]);
     } catch (error) {
       console.error("Error sending message to AI:", error);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: "Failed to get response from AI. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
-
-  // Handle incoming WebSocket messages
-  useEffect(() => {
-    if (!lastMessage) return;
-
-    if (lastMessage.type === 'message' && lastMessage.channelId === -1 && lastMessage.message) {
-      setMessages(prev => [...prev, {
-        content: lastMessage.message.content,
-        isBot: true,
-        timestamp: new Date(lastMessage.message.createdAt)
-      }]);
-      setIsLoading(false);
-    } else if (lastMessage.type === 'error') {
-      toast({
-        title: "Error",
-        description: lastMessage.message || "Something went wrong",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-    }
-  }, [lastMessage, toast]);
 
   const renderMessage = (content: string) => {
     try {
