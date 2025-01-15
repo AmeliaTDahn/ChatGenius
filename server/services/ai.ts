@@ -1,41 +1,26 @@
 import OpenAI from "openai";
-import { getRelevantUserMessages, analyzeUserPersonality, addUserMessageToVectorStore } from "./vectorStore";
 import { db } from "@db";
 import { messages } from "@db/schema";
-import { eq } from 'drizzle-orm';
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
 }
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const BASE_SYSTEM_PROMPT = `You are an AI assistant that adapts to the user's personality and communication style. 
-You should mirror their tone, preferences, and way of expressing themselves while maintaining helpfulness and authenticity.
-
-Guidelines for personality mirroring:
-- Match the user's level of formality/casualness
-- Adopt similar enthusiasm levels
-- Mirror their communication style (concise vs detailed)
-- Use similar types of expressions and phrases
-- Maintain their perspective on topics they've discussed
-
-Format code blocks with triple backticks and the language name.
-
-The user's past messages and personality analysis will be provided in the conversation context.`;
+const SYSTEM_PROMPT = `You are a helpful and knowledgeable AI assistant with a warm, professional personality.
+You are direct but friendly in your responses, and you aim to provide accurate and useful information.
+Format code blocks with triple backticks and the language name.`;
 
 class AIService {
   async processMessage(message: string, channelId?: number): Promise<string> {
     try {
-      // Allow processing without channelId for direct AI chat
       if (channelId && (typeof channelId !== 'number' || isNaN(channelId))) {
         throw new Error('Invalid channel ID');
       }
 
-      // Store the user message
       const [userMessage] = await db.insert(messages)
         .values({
           content: message,
@@ -50,36 +35,14 @@ class AIService {
         throw new Error('Failed to store message in database');
       }
 
-      console.log('Successfully stored user message:', userMessage.id);
-
-      // Add message to vector store for analysis
-      await addUserMessageToVectorStore(userMessage.id, message);
-      console.log('Successfully added message to vector store');
-
-      // Get relevant past messages
-      const relevantMessages = await getRelevantUserMessages(message, 5);
-      console.log('Retrieved relevant messages:', relevantMessages.length);
-
-      // Analyze user personality from relevant messages
-      const personalityAnalysis = await analyzeUserPersonality(
-        relevantMessages.map(m => m.content)
-      );
-
-      console.log('Generated personality analysis');
-
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
-          { 
-            role: "system", 
-            content: `${BASE_SYSTEM_PROMPT}\n\nUser's communication style analysis:\n${personalityAnalysis}\n\nRelevant past messages:\n${relevantMessages.map(m => m.content).join('\n')}` 
-          },
+          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: message }
         ],
-        temperature: 0.85,
-        max_tokens: 500,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.4
+        temperature: 0.7,
+        max_tokens: 500
       });
 
       return response.choices[0].message.content || "I couldn't process that request.";
