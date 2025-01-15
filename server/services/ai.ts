@@ -28,9 +28,10 @@ Format code blocks with triple backticks and the language name.
 The user's past messages and personality analysis will be provided in the conversation context.`;
 
 class AIService {
-  async processMessage(channelId: number, message: string): Promise<string> {
+  async processMessage(message: string, channelId?: number): Promise<string> {
     try {
-      if (typeof channelId !== 'number' || isNaN(channelId)) {
+      // Allow processing without channelId for direct AI chat
+      if (channelId && (typeof channelId !== 'number' || isNaN(channelId))) {
         throw new Error('Invalid channel ID');
       }
 
