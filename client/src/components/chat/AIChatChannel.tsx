@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { marked } from 'marked';
 
 interface AIChatMessage {
   content: string;
@@ -23,6 +24,15 @@ export function AIChatChannel() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { sendMessage, lastMessage } = useWebSocket();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleSendMessage = async (content: string) => {
     try {
@@ -49,6 +59,7 @@ export function AIChatChannel() {
         description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
+      setIsLoading(false);
     }
   };
 
@@ -63,6 +74,10 @@ export function AIChatChannel() {
       setIsLoading(false);
     }
   }, [lastMessage]);
+
+  const renderMessage = (content: string) => {
+    return { __html: marked.parse(content) };
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -86,9 +101,10 @@ export function AIChatChannel() {
                     {message.timestamp.toLocaleTimeString()}
                   </span>
                 </div>
-                <div className="text-sm mt-1 prose-sm max-w-none">
-                  {message.content}
-                </div>
+                <div 
+                  className="text-sm mt-1 prose-sm max-w-none"
+                  dangerouslySetInnerHTML={renderMessage(message.content)}
+                />
               </div>
             </div>
           ))}
@@ -98,6 +114,7 @@ export function AIChatChannel() {
               <span>AI is thinking...</span>
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
       <div className="p-4 border-t mt-auto">

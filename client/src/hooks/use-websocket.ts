@@ -26,6 +26,8 @@ export function useWebSocket() {
   const { toast } = useToast();
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const tabId = useRef<string | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
 
   if (!tabId.current) {
     if (!localStorage.getItem('tabId')) {
@@ -37,36 +39,71 @@ export function useWebSocket() {
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws?tabId=${tabId.current}`;
-    ws.current = new WebSocket(wsUrl);
 
-    ws.current.onmessage = (event) => {
-      const data: WSMessage = JSON.parse(event.data);
-      setLastMessage(data);
-
-      switch (data.type) {
-        case 'message':
-          break;
-        case 'presence':
-          break;
-        case 'friend_request':
-          if (data.friendRequest) {
-            toast({
-              title: 'New Friend Request',
-              description: `${data.friendRequest.sender.username} sent you a friend request!`,
-              duration: 5000,
-            });
-          }
-          break;
-        case 'ai_message':
-          break;
+    const connect = () => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        return;
       }
+
+      ws.current = new WebSocket(wsUrl);
+
+      ws.current.onmessage = (event) => {
+        try {
+          const data: WSMessage = JSON.parse(event.data);
+          setLastMessage(data);
+
+          switch (data.type) {
+            case 'message':
+              // Handle regular messages
+              break;
+            case 'presence':
+              // Handle presence updates
+              break;
+            case 'friend_request':
+              if (data.friendRequest) {
+                toast({
+                  title: 'New Friend Request',
+                  description: `${data.friendRequest.sender.username} sent you a friend request!`,
+                  duration: 5000,
+                });
+              }
+              break;
+            case 'ai_message':
+              // Handle AI messages
+              break;
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      ws.current.onopen = () => {
+        console.log('WebSocket connected');
+        reconnectAttempts.current = 0;
+      };
+
+      ws.current.onclose = () => {
+        if (reconnectAttempts.current < maxReconnectAttempts) {
+          console.log('WebSocket connection closed, attempting to reconnect...');
+          setTimeout(() => {
+            reconnectAttempts.current++;
+            connect();
+          }, Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000));
+        } else {
+          toast({
+            title: 'Connection Error',
+            description: 'Failed to reconnect to the server. Please refresh the page.',
+            variant: 'destructive',
+          });
+        }
+      };
+
+      ws.current.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
     };
 
-    ws.current.onclose = () => {
-      setTimeout(() => {
-        ws.current = new WebSocket(wsUrl);
-      }, 1000);
-    };
+    connect();
 
     const pingInterval = setInterval(() => {
       if (ws.current?.readyState === WebSocket.OPEN) {
@@ -83,8 +120,14 @@ export function useWebSocket() {
   const sendMessage = useCallback((message: Partial<WSMessage>) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ ...message, tabId: tabId.current }));
+    } else {
+      toast({
+        title: 'Connection Error',
+        description: 'Not connected to the server. Please wait or refresh the page.',
+        variant: 'destructive',
+      });
     }
-  }, []);
+  }, [toast]);
 
   return { sendMessage, lastMessage };
 }

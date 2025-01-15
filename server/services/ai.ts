@@ -28,7 +28,6 @@ class AIService {
   private conversationHistory: Map<number, Message[]> = new Map();
 
   constructor() {
-    // Initialize with system prompt for each channel
     this.conversationHistory = new Map();
   }
 
@@ -43,24 +42,18 @@ class AIService {
 
   async processMessage(channelId: number, message: string): Promise<string> {
     try {
-      // Get relevant documents from vector store
       const relevantDocs = await queryVectorStore(message);
       const contextFromDocs = relevantDocs
         .map((doc) => doc.pageContent)
         .join("\n\n");
 
-      // Add context to the message if available
       const messageWithContext = relevantDocs.length > 0
         ? `${message}\n\nRelevant context:\n${contextFromDocs}`
         : message;
 
-      // Get channel history
       const history = this.getChannelHistory(channelId);
-      
-      // Add user message to history
       history.push({ role: "user", content: messageWithContext });
 
-      // Keep last N messages for context window
       const recentHistory = history.slice(-10);
 
       const response = await openai.chat.completions.create({
@@ -71,8 +64,6 @@ class AIService {
       });
 
       const aiResponse = response.choices[0].message.content || "I couldn't process that request.";
-      
-      // Add AI response to history
       history.push({ role: "assistant", content: aiResponse });
 
       return aiResponse;
