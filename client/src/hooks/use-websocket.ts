@@ -1,9 +1,9 @@
-import { useEffect, useRef, useCallback } from 'react';
-import type { User, Message } from '@db/schema';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import type { Message } from '@db/schema';
 import { useToast } from '@/hooks/use-toast';
 
 type WSMessage = {
-  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request' | 'ai_message'; // Added ai_message type
+  type: 'message' | 'typing' | 'presence' | 'ping' | 'friend_request' | 'ai_message';
   channelId?: number;
   content?: string;
   userId?: number;
@@ -18,13 +18,13 @@ type WSMessage = {
       avatarUrl?: string;
     };
   };
-  aiResponse?: string; // Added aiResponse for AI messages
+  aiResponse?: string;
 };
 
 export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-
+  const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const tabId = useRef<string | null>(null);
 
   if (!tabId.current) {
@@ -39,15 +39,12 @@ export function useWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}/ws?tabId=${tabId.current}`;
     ws.current = new WebSocket(wsUrl);
 
-    const lastMessage = useRef<WSMessage | null>(null);
-
     ws.current.onmessage = (event) => {
       const data: WSMessage = JSON.parse(event.data);
-      lastMessage.current = data;
+      setLastMessage(data);
 
       switch (data.type) {
         case 'message':
-          // Handle the message in the component using the lastMessage
           break;
         case 'presence':
           break;
@@ -60,8 +57,7 @@ export function useWebSocket() {
             });
           }
           break;
-        case 'ai_message': // Handle AI messages
-          // Access AI response using data.aiResponse
+        case 'ai_message':
           break;
       }
     };
@@ -90,5 +86,5 @@ export function useWebSocket() {
     }
   }, []);
 
-  return { sendMessage, lastMessage: lastMessage.current };
+  return { sendMessage, lastMessage };
 }
