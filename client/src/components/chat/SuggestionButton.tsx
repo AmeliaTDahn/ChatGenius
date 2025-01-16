@@ -28,7 +28,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       });
 
       if (!response.ok) {
-        setIsLoading(false);
         return;
       }
 
@@ -77,7 +76,13 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
               </Button>
             </div>
             <div className="bg-muted p-3 rounded-md mb-3">
-              <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={handleDecline}>
