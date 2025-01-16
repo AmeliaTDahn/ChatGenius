@@ -95,6 +95,7 @@ Guidelines:
    - Use emojis and punctuation naturally
    - Keep capitalization minimal and natural
    - Only capitalize proper nouns and sentence beginnings
+   - Use maximum ONE word in all caps per reply, if emphasis is needed
 
 2. Match their style precisely:
    - Use similar message structure and length
@@ -106,7 +107,8 @@ Guidelines:
    - Don't sanitize or tone down their language
    - Keep it brief and natural
    - Never mention being AI
-   - Match their baseline communication style`;
+   - Match their baseline communication style
+   - Limit ALL CAPS to one word maximum per reply`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
