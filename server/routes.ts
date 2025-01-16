@@ -1080,7 +1080,6 @@ export function registerRoutes(app: Express): Server {
           .from(users)
           .where(eq(users.id, request.senderId))
           .limit(1);
-
         res.json({
           message: "Friend request accepted",
           friend
@@ -1578,6 +1577,8 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error updating channel color");
     }
   });
+
+  // AI Chat endpoint
   app.post("/api/chat/ai", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1589,7 +1590,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      const response = await aiService.processMessage(message);
+      const response = await aiService.processMessage(message, req.user.id);
       res.json({ response });
     } catch (error) {
       console.error("Error processing AI message:", error);
@@ -2125,8 +2126,7 @@ export function registerRoutes(app: Express): Server {
       const hashedPassword = await crypto.hash(password);
 
       // Create the new user
-      const [newUser] = await db
-        .insert(users)
+      const [newUser] = await db        .insert(users)
         .values({
           username,
           email,
@@ -2146,6 +2146,40 @@ export function registerRoutes(app: Express): Server {
       });
     } catch (error) {
       next(error);
+    }
+  });
+
+  // Add suggestion API endpoint
+  app.post("/api/channels/:channelId/suggest-reply", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      // Check if user is a member of this channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      const suggestion = await aiService.generateReplySuggestion(channelId);
+      res.json({ suggestion });
+    } catch (error) {
+      console.error("Error generating reply suggestion:", error);
+      res.status(500).send("Error generating reply suggestion");
     }
   });
 

@@ -107,20 +107,17 @@ export function setupWebSocket(server: Server) {
               // Handle AI channel messages
               if (message.channelId === -1) {
                 try {
-                  // Process message with AI service - fix: remove channelId argument
-                  const aiResponse = await aiService.processMessage(message.content!);
+                  const aiResponse = await aiService.processMessage(message.content!, ws.userId);
 
-                  // Create AI message in database
                   const [newMessage] = await db.insert(messages)
                     .values({
                       content: aiResponse,
                       channelId: message.channelId,
-                      userId: -1, // Special AI user ID
+                      userId: -1,
                       isAIMessage: true
                     })
                     .returning();
 
-                  // Broadcast AI response
                   await broadcastToChannel(
                     message.channelId,
                     {

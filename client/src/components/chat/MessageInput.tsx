@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { SuggestionButton } from "./SuggestionButton";
 import {
   Popover,
   PopoverContent,
@@ -13,9 +14,12 @@ import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
   onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
+  channelId?: number;
+  disabled?: boolean;
+  placeholder?: string;
 };
 
-export function MessageInput({ onSendMessage }: MessageInputProps) {
+export function MessageInput({ onSendMessage, channelId, disabled, placeholder }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [currentFormat, setCurrentFormat] = useState<{
@@ -32,6 +36,13 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const handleSuggestion = (suggestion: string) => {
+    setMessage(suggestion);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -178,7 +189,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             size="icon"
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={disabled || isUploading}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -187,6 +198,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             size="icon"
             variant={currentFormat.bold ? "secondary" : "ghost"}
             onClick={() => toggleFormat('bold')}
+            disabled={disabled}
           >
             <Bold className="h-4 w-4" />
           </Button>
@@ -195,6 +207,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             size="icon"
             variant={currentFormat.italic ? "secondary" : "ghost"}
             onClick={() => toggleFormat('italic')}
+            disabled={disabled}
           >
             <Italic className="h-4 w-4" />
           </Button>
@@ -204,6 +217,7 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
                 type="button"
                 size="icon"
                 variant={currentFormat.color ? "secondary" : "ghost"}
+                disabled={disabled}
               >
                 <Palette className="h-4 w-4" />
               </Button>
@@ -227,6 +241,14 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
               </div>
             </PopoverContent>
           </Popover>
+          {/* Only show suggestion button for non-AI assistant chats */}
+          {channelId && channelId !== -1 && (
+            <SuggestionButton
+              channelId={channelId}
+              onSuggestion={handleSuggestion}
+              disabled={disabled}
+            />
+          )}
         </div>
         <div className="flex-1 relative">
           <Textarea
@@ -234,17 +256,18 @@ export function MessageInput({ onSendMessage }: MessageInputProps) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
               fontWeight: currentFormat.bold ? 'bold' : 'normal',
               fontStyle: currentFormat.italic ? 'italic' : 'normal',
               color: currentFormat.color || 'inherit'
             }}
+            disabled={disabled}
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading}>
+        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
