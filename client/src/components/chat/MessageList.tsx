@@ -124,14 +124,16 @@ export function MessageList({ channelId }: MessageListProps) {
         ))}
         <div ref={bottomRef} />
       </ScrollArea>
-      <div className="p-4 border-t">
-        <SuggestionButton channelId={channelId} onSuggestion={handleUseSuggestion} />
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          channelId={channelId}
-          message={draftMessage}
-          onMessageChange={setDraftMessage}
-        />
+      <div className="p-4 border-t flex items-center">
+        <SuggestionButton channelId={channelId} onSuggestion={handleUseSuggestion} disabled={!channelId} />
+        <div className="flex-1">
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            channelId={channelId}
+            message={draftMessage}
+            onMessageChange={setDraftMessage}
+          />
+        </div>
       </div>
     </div>
   );

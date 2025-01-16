@@ -56,12 +56,27 @@ export function SuggestionButton({
     }
   };
 
-  const handleUseSuggestion = () => {
+  const handleUseSuggestion = async () => {
     if (currentSuggestion) {
-      // Pass suggestion to parent using onSuggestion callback
-      onSuggestion(currentSuggestion);
-      setShowDialog(false); // Close dialog
-      setCurrentSuggestion(""); // Reset suggestion
+      try {
+        await fetch(`/api/channels/${channelId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ content: currentSuggestion }),
+          credentials: 'include',
+        });
+        setShowDialog(false);
+        setCurrentSuggestion("");
+      } catch (error) {
+        console.error('Error sending message:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send message",
+          variant: "destructive",
+        });
+      }
     }
   };
 
