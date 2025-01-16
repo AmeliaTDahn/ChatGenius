@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -5,44 +6,24 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { marked } from 'marked';
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-interface Message {
-  id: number;
+interface AIChatMessage {
   content: string;
-  userId: number;
-  isAIMessage: boolean;
-  createdAt: string;
-  user: {
-    username: string;
-    avatarUrl: string | null;
-  };
+  isBot: boolean;
+  timestamp: Date;
 }
 
-const AI_CHANNEL_ID = -1;
-const WELCOME_MESSAGE = "👋 Hello! I'm Sarah. I'll adapt my responses to match your communication style based on your chat history. How can I help you today?";
+const WELCOME_MESSAGE = "👋 Hello! I'm your AI Assistant. I'm here to help with any questions or tasks you have. Feel free to ask me anything, and I'll do my best to assist you!";
 
 export function AIChatChannel() {
+  const [messages, setMessages] = useState<AIChatMessage[]>([{
+    content: WELCOME_MESSAGE,
+    isBot: true,
+    timestamp: new Date()
+  }]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
-
-  // Fetch message history
-  const { data: messages = [] } = useQuery<Message[]>({
-    queryKey: [`/api/channels/${AI_CHANNEL_ID}/messages`],
-    initialData: [{
-      id: 0,
-      content: WELCOME_MESSAGE,
-      userId: -1,
-      isAIMessage: true,
-      createdAt: new Date().toISOString(),
-      user: {
-        username: 'Sarah',
-        avatarUrl: null
-      }
-    }]
-  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -52,8 +33,16 @@ export function AIChatChannel() {
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
+  const handleSendMessage = async (content: string) => {
+    try {
+      setIsLoading(true);
+      
+      setMessages(prev => [...prev, {
+        content,
+        isBot: false,
+        timestamp: new Date()
+      }]);
+
       const response = await fetch('/api/chat/ai', {
         method: 'POST',
         headers: {
@@ -67,29 +56,23 @@ export function AIChatChannel() {
         throw new Error(`Error: ${response.statusText}`);
       }
 
-      return response.json();
-    },
-    onMutate: () => {
-      setIsLoading(true);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/channels/${AI_CHANNEL_ID}/messages`] });
-    },
-    onError: (error) => {
+      const data = await response.json();
+      
+      setMessages(prev => [...prev, {
+        content: data.response,
+        isBot: true,
+        timestamp: new Date()
+      }]);
+    } catch (error) {
       console.error("Error sending message to AI:", error);
       toast({
         title: "Error",
         description: "Failed to get response from AI. Please try again.",
         variant: "destructive",
       });
-    },
-    onSettled: () => {
+    } finally {
       setIsLoading(false);
     }
-  });
-
-  const handleSendMessage = async (content: string) => {
-    await sendMessage.mutateAsync(content);
   };
 
   const renderMessage = (content: string) => {
@@ -105,14 +88,14 @@ export function AIChatChannel() {
     <div className="flex flex-col h-full bg-background">
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-2xl mx-auto">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex items-start gap-3 ${!message.isAIMessage ? 'flex-row-reverse justify-start' : ''}`}>
+          {messages.map((message, index) => (
+            <div key={index} className={`flex items-start gap-3 ${!message.isBot ? 'flex-row-reverse justify-start' : ''}`}>
               <Avatar className="h-8 w-8">
-                <AvatarFallback className={message.isAIMessage ? "bg-primary text-primary-foreground" : "bg-muted"}>
-                  {message.isAIMessage ? "AI" : "ME"}
+                <AvatarFallback className={message.isBot ? "bg-primary text-primary-foreground" : "bg-muted"}>
+                  {message.isBot ? "AI" : "ME"}
                 </AvatarFallback>
               </Avatar>
-              <div className={`flex-1 ${!message.isAIMessage ? 'ml-12' : 'mr-12'}`}>
+              <div className={`flex-1 ${!message.isBot ? 'ml-12' : 'mr-12'}`}>
                 <div className="prose prose-sm dark:prose-invert max-w-none">
                   <div dangerouslySetInnerHTML={renderMessage(message.content)} />
                 </div>
@@ -122,7 +105,7 @@ export function AIChatChannel() {
           {isLoading && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Sarah is thinking...</span>
+              <span>AI is thinking...</span>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -131,7 +114,7 @@ export function AIChatChannel() {
       <div className="p-4 border-t mt-auto max-w-2xl mx-auto w-full">
         <MessageInput 
           onSendMessage={handleSendMessage}
-          isLoading={isLoading}
+          disabled={isLoading}
           placeholder="Ask me anything..."
         />
       </div>
