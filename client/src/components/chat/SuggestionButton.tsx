@@ -48,7 +48,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         if (currentSuggestion) {
           // Remove any formatting tags and name prefix before setting the suggestion
           let plainText = currentSuggestion
-            .replace(/\[color=#[0-9a-f]{6}\](.*?)\[\/color\]/gi, '$1')
             .replace(/\*\*(.*?)\*\*/g, '$1')
             .replace(/\*(.*?)\*/g, '$1');
 
