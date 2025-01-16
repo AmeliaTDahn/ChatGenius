@@ -10,6 +10,7 @@ import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
+import { MessageInput } from "./MessageInput";
 
 function parseFormattedText(text: string) {
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
@@ -24,9 +25,10 @@ function parseFormattedText(text: string) {
 
 type MessageListProps = {
   channelId: number;
+  onUseSuggestion?: (suggestion: string) => void;
 };
 
-export function MessageList({ channelId }: MessageListProps) {
+export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
   const { user } = useUser();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -61,14 +63,12 @@ export function MessageList({ channelId }: MessageListProps) {
             variant="outline"
             size="sm"
             onClick={() => {
-              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-              if (textarea) {
-                textarea.value = data.suggestion;
-                textarea.focus();
+              if (onUseSuggestion) {
+                onUseSuggestion(data.suggestion);
                 toast({
-                    duration: 0,
-                    onOpenChange: () => {}
-                  });
+                  duration: 0,
+                  onOpenChange: () => {}
+                });
               }
             }}
           >
