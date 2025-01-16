@@ -9,6 +9,7 @@ import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 function parseFormattedText(text: string) {
   // Replace color tags with spans
@@ -29,12 +30,14 @@ type MessageListProps = {
 };
 
 export function MessageList({ channelId }: MessageListProps) {
-  const { messages, isLoading, addReaction } = useMessages(channelId);
+  const { messages, isLoading } = useMessages(channelId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
+  const { sendMessage } = useWebSocket();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,6 +45,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
   const handleGetSuggestion = async () => {
     try {
+      setIsSending(true);
       const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
         credentials: 'include',
@@ -52,33 +56,28 @@ export function MessageList({ channelId }: MessageListProps) {
       }
 
       const data = await response.json();
-      // Show suggestion in a toast
+
+      // Send the suggested message directly
+      sendMessage({
+        type: 'message',
+        content: data.suggestion,
+        channelId,
+      });
+
+      // Show success toast
       toast({
-        title: "Suggested Reply",
-        description: data.suggestion,
-        action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-              if (textarea) {
-                textarea.value = data.suggestion;
-                textarea.focus();
-              }
-            }}
-          >
-            Use This
-          </Button>
-        ),
+        title: "Message Sent",
+        description: "AI-suggested reply was sent successfully",
       });
     } catch (error) {
-      console.error('Error getting suggestion:', error);
+      console.error('Error getting/sending suggestion:', error);
       toast({
         title: "Error",
-        description: "Failed to get reply suggestion",
+        description: "Failed to send AI-suggested reply",
         variant: "destructive",
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -91,15 +90,6 @@ export function MessageList({ channelId }: MessageListProps) {
   }
 
   const MessageComponent = ({ message }: { message: Message }) => {
-    const handleReaction = async (emoji: string) => {
-      await addReaction({ messageId: message.id, emoji });
-    };
-
-    const handleReply = () => {
-      setSelectedMessage(message);
-      setShowThread(true);
-    };
-
     const handleImageError = (fileUrl: string) => {
       setFailedImages(prev => new Set([...prev, fileUrl]));
     };
@@ -217,7 +207,7 @@ export function MessageList({ channelId }: MessageListProps) {
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs"
-              onClick={handleReply}
+              //onClick={handleReply}
             >
               <Reply className="h-3 w-3 mr-1" />
               Reply
@@ -227,7 +217,7 @@ export function MessageList({ channelId }: MessageListProps) {
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs text-muted-foreground"
-                onClick={handleReply}
+                //onClick={handleReply}
               >
                 {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
               </Button>
@@ -239,14 +229,14 @@ export function MessageList({ channelId }: MessageListProps) {
                   variant="secondary"
                   size="sm"
                   className="h-6 px-2 text-xs"
-                  onClick={() => handleReaction(emoji)}
+                  //onClick={() => handleReaction(emoji)}
                 >
                   <span>{emoji}</span>
                   <span className="ml-1">{count}</span>
                 </Button>
               ))}
             </div>
-            <ReactionPicker onSelectEmoji={handleReaction} />
+            <ReactionPicker onSelectEmoji={()=>{}} />
           </div>
         </div>
       </div>
@@ -281,9 +271,14 @@ export function MessageList({ channelId }: MessageListProps) {
             size="sm"
             onClick={handleGetSuggestion}
             className="shadow-lg"
+            disabled={isSending}
           >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Get Reply Suggestion
+            {isSending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Lightbulb className="h-4 w-4 mr-2" />
+            )}
+            {isSending ? "Sending..." : "Send AI Reply"}
           </Button>
         </div>
       )}
