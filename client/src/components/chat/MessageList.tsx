@@ -257,6 +257,19 @@ export function MessageList({ channelId }: MessageListProps) {
     <div className="flex h-full overflow-hidden">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
+          {messages.length > 0 && channelId !== -1 && (
+            <div className="flex justify-end mb-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleGetSuggestion}
+                className="shadow-lg"
+              >
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Get Reply Suggestion
+              </Button>
+            </div>
+          )}
           {messages.map((message) => (
             <MessageComponent key={message.id} message={message} />
           ))}
@@ -272,19 +285,6 @@ export function MessageList({ channelId }: MessageListProps) {
               setSelectedMessage(null);
             }} 
           />
-        </div>
-      )}
-      {messages.length > 0 && channelId !== -1 && (
-        <div className="fixed bottom-24 right-8">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleGetSuggestion}
-            className="shadow-lg"
-          >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Get Reply Suggestion
-          </Button>
         </div>
       )}
     </div>
