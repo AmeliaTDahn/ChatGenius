@@ -50,7 +50,11 @@ export function MessageInput({
       onMessageChange(suggestion);
     }
     if (textareaRef.current) {
+      textareaRef.current.value = suggestion;
       textareaRef.current.focus();
+      // Trigger a change event to ensure the value is updated
+      const event = new Event('input', { bubbles: true });
+      textareaRef.current.dispatchEvent(event);
     }
   };
 
