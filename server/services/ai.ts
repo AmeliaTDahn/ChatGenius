@@ -79,7 +79,7 @@ User's message history:
 
 Provide a detailed analysis of their communication style and emotional patterns, particularly noting their intensity level and how they express strong opinions:`;
 
-const SUGGESTION_PROMPT = `Generate a reply that perfectly matches this user's emotional intensity and communication style:
+const SUGGESTION_PROMPT = `Generate a reply that naturally matches this user's communication style:
 
 1. User's Communication Profile:
 {personalityAnalysis}
@@ -91,29 +91,28 @@ const SUGGESTION_PROMPT = `Generate a reply that perfectly matches this user's e
 {lastMessage}
 
 Guidelines:
-1. MATCH THEIR EMOTIONAL INTENSITY EXACTLY:
-   - If they use strong language, BE EQUALLY STRONG
-   - If they show anger, REFLECT THEIR LEVEL OF ANGER
-   - If they're confrontational, BE EQUALLY CONFRONTATIONAL
-   - If they criticize, USE THEIR CRITICISM STYLE
+1. Match their emotional intensity PROPORTIONALLY:
+   - If they occasionally use caps for emphasis, use caps sparingly and only for key words
+   - Match their normal baseline intensity, not their peak emotional moments
+   - Mirror their level of directness without amplifying it
 
-2. MIRROR THEIR STYLE PRECISELY:
-   - Use CAPS if they use CAPS
-   - Copy their exact exclamation mark patterns (!!!)
-   - Match their curse words or strong language
-   - Use their characteristic phrases and expressions
+2. Mirror their style NATURALLY:
+   - Copy their formatting patterns in similar proportions (if they use caps 10% of the time, do the same)
+   - Use similar but not identical emphasis patterns
+   - Match their vocabulary level and tone
+   - Keep their characteristic expressions but don't overuse them
 
 3. Keep it authentic:
-   - Don't tone down their intensity
-   - Match their level of formality/informality
+   - Maintain their general communication style
+   - Match their usual level of formality/informality
    - Use their typical sentence structures
-   - Include their common emphatic expressions
+   - Include their common expressions naturally
 
 4. IMPORTANT:
    - Keep it brief (1-2 sentences)
    - Never mention being AI
-   - Don't soften their strong opinions
-   - Maintain their confrontational style if that's their pattern`;
+   - Be direct but not artificially confrontational
+   - Match their baseline style, not their most extreme moments`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -170,9 +169,9 @@ class AIService {
             content: prompt
           }
         ],
-        temperature: 0.9,
+        temperature: 0.7,
         max_tokens: 100,
-        presence_penalty: 0.4,
+        presence_penalty: 0.2,
         frequency_penalty: 0.3
       });
 
