@@ -72,6 +72,13 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
   const handleAcceptSuggestion = () => {
     if (currentSuggestion && onUseSuggestion) {
       onUseSuggestion(currentSuggestion);
+      const textarea = document.querySelector('textarea');
+      if (textarea) {
+        textarea.value = currentSuggestion;
+        textarea.focus();
+        const event = new Event('input', { bubbles: true });
+        textarea.dispatchEvent(event);
+      }
       setCurrentSuggestion(null);
     }
   };
