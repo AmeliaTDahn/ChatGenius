@@ -112,11 +112,11 @@ class AIService {
       const recentMessages = await getRecentMessages(channelId);
       const userHistory = await getUserChatHistory(userId);
 
-      if (recentMessages.length === 0) {
+      const lastMessage = recentMessages[recentMessages.length - 1];
+      
+      if (!lastMessage) {
         throw new Error("No messages to reply to");
       }
-
-      const lastMessage = recentMessages[recentMessages.length - 1];
 
       if (lastMessage.userId === userId) {
         throw new Error("Cannot suggest a reply to your own message");
