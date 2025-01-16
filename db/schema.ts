@@ -46,7 +46,7 @@ export type Document = typeof documents.$inferSelect;
 export const documentEmbeddings = pgTable("document_embeddings", {
   id: serial("id").primaryKey(),
   documentId: integer("document_id").references(() => documents.id).notNull(),
-  embedding: text("embedding").notNull(),
+  embedding: text("embedding").notNull(), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -160,6 +160,7 @@ export const documentEmbeddingRelations = relations(documentEmbeddings, ({ one }
   }),
 }));
 
+
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
 
@@ -174,7 +175,7 @@ export const channelInvites = pgTable("channel_invites", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'),
+  status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -182,7 +183,7 @@ export const friendRequests = pgTable("friend_requests", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'),
+  status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -300,47 +301,3 @@ export const selectDocumentSchema = createSelectSchema(documents);
 
 export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddings);
 export const selectDocumentEmbeddingSchema = createSelectSchema(documentEmbeddings);
-
-
-export const aiConversations = pgTable("ai_conversations", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
-});
-
-export const aiMessages = pgTable("ai_messages", {
-  id: serial("id").primaryKey(),
-  conversationId: integer("conversation_id").references(() => aiConversations.id).notNull(),
-  content: text("content").notNull(),
-  isFromAI: boolean("is_from_ai").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Add relations for AI conversations
-export const aiConversationRelations = relations(aiConversations, ({ one, many }) => ({
-  user: one(users, {
-    fields: [aiConversations.userId],
-    references: [users.id],
-  }),
-  messages: many(aiMessages),
-}));
-
-export const aiMessageRelations = relations(aiMessages, ({ one }) => ({
-  conversation: one(aiConversations, {
-    fields: [aiMessages.conversationId],
-    references: [aiConversations.id],
-  }),
-}));
-
-// Add types for the new tables
-export type AIConversation = typeof aiConversations.$inferSelect;
-export type InsertAIConversation = typeof aiConversations.$inferInsert;
-export type AIMessage = typeof aiMessages.$inferSelect;
-export type InsertAIMessage = typeof aiMessages.$inferInsert;
-
-// Add schemas for validation
-export const insertAIConversationSchema = createInsertSchema(aiConversations);
-export const selectAIConversationSchema = createSelectSchema(aiConversations);
-export const insertAIMessageSchema = createInsertSchema(aiMessages);
-export const selectAIMessageSchema = createSelectSchema(aiMessages);

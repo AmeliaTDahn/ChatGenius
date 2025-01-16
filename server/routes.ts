@@ -1080,6 +1080,7 @@ export function registerRoutes(app: Express): Server {
           .from(users)
           .where(eq(users.id, request.senderId))
           .limit(1);
+
         res.json({
           message: "Friend request accepted",
           friend
@@ -1577,8 +1578,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error updating channel color");
     }
   });
-
-  // AI Chat endpoint
   app.post("/api/chat/ai", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
@@ -1590,7 +1589,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      const response = await aiService.processMessage(message, req.user.id);
+      const response = await aiService.processMessage(message);
       res.json({ response });
     } catch (error) {
       console.error("Error processing AI message:", error);
