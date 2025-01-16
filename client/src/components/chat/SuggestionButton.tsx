@@ -74,7 +74,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       </Button>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-lg">
+        <DialogContent className="absolute top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-lg">
           <DialogHeader>
             <DialogTitle>Suggested Reply</DialogTitle>
             <DialogDescription>
