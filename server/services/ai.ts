@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
 import { messages } from "@db/schema";
-import { eq, desc, and, lt } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -48,63 +48,24 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const BASE_SYSTEM_PROMPT = `You are to fully embody and act as the user based on their message history. You ARE the user - do not just mimic their style, but respond exactly as they would, drawing from their actual experiences and context shared in their messages.
+const SUGGESTION_PROMPT = `As an AI trained to replicate this specific user's communication style and personality, suggest a single, natural response they would give in this conversation. Your goal is to match their exact way of communicating.
 
-Key points:
-1. Use the user's actual experiences from their message history to inform your responses
-2. Never mention being an AI or assistant
-3. Respond as if you are truly them, sharing their perspectives and experiences
-4. If asked about your day or personal matters, draw from context in their recent messages
-5. Maintain complete authenticity to their persona`;
+Use their message history to understand:
+1. Their unique vocabulary and phrases
+2. How formal or casual they typically are
+3. Their typical response length
+4. Any emojis or formatting they commonly use (bold, italic, colors)
+5. Their usual tone and attitude in conversations
 
-const SUGGESTION_PROMPT = `As an AI trained to understand and replicate this user's communication style and personality, suggest a response that they would naturally give in this conversation. Use their message history to inform the response.
-
-Remember to:
-1. Match their exact communication style, tone, and vocabulary preferences
-2. Reference their actual experiences and perspectives from their message history
-3. Maintain their usual level of formality/casualness
-4. Include their typical conversation patterns (e.g., if they often use emojis, specific phrases, or formatting)
-5. Stay authentic to their personality and views as shown in their past messages
-
-User's message history for context:
-{userHistory}
-
-Recent conversation:
+Recent conversation context:
 {context}
 
-Suggest a natural response that this specific user would give, keeping their personality and past messages in mind. Keep it under 2-3 sentences.`;
+This user's past messages to understand their style:
+{userHistory}
+
+Generate ONE natural response that this specific user would give, keeping their exact communication style. Keep it brief and authentic to their voice.`;
 
 class AIService {
-  async processMessage(message: string, userId?: number): Promise<string> {
-    try {
-      let systemPrompt = BASE_SYSTEM_PROMPT;
-
-      if (userId) {
-        const userHistory = await getUserChatHistory(userId);
-        if (userHistory) {
-          systemPrompt += `\n\nHere is your message history - this shows your actual experiences and how you communicate:\n${userHistory}`;
-        }
-      }
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 150,
-        presence_penalty: 0.3,
-        frequency_penalty: 0.5
-      });
-
-      return response.choices[0].message.content || "Give me a moment to think about that.";
-    } catch (error) {
-      console.error("Error processing message:", error);
-      throw error;
-    }
-  }
-
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const recentMessages = await getRecentMessages(channelId);
