@@ -64,7 +64,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   return (
     <>
       {showPreview && (
-        <div className="absolute top-0 left-0 right-0 bg-background/95 backdrop-blur-sm p-4 border-b shadow-lg z-50">
+        <div className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm p-4 border-b shadow-lg z-50" style={{ marginTop: "var(--header-height, 64px)" }}>
           <div className="max-w-2xl mx-auto">
             <div className="flex justify-between items-start mb-2">
               <div>
