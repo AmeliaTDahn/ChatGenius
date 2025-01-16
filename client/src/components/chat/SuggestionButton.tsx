@@ -1,15 +1,9 @@
+
 import { useState } from "react";
-import { Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Lightbulb, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface SuggestionButtonProps {
   channelId: number;
@@ -55,6 +49,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const handleUseSuggestion = () => {
     onSuggestion(currentSuggestion);
     setShowDialog(false);
+    setCurrentSuggestion("");
   };
 
   return (
