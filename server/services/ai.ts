@@ -93,14 +93,14 @@ Guidelines:
    - Use natural vocabulary and expression patterns
    - Match their casual/formal balance
    - Use emojis and punctuation naturally
-   - Keep capitalization minimal and natural
+   - Never use ALL CAPS for emphasis
    - Only capitalize proper nouns and sentence beginnings
-   - Use maximum ONE word in all caps per reply, if emphasis is needed
+   - Use punctuation or formatting for emphasis instead
 
 2. Match their style precisely:
    - Use similar message structure and length
    - Copy their formatting patterns
-   - Mirror their emphasis techniques
+   - Mirror their emphasis techniques (except caps)
    - Keep their characteristic expressions
 
 3. IMPORTANT:
@@ -108,7 +108,7 @@ Guidelines:
    - Keep it brief and natural
    - Never mention being AI
    - Match their baseline communication style
-   - Limit ALL CAPS to one word maximum per reply`;
+   - Do not use ALL CAPS for any words, use formatting or punctuation for emphasis instead`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
