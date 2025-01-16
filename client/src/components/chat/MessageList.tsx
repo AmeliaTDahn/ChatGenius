@@ -3,11 +3,12 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileIcon, Download, Reply } from "lucide-react";
+import { Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 function parseFormattedText(text: string) {
   // Replace color tags with spans
@@ -33,10 +34,53 @@ export function MessageList({ channelId }: MessageListProps) {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleGetSuggestion = async () => {
+    try {
+      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get suggestion');
+      }
+
+      const data = await response.json();
+      // Show suggestion in a toast
+      toast({
+        title: "Suggested Reply",
+        description: data.suggestion,
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+              if (textarea) {
+                textarea.value = data.suggestion;
+                textarea.focus();
+              }
+            }}
+          >
+            Use This
+          </Button>
+        ),
+      });
+    } catch (error) {
+      console.error('Error getting suggestion:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get reply suggestion",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -228,6 +272,19 @@ export function MessageList({ channelId }: MessageListProps) {
               setSelectedMessage(null);
             }} 
           />
+        </div>
+      )}
+      {messages.length > 0 && channelId !== -1 && (
+        <div className="fixed bottom-24 right-8">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleGetSuggestion}
+            className="shadow-lg"
+          >
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Get Reply Suggestion
+          </Button>
         </div>
       )}
     </div>
