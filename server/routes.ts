@@ -1075,8 +1075,8 @@ export function registerRoutes(app: Express): Server {
             username: users.username,
             avatarUrl: users.avatarUrl,
             isOnline: users.isOnline,
-            hideActivity: users.hideActivity,
-                    })
+            hideActivity: users.hideActivity
+          })
           .from(users)
           .where(eq(users.id, request.senderId))
           .limit(1);
@@ -1211,11 +1211,11 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/friends/:friendId", async (req, res) => {
+    const friendId = parseInt(req.params.friendId);
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
-    const friendId = parseInt(req.params.friendId);
     if (isNaN(friendId)) {
       return res.status(400).send("Invalid friend ID");
     }
@@ -1240,36 +1240,48 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (dmChannel) {
-        // First delete all message attachments
-        await db
-          .delete(messageAttachments)
-          .where(
-            inArray(
-              messageAttachments.messageId,
-              db
-                .select({ id: messages.id })
-                .from(messages)
-                .where(eq(messages.channelId, dmChannel.channelId))
-            )
-          );
+        // Get all message IDs in this channel
+        const messageIds = await db
+          .select({ id: messages.id })
+          .from(messages)
+          .where(eq(messages.channelId, dmChannel.channelId));
 
-        // Then delete all messages in the channel
+        const messageIdArray = messageIds.map(m => m.id);
+
+        if (messageIdArray.length > 0) {
+          // First delete message reactions
+          await db
+            .delete(messageReactions)
+            .where(inArray(messageReactions.messageId, messageIdArray));
+
+          // Then delete message reads
+          await db
+            .delete(messageReads)
+            .where(inArray(messageReads.messageId, messageIdArray));
+
+          // Then delete message attachments
+          await db
+            .delete(messageAttachments)
+            .where(inArray(messageAttachments.messageId, messageIdArray));
+        }
+
+        // Delete all messages in the channel
         await db
           .delete(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
 
-        // Delete the direct message channel entry
+        // Delete the direct message channel record
         await db
           .delete(directMessageChannels)
-          .where(eq(directMessageChannels.channelId, dmChannel.channelId));
+          .where(eq(directMessageChannels.id, dmChannel.id));
 
-        // Delete the channel itself
+        // Finally delete the channel itself
         await db
           .delete(channels)
           .where(eq(channels.id, dmChannel.channelId));
       }
 
-      // Finally remove the friend relationship
+      // Remove the friend relationship
       await db
         .delete(friends)
         .where(
@@ -2116,7 +2128,7 @@ export function registerRoutes(app: Express): Server {
 
       if (existingUser) {
         if (existingUser.email === email) {
-          return res.status(400).send("A user with this email is already registered");
+          return res.status(400).send("A user with this email isalready registered");
         }
         return res.status(400).send("Username already exists");
       }
