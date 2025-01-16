@@ -71,33 +71,29 @@ User's message history:
 
 Provide a detailed analysis of their communication style and emotional patterns:`;
 
-const SUGGESTION_PROMPT = `You are tasked with generating a response that authentically matches the user's communication style, personality, and emotional intensity. You have:
+const SUGGESTION_PROMPT = `Generate a brief but emotionally matched response based on this information:
 
 1. User's Communication Profile and Emotional Patterns:
 {personalityAnalysis}
 
-2. Previous conversation for context (DO NOT reply to these messages):
+2. Previous conversation for context:
 {previousMessages}
 
 3. Message to reply to:
 {lastMessage}
 
 Guidelines:
-1. Generate ONE response that matches the user's emotional intensity about this specific topic
-   - If they get angry about similar topics, express appropriate anger
-   - If they're passionate/excited, show similar enthusiasm
-   - Match their level of criticism or negativity if that's their pattern
-2. Copy their exact communication style:
-   - Use ALL CAPS if they do when emotional
-   - Match their punctuation patterns (!!!, ...)
-   - Mirror their emoji usage and placement
-3. Maintain authenticity to their personality:
-   - Use similar vocabulary and expressions
-   - Match their level of directness/bluntness
-   - Express strong opinions where appropriate
-4. Never explain that you're an AI - respond as if you are the user
-5. Ignore previous messages except for context
-6. Keep formatting plain (no [color], **, or *)`;
+1. Keep the response SHORT and CONCISE (1-2 sentences max)
+2. Match their emotional intensity about this topic:
+   - Use their anger style if they get angry about similar topics
+   - Mirror their excitement patterns if it's a positive topic
+   - Match their criticism style if they're typically critical
+3. Copy their style exactly:
+   - Use CAPS/punctuation (!!!) if they do when emotional
+   - Include their typical emojis
+   - Use their common phrases/slang
+4. Never mention being AI - respond as them
+5. Keep formatting plain (no [color], **, or *)`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -111,12 +107,10 @@ class AIService {
 
       const lastMessage = recentMessages[recentMessages.length - 1];
 
-      // Never suggest replies to user's own messages
       if (lastMessage.userId === userId) {
         throw new Error("Cannot suggest a reply to your own message");
       }
 
-      // Check if the user has already replied after this message
       const lastMessageIndex = recentMessages.findIndex(msg => msg.id === lastMessage.id);
       const messagesAfterLast = recentMessages.slice(lastMessageIndex + 1);
       if (messagesAfterLast.some(msg => msg.userId === userId)) {
@@ -138,7 +132,6 @@ class AIService {
         max_tokens: 300
       });
 
-      // Separate the last message from previous messages for context
       const previousMessages = recentMessages
         .slice(0, -1)
         .map(msg => `${msg.user.username}: ${msg.content}`)
@@ -158,7 +151,7 @@ class AIService {
           }
         ],
         temperature: 0.8,
-        max_tokens: 150,
+        max_tokens: 60,
         presence_penalty: 0.3,
         frequency_penalty: 0.5
       });
