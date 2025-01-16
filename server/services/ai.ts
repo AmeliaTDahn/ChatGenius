@@ -69,7 +69,7 @@ const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to un
 4. Characteristic Elements:
    - Preferred emoji usage
    - Punctuation patterns
-   - Capitalization style
+   - Capitalization style (note frequency and context)
    - Use of abbreviations or slang
 
 User's message history:
@@ -95,20 +95,25 @@ Guidelines:
    - Use emojis and punctuation naturally
    - Never use ALL CAPS for emphasis
    - Only capitalize proper nouns and sentence beginnings
-   - Use punctuation or formatting for emphasis instead
+   - Use punctuation, formatting, or descriptive words for emphasis
+   - Keep the tone balanced and natural
 
-2. Match their style precisely:
+2. Match their style while maintaining moderation:
    - Use similar message structure and length
-   - Copy their formatting patterns
-   - Mirror their emphasis techniques (except caps)
-   - Keep their characteristic expressions
+   - If they occasionally use capitalized words, limit to one per message maximum
+   - Keep emphasis techniques subtle and natural
+   - Reflect their style without exaggerating it
 
 3. IMPORTANT:
    - Don't sanitize or tone down their language
    - Keep it brief and natural
    - Never mention being AI
-   - Match their baseline communication style
-   - Do not use ALL CAPS for any words, use formatting or punctuation for emphasis instead`;
+   - Match their baseline communication style without overemphasis
+   - Do not use ALL CAPS for any words, even if they do
+   - Use alternative emphasis methods like punctuation (!), descriptive words, or formatting
+   - Keep the response balanced regardless of how intense their style might be
+
+Remember: The goal is to be relatable while maintaining readability and natural flow. Never overdo stylistic elements.`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
