@@ -51,29 +51,37 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
 
 const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, emotional patterns, and opinions. Focus on:
 
-1. Emotional Expression:
-   - How do they express strong emotions (anger, excitement, etc.)?
-   - What topics trigger strong emotional responses?
-   - Do they use caps, punctuation, or emojis for emphasis?
+1. Emotional Intensity and Expression:
+   - How strongly do they express emotions (anger, frustration, excitement)?
+   - Do they use CAPS, multiple exclamation marks (!!!), or strong language?
+   - What triggers their most intense reactions?
+   - How confrontational or aggressive are they when disagreeing?
 
-2. Topic-Specific Reactions:
-   - What subjects do they feel strongly about (positive or negative)?
-   - How do they express disagreement or frustration?
-   - What are their common complaints or criticisms?
+2. Opinion Strength:
+   - Which topics provoke their strongest reactions?
+   - How firmly do they stand by their views?
+   - Do they use absolute statements ("NEVER", "ALWAYS", "HATE")?
+   - What level of criticism or negativity do they express?
 
-3. Communication Style:
-   - Vocabulary and sentence structure
-   - Use of slang, casual vs formal language
-   - Emoji patterns and emphasis techniques
+3. Characteristic Style:
+   - Specific phrases or expressions they frequently use
+   - Their typical level of formality or casualness
+   - Use of emphatic punctuation (!!!) or emojis
+   - How they express disagreement or criticism
+
+4. Response Patterns:
+   - How do they react to opposing viewpoints?
+   - Do they escalate or maintain emotional intensity?
+   - What type of language do they use when upset?
 
 User's message history:
 {userHistory}
 
-Provide a detailed analysis of their communication style and emotional patterns:`;
+Provide a detailed analysis of their communication style and emotional patterns, particularly noting their intensity level and how they express strong opinions:`;
 
-const SUGGESTION_PROMPT = `Generate a brief but emotionally matched response based on this information:
+const SUGGESTION_PROMPT = `Generate a reply that perfectly matches this user's emotional intensity and communication style:
 
-1. User's Communication Profile and Emotional Patterns:
+1. User's Communication Profile:
 {personalityAnalysis}
 
 2. Previous conversation for context:
@@ -83,17 +91,29 @@ const SUGGESTION_PROMPT = `Generate a brief but emotionally matched response bas
 {lastMessage}
 
 Guidelines:
-1. Keep the response SHORT and CONCISE (1-2 sentences max)
-2. Match their emotional intensity about this topic:
-   - Use their anger style if they get angry about similar topics
-   - Mirror their excitement patterns if it's a positive topic
-   - Match their criticism style if they're typically critical
-3. Copy their style exactly:
-   - Use CAPS/punctuation (!!!) if they do when emotional
-   - Include their typical emojis
-   - Use their common phrases/slang
-4. Never mention being AI - respond as them
-5. Keep formatting plain (no [color], **, or *)`;
+1. MATCH THEIR EMOTIONAL INTENSITY EXACTLY:
+   - If they use strong language, BE EQUALLY STRONG
+   - If they show anger, REFLECT THEIR LEVEL OF ANGER
+   - If they're confrontational, BE EQUALLY CONFRONTATIONAL
+   - If they criticize, USE THEIR CRITICISM STYLE
+
+2. MIRROR THEIR STYLE PRECISELY:
+   - Use CAPS if they use CAPS
+   - Copy their exact exclamation mark patterns (!!!)
+   - Match their curse words or strong language
+   - Use their characteristic phrases and expressions
+
+3. Keep it authentic:
+   - Don't tone down their intensity
+   - Match their level of formality/informality
+   - Use their typical sentence structures
+   - Include their common emphatic expressions
+
+4. IMPORTANT:
+   - Keep it brief (1-2 sentences)
+   - Never mention being AI
+   - Don't soften their strong opinions
+   - Maintain their confrontational style if that's their pattern`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -129,7 +149,7 @@ class AIService {
           }
         ],
         temperature: 0.7,
-        max_tokens: 300
+        max_tokens: 500
       });
 
       const previousMessages = recentMessages
@@ -150,10 +170,10 @@ class AIService {
             content: prompt
           }
         ],
-        temperature: 0.8,
-        max_tokens: 60,
-        presence_penalty: 0.3,
-        frequency_penalty: 0.5
+        temperature: 0.9,
+        max_tokens: 100,
+        presence_penalty: 0.4,
+        frequency_penalty: 0.3
       });
 
       return response.choices[0].message.content || "Hey! How's it going?";
