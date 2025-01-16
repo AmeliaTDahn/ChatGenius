@@ -33,6 +33,7 @@ export function MessageList({ channelId }: MessageListProps) {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
   const handleGetSuggestion = async () => {
     try {
+      setIsGeneratingSuggestion(true);
       const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
         credentials: 'include',
@@ -77,16 +79,10 @@ export function MessageList({ channelId }: MessageListProps) {
         description: "Failed to get reply suggestion",
         variant: "destructive",
       });
+    } finally {
+      setIsGeneratingSuggestion(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   const MessageComponent = ({ message }: { message: Message }) => {
     const handleReaction = async (emoji: string) => {
@@ -254,16 +250,26 @@ export function MessageList({ channelId }: MessageListProps) {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {messages.length > 0 && channelId !== -1 && lastMessageFromOthers && (
+      {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <Button
             variant="secondary"
             size="sm"
             onClick={handleGetSuggestion}
+            disabled={isGeneratingSuggestion}
             className="shadow-lg"
           >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Get Reply Suggestion
+            {isGeneratingSuggestion ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Get Reply Suggestion
+              </>
+            )}
           </Button>
         </div>
       )}
