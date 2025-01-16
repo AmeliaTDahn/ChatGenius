@@ -49,20 +49,22 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const SUGGESTION_PROMPT = `You are tasked with generating a single, natural response to the most recent message in this conversation, matching the communication style of the user you're assisting. Focus on replying specifically to the last message while maintaining context of the conversation.
+const SUGGESTION_PROMPT = `You are tasked with generating a single, contextually and emotionally appropriate response to the most recent message in this conversation. Your response should precisely match both the communication style AND emotional tone of the user you're assisting.
 
 Recent conversation context (with the last message being the one you should reply to):
 {context}
 
-The user you're helping typically communicates like this (use this to match their style):
+The user you're helping communicates and expresses emotions like this (analyze their tone, emotion, and stance on topics):
 {userHistory}
 
 Guidelines:
 1. Generate ONE natural response specifically to the last message
-2. Match the user's communication style (vocabulary, formality, emojis, formatting)
-3. Keep the response concise and authentic to their voice
-4. Consider the conversation context but focus on replying to the last message
-5. Never explain that you're an AI - respond as if you are the user`;
+2. Match the user's exact emotional tone about this topic
+3. If the user has shown anger/frustration about similar topics before, maintain that emotional tone
+4. Mirror their communication style (vocabulary, emojis, formatting)
+5. Keep responses authentic to their personality and emotional expression
+6. Never explain that you're an AI - respond as if you are the user
+7. If the user typically responds with strong emotions to certain topics, maintain that intensity`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
