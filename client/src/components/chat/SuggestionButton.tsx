@@ -1,7 +1,8 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Lightbulb, Loader2, Copy, X } from "lucide-react";
+import { Lightbulb, Loader2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface SuggestionButtonProps {
@@ -29,8 +30,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to get suggestion');
+        throw new Error('Failed to get suggestion');
       }
 
       const data = await response.json();
@@ -50,12 +50,17 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleUseSuggestion = () => {
+  const handleAccept = () => {
     if (currentSuggestion) {
       onSuggestion(currentSuggestion);
       setShowDialog(false);
       setCurrentSuggestion("");
     }
+  };
+
+  const handleDecline = () => {
+    setShowDialog(false);
+    setCurrentSuggestion("");
   };
 
   return (
@@ -64,8 +69,9 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         variant="ghost"
         size="icon"
         onClick={handleGetSuggestion}
+        disabled={disabled || isLoading}
         title="Get AI reply suggestion"
-        className="hover:bg-accent hover:text-accent-foreground cursor-pointer"
+        className="hover:bg-accent hover:text-accent-foreground"
       >
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -79,20 +85,20 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
           <DialogHeader>
             <DialogTitle>Suggested Reply</DialogTitle>
             <DialogDescription>
-              Here's a suggested reply based on your communication style:
+              Here's a suggested reply based on the conversation:
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
           <DialogFooter className="flex justify-between items-center">
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button variant="outline" onClick={handleDecline}>
               <X className="h-4 w-4 mr-2" />
               Decline
             </Button>
-            <Button onClick={handleUseSuggestion}>
-              <Copy className="h-4 w-4 mr-2" />
-              Use This
+            <Button onClick={handleAccept}>
+              <Check className="h-4 w-4 mr-2" />
+              Accept
             </Button>
           </DialogFooter>
         </DialogContent>
