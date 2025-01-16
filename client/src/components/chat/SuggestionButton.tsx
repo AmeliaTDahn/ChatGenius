@@ -22,14 +22,10 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       const response = await fetch(`/api/chat/suggest-reply`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ channelId }),
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
+        credentials: 'include'
       });
 
       if (!response.ok) {
