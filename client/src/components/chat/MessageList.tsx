@@ -28,7 +28,7 @@ type MessageListProps = {
   onUseSuggestion?: (suggestion: string) => void;
 };
 
-export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
+export function MessageList({ channelId }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
   const { user } = useUser();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -37,6 +37,7 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState<string | null>(null);
+  const [draftMessage, setDraftMessage] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,14 +71,35 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
   };
 
   const handleAcceptSuggestion = () => {
-    if (currentSuggestion && onUseSuggestion) {
-      onUseSuggestion(currentSuggestion);
+    if (currentSuggestion) {
+      setDraftMessage(currentSuggestion);
       setCurrentSuggestion(null);
     }
   };
 
   const handleRejectSuggestion = () => {
     setCurrentSuggestion(null);
+  };
+
+  const handleSendMessage = async (content: string, files?: File[], tabId?: string | null) => {
+    try {
+      await fetch(`/api/channels/${channelId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content, tabId }),
+        credentials: 'include',
+      });
+      setDraftMessage("");
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message",
+        variant: "destructive",
+      });
+    }
   };
 
   const MessageComponent = ({ message }: { message: Message }) => {
@@ -323,7 +345,7 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRejectSuggestion}
+                  onClick={() => setCurrentSuggestion(null)}
                   className="w-24"
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -357,14 +379,25 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
           </Button>
         </div>
       )}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4 pt-14">
-          {messages.map((message) => (
-            <MessageComponent key={message.id} message={message} />
-          ))}
-          <div ref={bottomRef} />
+      <div className="flex flex-col h-full">
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4 pt-14">
+            {messages.map((message) => (
+              <MessageComponent key={message.id} message={message} />
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        </ScrollArea>
+        <div className="p-4 border-t">
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            channelId={channelId}
+            disabled={isLoading}
+            message={draftMessage}
+            onMessageChange={setDraftMessage}
+          />
         </div>
-      </ScrollArea>
+      </div>
       {showThread && selectedMessage && (
         <div className="w-80 border-l">
           <ThreadView 
