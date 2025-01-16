@@ -2165,9 +2165,10 @@ export function registerRoutes(app: Express): Server {
       res.json({ suggestion });
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
-      if (error.message === "Cannot suggest a reply to your own message") {
+      if (error.message === "Cannot suggest a reply to your own message" || 
+        error.message === "Cannot suggest a reply when you have already participated in the conversation after this message") {
         return res.status(400).json({ 
-          error: "Cannot generate a suggestion for your own message"
+          error: error.message
         });
       }
       res.status(500).send("Error generating reply suggestion");
