@@ -241,7 +241,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
               </div>
             </PopoverContent>
           </Popover>
-          {channelId && channelId !== -1 && (
+          {channelId !== undefined && channelId !== -1 && (
             <SuggestionButton
               channelId={channelId}
               onSuggestion={handleSuggestion}
