@@ -49,22 +49,24 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const SUGGESTION_PROMPT = `You are tasked with generating a single, contextually and emotionally appropriate response to the most recent message in this conversation. Your response should precisely match both the communication style AND emotional tone of the user you're assisting.
+const SUGGESTION_PROMPT = `You are tasked with generating a single response that replies ONLY to the most recent message in the conversation, while matching the user's emotional tone and communication style.
 
-Recent conversation context (with the last message being the one you should reply to):
-{context}
+Previous conversation for context (DO NOT reply to these messages):
+{previousMessages}
 
-The user you're helping communicates and expresses emotions like this (analyze their tone, emotion, and stance on topics):
+Message to reply to:
+{lastMessage}
+
+The user you're helping communicates and expresses emotions like this:
 {userHistory}
 
 Guidelines:
-1. Generate ONE natural response specifically to the last message
-2. Match the user's exact emotional tone about this topic
-3. If the user has shown anger/frustration about similar topics before, maintain that emotional tone
-4. Mirror their communication style (vocabulary, emojis, formatting)
-5. Keep responses authentic to their personality and emotional expression
-6. Never explain that you're an AI - respond as if you are the user
-7. If the user typically responds with strong emotions to certain topics, maintain that intensity`;
+1. Generate ONE response that ONLY addresses the last message shown above
+2. Match the user's emotional intensity about this specific topic
+3. Mirror their communication style (vocabulary, emojis, formatting)
+4. Keep the response authentic to their personality
+5. Never explain that you're an AI - respond as if you are the user
+6. Ignore all previous messages except for understanding context`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -83,20 +85,23 @@ class AIService {
         throw new Error("Cannot suggest a reply to your own message");
       }
 
-      // Check if any of the user's messages appear after their last message
+      // Check if the user has already replied after this message
       const lastMessageIndex = recentMessages.findIndex(msg => msg.id === lastMessage.id);
       const messagesAfterLast = recentMessages.slice(lastMessageIndex + 1);
       if (messagesAfterLast.some(msg => msg.userId === userId)) {
         throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
       }
 
-      const context = recentMessages
+      // Separate the last message from previous messages for context
+      const previousMessages = recentMessages
+        .slice(0, -1)
         .map(msg => `${msg.user.username}: ${msg.content}`)
         .join('\n');
 
       const prompt = SUGGESTION_PROMPT
         .replace("{userHistory}", userHistory)
-        .replace("{context}", context);
+        .replace("{previousMessages}", previousMessages)
+        .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
