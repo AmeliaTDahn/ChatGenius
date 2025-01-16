@@ -40,20 +40,15 @@ export function MessageInput({
     color: null
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [localMessage, setLocalMessage] = useState(message);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleSuggestion = (suggestion: string) => {
-    if (onMessageChange) {
-      onMessageChange(suggestion);
-    }
-    if (textareaRef.current) {
-      textareaRef.current.value = suggestion;
-      textareaRef.current.focus();
-    }
-  };
+  useEffect(() => {
+    setLocalMessage(message);
+  }, [message]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -63,14 +58,14 @@ export function MessageInput({
         200
       )}px`;
     }
-  }, [message]);
+  }, [localMessage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() || files.length > 0) {
+    if (localMessage.trim() || files.length > 0) {
       try {
         setIsUploading(true);
-        let finalMessage = message;
+        let finalMessage = localMessage;
 
         // Apply formatting in reverse order to handle nested formats
         if (currentFormat.color) {
@@ -84,6 +79,7 @@ export function MessageInput({
         }
 
         await onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
+        setLocalMessage("");
         if (onMessageChange) {
           onMessageChange("");
         }
@@ -265,13 +261,11 @@ export function MessageInput({
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
-            value={message}
+            value={localMessage}
             onChange={(e) => {
+              setLocalMessage(e.target.value);
               if (onMessageChange) {
                 onMessageChange(e.target.value);
-              }
-              if (textareaRef.current) {
-                textareaRef.current.value = e.target.value;
               }
             }}
             onKeyDown={handleKeyDown}
@@ -286,7 +280,7 @@ export function MessageInput({
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading || disabled}>
+        <Button type="submit" size="icon" disabled={(!localMessage.trim() && files.length === 0) || isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
