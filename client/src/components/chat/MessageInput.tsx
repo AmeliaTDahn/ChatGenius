@@ -40,6 +40,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   const handleSuggestion = (suggestion: string) => {
     setMessage(suggestion);
     if (textareaRef.current) {
+      textareaRef.current.value = suggestion;
       textareaRef.current.focus();
     }
   };

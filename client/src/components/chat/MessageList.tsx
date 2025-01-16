@@ -65,10 +65,7 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
             onClick={() => {
               if (onUseSuggestion) {
                 onUseSuggestion(data.suggestion);
-                toast({
-                  duration: 0,
-                  onOpenChange: () => {}
-                });
+                toast.dismiss();
               }
             }}
           >
