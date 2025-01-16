@@ -251,9 +251,9 @@ export function MessageInput({
             </PopoverContent>
           </Popover>
           <SuggestionButton
-            channelId={channelId ?? -1}
+            channelId={channelId || -1}
             onSuggestion={handleSuggestedReply}
-            disabled={disabled || channelId === undefined}
+            disabled={disabled || !channelId}
           />
         </div>
         <div className="flex-1 relative">
