@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { SuggestionButton } from './SuggestionButton'; // Fixed import to use named import
 
 type MessageInputProps = {
   onSendMessage: (content: string, files?: File[]) => void;
@@ -140,6 +141,13 @@ export function MessageInput({
     textareaRef.current?.focus();
   };
 
+  const handleSuggestedReply = (suggestion: string) => {
+    onMessageChange(suggestion);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   const COLORS = [
     "#ef4444", // Red
     "#f97316", // Orange
@@ -242,6 +250,13 @@ export function MessageInput({
               </div>
             </PopoverContent>
           </Popover>
+          {channelId && (
+            <SuggestionButton
+              channelId={channelId}
+              onSuggestion={handleSuggestedReply}
+              disabled={disabled}
+            />
+          )}
         </div>
         <div className="flex-1 relative">
           <Textarea

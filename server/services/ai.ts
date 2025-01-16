@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback } from "@db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { messages } from "@db/schema";
+import { eq, desc } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -22,30 +22,6 @@ async function getUserChatHistory(userId: number): Promise<string> {
     return userMessages.map(msg => msg.content).join('\n');
   } catch (error) {
     console.error("Error fetching user chat history:", error);
-    return "";
-  }
-}
-
-async function getUserFeedbackAnalysis(userId: number): Promise<string> {
-  try {
-    const recentFeedback = await db.query.suggestionFeedback.findMany({
-      where: eq(suggestionFeedback.userId, userId),
-      orderBy: [desc(suggestionFeedback.createdAt)],
-      limit: 20,
-    });
-
-    if (recentFeedback.length === 0) {
-      return "No previous feedback available.";
-    }
-
-    const likedSuggestions = recentFeedback.filter(f => f.isPositive);
-    const dislikedSuggestions = recentFeedback.filter(f => !f.isPositive);
-
-    return `Based on user feedback:
-- Liked suggestions (${likedSuggestions.length}): ${likedSuggestions.map(f => `"${f.suggestion}"`).join(', ')}
-- Disliked suggestions (${dislikedSuggestions.length}): ${dislikedSuggestions.map(f => `"${f.suggestion}"`).join(', ')}`;
-  } catch (error) {
-    console.error("Error fetching user feedback:", error);
     return "";
   }
 }
@@ -76,32 +52,29 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
 const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, emotional patterns, and opinions. Focus on:
 
 1. Emotional Intensity and Expression:
-   - How strongly do they express emotions (anger, frustration, excitement)?
-   - Do they use CAPS, multiple exclamation marks (!!!), or strong language?
+   - How strongly do they express emotions?
+   - Do they use emojis, punctuation, or formatting for emphasis?
    - What triggers their most intense reactions?
-   - How confrontational or aggressive are they when disagreeing?
 
-2. Opinion Strength:
-   - Which topics provoke their strongest reactions?
-   - How firmly do they stand by their views?
-   - Do they use absolute statements ("NEVER", "ALWAYS", "HATE")?
-   - What level of criticism or negativity do they express?
+2. Opinion Strength and Topics:
+   - Which topics do they engage with most?
+   - How do they express agreement/disagreement?
+   - What language patterns indicate their views?
 
 3. Characteristic Style:
    - Specific phrases or expressions they frequently use
    - Their typical level of formality or casualness
-   - Use of emphatic punctuation (!!!) or emojis
-   - How they express disagreement or criticism
+   - Use of emojis, punctuation, or formatting
 
 4. Response Patterns:
-   - How do they react to opposing viewpoints?
-   - Do they escalate or maintain emotional intensity?
-   - What type of language do they use when upset?
+   - How do they typically start conversations?
+   - How do they react to different types of messages?
+   - What's their usual message length and structure?
 
 User's message history:
 {userHistory}
 
-Provide a detailed analysis of their communication style and emotional patterns, particularly noting their intensity level and how they express strong opinions:`;
+Provide a detailed analysis of their communication style and emotional patterns:`;
 
 const SUGGESTION_PROMPT = `Generate a reply that naturally matches this user's communication style:
 
@@ -114,45 +87,30 @@ const SUGGESTION_PROMPT = `Generate a reply that naturally matches this user's c
 3. Message to reply to:
 {lastMessage}
 
-4. User's Feedback History:
-{feedbackAnalysis}
-
 Guidelines:
-1. Match their emotional intensity PROPORTIONALLY:
-   - If they occasionally use caps for emphasis, use caps sparingly and only for key words
-   - Match their normal baseline intensity, not their peak emotional moments
-   - Mirror their level of directness without amplifying it
+1. Match their communication style authentically:
+   - Use similar formatting patterns and emphasis
+   - Mirror their vocabulary level and tone
+   - Keep their characteristic expressions
+   - Match their emoji usage pattern
 
-2. Mirror their style NATURALLY:
-   - Copy their formatting patterns in similar proportions (if they use caps 10% of the time, do the same)
-   - Use similar but not identical emphasis patterns
-   - Match their vocabulary level and tone
-   - Keep their characteristic expressions but don't overuse them
+2. Keep it natural:
+   - Maintain their level of formality
+   - Use their typical sentence structure
+   - Keep their common expressions
+   - Match their usual message length
 
-3. Keep it authentic:
-   - Maintain their general communication style
-   - Match their usual level of formality/informality
-   - Use their typical sentence structures
-   - Include their common expressions naturally
-   - Do not use any color formatting or [color] tags
-
-4. Based on feedback history:
-   - Prefer patterns from positively rated suggestions
-   - Avoid patterns from negatively rated suggestions
-   - Adapt tone and style based on what the user has liked
-
-5. IMPORTANT:
-   - Keep it brief (1-2 sentences)
+3. IMPORTANT:
+   - Keep it brief and natural
    - Never mention being AI
-   - Be direct but not artificially confrontational
-   - Match their baseline style, not their most extreme moments`;
+   - Match their baseline style
+   - Be direct but friendly`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const recentMessages = await getRecentMessages(channelId);
       const userHistory = await getUserChatHistory(userId);
-      const feedbackAnalysis = await getUserFeedbackAnalysis(userId);
 
       if (recentMessages.length === 0) {
         throw new Error("No messages to reply to");
@@ -192,8 +150,7 @@ class AIService {
       const prompt = SUGGESTION_PROMPT
         .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
         .replace("{previousMessages}", previousMessages)
-        .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`)
-        .replace("{feedbackAnalysis}", feedbackAnalysis);
+        .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -209,7 +166,7 @@ class AIService {
         frequency_penalty: 0.3
       });
 
-      return response.choices[0].message.content || "Hey! How's it going?";
+      return response.choices[0].message.content || "I'd need more context to generate a good suggestion.";
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
       throw error;
