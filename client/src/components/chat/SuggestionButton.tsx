@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -47,9 +46,17 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   };
 
   const handleUseSuggestion = () => {
-    if (currentSuggestion) {
+    if (currentSuggestion && onSuggestion) {
       onSuggestion(currentSuggestion);
       setShowDialog(false);
+      setCurrentSuggestion("");
+      const textarea = document.querySelector('textarea');
+      if (textarea) {
+        textarea.value = currentSuggestion;
+        textarea.focus();
+        const event = new Event('input', { bubbles: true });
+        textarea.dispatchEvent(event);
+      }
     }
   };
 
