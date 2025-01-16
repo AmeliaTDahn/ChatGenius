@@ -52,9 +52,6 @@ export function MessageInput({
     if (textareaRef.current) {
       textareaRef.current.value = suggestion;
       textareaRef.current.focus();
-      // Trigger a change event to ensure the value is updated
-      const event = new Event('input', { bubbles: true });
-      textareaRef.current.dispatchEvent(event);
     }
   };
 
@@ -269,7 +266,14 @@ export function MessageInput({
           <Textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => onMessageChange?.(e.target.value)}
+            onChange={(e) => {
+              if (onMessageChange) {
+                onMessageChange(e.target.value);
+              }
+              if (textareaRef.current) {
+                textareaRef.current.value = e.target.value;
+              }
+            }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
