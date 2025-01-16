@@ -4,51 +4,35 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { SuggestionButton } from "./SuggestionButton";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
-  onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
+  onSendMessage: (content: string, files?: File[]) => void; // Callback to send the message
   channelId?: number;
   disabled?: boolean;
   placeholder?: string;
   message?: string;
-  onMessageChange?: (message: string) => void;
+  onMessageChange?: (message: string) => void; // Callback to update the draft message
 };
 
-export function MessageInput({ 
-  onSendMessage, 
-  channelId, 
-  disabled, 
+export function MessageInput({
+  onSendMessage,
+  channelId,
+  disabled,
   placeholder,
   message = "",
-  onMessageChange
+  onMessageChange,
 }: MessageInputProps) {
   const [files, setFiles] = useState<File[]>([]);
-  const [currentFormat, setCurrentFormat] = useState<{
-    bold: boolean;
-    italic: boolean;
-    color: string | null;
-  }>({
+  const [currentFormat, setCurrentFormat] = useState({
     bold: false,
     italic: false,
-    color: null
+    color: null as string | null,
   });
   const [isUploading, setIsUploading] = useState(false);
-  const [localMessage, setLocalMessage] = useState(message);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    setLocalMessage(message);
-  }, [message]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -58,37 +42,32 @@ export function MessageInput({
         200
       )}px`;
     }
-  }, [localMessage]);
+  }, [message]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (localMessage.trim() || files.length > 0) {
+    if (message.trim() || files.length > 0) {
       try {
         setIsUploading(true);
-        let finalMessage = localMessage;
+        let formattedMessage = message;
 
         // Apply formatting in reverse order to handle nested formats
         if (currentFormat.color) {
-          finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
+          formattedMessage = `[color=${currentFormat.color}]${formattedMessage}[/color]`;
         }
         if (currentFormat.italic) {
-          finalMessage = `*${finalMessage}*`;
+          formattedMessage = `*${formattedMessage}*`;
         }
         if (currentFormat.bold) {
-          finalMessage = `**${finalMessage}**`;
+          formattedMessage = `**${formattedMessage}**`;
         }
 
-        await onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
-        setLocalMessage("");
+        await onSendMessage(formattedMessage, files);
         if (onMessageChange) {
-          onMessageChange("");
+          onMessageChange(""); // Clear the draft message
         }
         setFiles([]);
-        setCurrentFormat({
-          bold: false,
-          italic: false,
-          color: null
-        });
+        setCurrentFormat({ bold: false, italic: false, color: null });
       } catch (error) {
         toast({
           title: "Error",
@@ -101,48 +80,40 @@ export function MessageInput({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const maxFileSize = 5 * 1024 * 1024; // 5MB
-      const newFiles = Array.from(e.target.files).filter(file => {
+      const newFiles = Array.from(e.target.files).filter((file) => {
         if (file.size > maxFileSize) {
           toast({
             title: "File too large",
             description: `${file.name} exceeds the 5MB limit`,
-            variant: "destructive"
+            variant: "destructive",
           });
           return false;
         }
         return true;
       });
 
-      setFiles(prev => [...prev, ...newFiles]);
-      // Reset the input value so the same file can be selected again
-      e.target.value = '';
+      setFiles((prev) => [...prev, ...newFiles]);
+      e.target.value = ""; // Reset the input value
     }
   };
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const toggleFormat = (type: 'bold' | 'italic' | 'color', value?: string) => {
-    if (type === 'color') {
-      setCurrentFormat(prev => ({
+  const toggleFormat = (type: "bold" | "italic" | "color", value?: string) => {
+    if (type === "color") {
+      setCurrentFormat((prev) => ({
         ...prev,
-        color: value === prev.color ? null : value
+        color: value === prev.color ? null : value,
       }));
     } else {
-      setCurrentFormat(prev => ({
+      setCurrentFormat((prev) => ({
         ...prev,
-        [type]: !prev[type]
+        [type]: !prev[type],
       }));
     }
     textareaRef.current?.focus();
@@ -206,7 +177,7 @@ export function MessageInput({
             type="button"
             size="icon"
             variant={currentFormat.bold ? "secondary" : "ghost"}
-            onClick={() => toggleFormat('bold')}
+            onClick={() => toggleFormat("bold")}
             disabled={disabled}
           >
             <Bold className="h-4 w-4" />
@@ -215,7 +186,7 @@ export function MessageInput({
             type="button"
             size="icon"
             variant={currentFormat.italic ? "secondary" : "ghost"}
-            onClick={() => toggleFormat('italic')}
+            onClick={() => toggleFormat("italic")}
             disabled={disabled}
           >
             <Italic className="h-4 w-4" />
@@ -244,43 +215,37 @@ export function MessageInput({
                       currentFormat.color === color && "ring-2 ring-primary"
                     )}
                     style={{ backgroundColor: color }}
-                    onClick={() => toggleFormat('color', color)}
+                    onClick={() => toggleFormat("color", color)}
                   />
                 ))}
               </div>
             </PopoverContent>
           </Popover>
-          {channelId && channelId !== -1 && (
-            <SuggestionButton
-              channelId={channelId}
-              onSuggestion={handleSuggestion}
-              disabled={disabled}
-            />
-          )}
         </div>
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
-            value={localMessage}
+            value={message}
             onChange={(e) => {
-              setLocalMessage(e.target.value);
               if (onMessageChange) {
                 onMessageChange(e.target.value);
               }
             }}
-            onKeyDown={handleKeyDown}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
-              fontWeight: currentFormat.bold ? 'bold' : 'normal',
-              fontStyle: currentFormat.italic ? 'italic' : 'normal',
-              color: currentFormat.color || 'inherit'
+              fontWeight: currentFormat.bold ? "bold" : "normal",
+              fontStyle: currentFormat.italic ? "italic" : "normal",
+              color: currentFormat.color || "inherit",
             }}
             disabled={disabled}
-            rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!localMessage.trim() && files.length === 0) || isUploading || disabled}>
+        <Button
+          type="submit"
+          size="icon"
+          disabled={(!message.trim() && files.length === 0) || isUploading || disabled}
+        >
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
