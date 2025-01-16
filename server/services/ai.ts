@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages } from "@db/schema";
+import { messages, suggestionFeedback } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
@@ -22,6 +22,30 @@ async function getUserChatHistory(userId: number): Promise<string> {
     return userMessages.map(msg => msg.content).join('\n');
   } catch (error) {
     console.error("Error fetching user chat history:", error);
+    return "";
+  }
+}
+
+async function getUserFeedbackAnalysis(userId: number): Promise<string> {
+  try {
+    const recentFeedback = await db.query.suggestionFeedback.findMany({
+      where: eq(suggestionFeedback.userId, userId),
+      orderBy: [desc(suggestionFeedback.createdAt)],
+      limit: 20,
+    });
+
+    if (recentFeedback.length === 0) {
+      return "No previous feedback available.";
+    }
+
+    const likedSuggestions = recentFeedback.filter(f => f.isPositive);
+    const dislikedSuggestions = recentFeedback.filter(f => !f.isPositive);
+
+    return `Based on user feedback:
+- Liked suggestions (${likedSuggestions.length}): ${likedSuggestions.map(f => `"${f.suggestion}"`).join(', ')}
+- Disliked suggestions (${dislikedSuggestions.length}): ${dislikedSuggestions.map(f => `"${f.suggestion}"`).join(', ')}`;
+  } catch (error) {
+    console.error("Error fetching user feedback:", error);
     return "";
   }
 }
@@ -90,6 +114,9 @@ const SUGGESTION_PROMPT = `Generate a reply that naturally matches this user's c
 3. Message to reply to:
 {lastMessage}
 
+4. User's Feedback History:
+{feedbackAnalysis}
+
 Guidelines:
 1. Match their emotional intensity PROPORTIONALLY:
    - If they occasionally use caps for emphasis, use caps sparingly and only for key words
@@ -108,7 +135,12 @@ Guidelines:
    - Use their typical sentence structures
    - Include their common expressions naturally
 
-4. IMPORTANT:
+4. Based on feedback history:
+   - Prefer patterns from positively rated suggestions
+   - Avoid patterns from negatively rated suggestions
+   - Adapt tone and style based on what the user has liked
+
+5. IMPORTANT:
    - Keep it brief (1-2 sentences)
    - Never mention being AI
    - Be direct but not artificially confrontational
@@ -119,6 +151,7 @@ class AIService {
     try {
       const recentMessages = await getRecentMessages(channelId);
       const userHistory = await getUserChatHistory(userId);
+      const feedbackAnalysis = await getUserFeedbackAnalysis(userId);
 
       if (recentMessages.length === 0) {
         throw new Error("No messages to reply to");
@@ -136,7 +169,6 @@ class AIService {
         throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
       }
 
-      // First, analyze user's personality and emotional patterns
       const personalityAnalysisPrompt = PERSONALITY_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
 
       const personalityAnalysis = await openai.chat.completions.create({
@@ -159,7 +191,8 @@ class AIService {
       const prompt = SUGGESTION_PROMPT
         .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
         .replace("{previousMessages}", previousMessages)
-        .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
+        .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`)
+        .replace("{feedbackAnalysis}", feedbackAnalysis);
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",

@@ -3,7 +3,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileIcon, Download, Reply, Lightbulb, Check, X } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Check, X, Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
@@ -254,7 +254,63 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
                 <h3 className="text-sm font-medium mb-2">Suggested Reply:</h3>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{currentSuggestion}</p>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <div className="flex gap-2 mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            suggestion: currentSuggestion,
+                            isPositive: true
+                          }),
+                          credentials: 'include'
+                        });
+                        toast({
+                          title: "Thank you!",
+                          description: "Your feedback helps improve suggestions",
+                          variant: "default"
+                        });
+                      } catch (error) {
+                        console.error('Error sending feedback:', error);
+                      }
+                    }}
+                    className="w-10"
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            suggestion: currentSuggestion,
+                            isPositive: false
+                          }),
+                          credentials: 'include'
+                        });
+                        toast({
+                          title: "Thank you!",
+                          description: "Your feedback helps improve suggestions",
+                          variant: "default"
+                        });
+                      } catch (error) {
+                        console.error('Error sending feedback:', error);
+                      }
+                    }}
+                    className="w-10"
+                  >
+                    <ThumbsDown className="h-4 w-4" />
+                  </Button>
+                </div>
                 <Button
                   variant="default"
                   size="sm"
