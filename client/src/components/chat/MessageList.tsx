@@ -25,7 +25,6 @@ function parseFormattedText(text: string) {
 
 type MessageListProps = {
   channelId: number;
-  onUseSuggestion?: (suggestion: string) => void;
 };
 
 export function MessageList({ channelId }: MessageListProps) {
@@ -81,14 +80,14 @@ export function MessageList({ channelId }: MessageListProps) {
     setCurrentSuggestion(null);
   };
 
-  const handleSendMessage = async (content: string, files?: File[], tabId?: string | null) => {
+  const handleSendMessage = async (content: string, files?: File[]) => {
     try {
       await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content, tabId }),
+        body: JSON.stringify({ content }),
         credentials: 'include',
       });
       setDraftMessage("");
@@ -267,7 +266,7 @@ export function MessageList({ channelId }: MessageListProps) {
   const lastMessageFromOthers = messages.length > 0 && messages[messages.length - 1].userId !== user?.id;
 
   return (
-    <div className="flex h-full overflow-hidden relative">
+    <div className="flex flex-col h-full">
       {currentSuggestion && (
         <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-background/95 backdrop-blur-sm border-b shadow-lg">
           <div className="max-w-2xl mx-auto">
@@ -345,7 +344,7 @@ export function MessageList({ channelId }: MessageListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentSuggestion(null)}
+                  onClick={handleRejectSuggestion}
                   className="w-24"
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -379,25 +378,14 @@ export function MessageList({ channelId }: MessageListProps) {
           </Button>
         </div>
       )}
-      <div className="flex flex-col h-full">
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4 pt-14">
-            {messages.map((message) => (
-              <MessageComponent key={message.id} message={message} />
-            ))}
-            <div ref={bottomRef} />
-          </div>
-        </ScrollArea>
-        <div className="p-4 border-t">
-          <MessageInput
-            onSendMessage={handleSendMessage}
-            channelId={channelId}
-            disabled={isLoading}
-            message={draftMessage}
-            onMessageChange={setDraftMessage}
-          />
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4 pt-14">
+          {messages.map((message) => (
+            <MessageComponent key={message.id} message={message} />
+          ))}
+          <div ref={bottomRef} />
         </div>
-      </div>
+      </ScrollArea>
       {showThread && selectedMessage && (
         <div className="w-80 border-l">
           <ThreadView 
@@ -409,6 +397,15 @@ export function MessageList({ channelId }: MessageListProps) {
           />
         </div>
       )}
+      <div className="p-4 border-t">
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          channelId={channelId}
+          disabled={isLoading}
+          message={draftMessage}
+          onMessageChange={setDraftMessage}
+        />
+      </div>
     </div>
   );
 }

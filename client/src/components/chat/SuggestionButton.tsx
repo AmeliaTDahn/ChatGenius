@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Lightbulb, Loader2 } from "lucide-react";
+import { Lightbulb, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface SuggestionButtonProps {
@@ -45,27 +45,32 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleUseSuggestion = async () => {
+  const handleUseSuggestion = () => {
     if (currentSuggestion) {
-      try {
-        await fetch(`/api/channels/${channelId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content: currentSuggestion }),
-          credentials: 'include',
-        });
-        setShowDialog(false);
-        setCurrentSuggestion("");
-      } catch (error) {
-        console.error('Error sending message:', error);
-        toast({
-          title: "Error",
-          description: "Failed to send message",
-          variant: "destructive",
-        });
-      }
+      onSuggestion(currentSuggestion);
+      setShowDialog(false);
+      setCurrentSuggestion("");
+    }
+  };
+
+  const handleFeedback = async (isPositive: boolean) => {
+    try {
+      await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          suggestion: currentSuggestion,
+          isPositive
+        }),
+        credentials: 'include'
+      });
+      toast({
+        title: "Thank you!",
+        description: "Your feedback helps improve suggestions",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Error sending feedback:', error);
     }
   };
 
@@ -96,14 +101,34 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUseSuggestion}>
-              Use This Reply
-            </Button>
-          </DialogFooter>
+          <div className="flex justify-between items-center mt-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFeedback(true)}
+                className="w-10"
+              >
+                <ThumbsUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFeedback(false)}
+                className="w-10"
+              >
+                <ThumbsDown className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUseSuggestion}>
+                Use This
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
