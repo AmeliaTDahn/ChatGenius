@@ -1,7 +1,15 @@
 import { useState } from "react";
+import { Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Lightbulb, Loader2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SuggestionButtonProps {
   channelId: number;
@@ -11,128 +19,81 @@ interface SuggestionButtonProps {
 
 export function SuggestionButton({ channelId, onSuggestion, disabled }: SuggestionButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState("");
   const { toast } = useToast();
 
   const handleGetSuggestion = async () => {
-    setShowPreview(true);
-    setCurrentSuggestion("");
-    setIsLoading(true);
     try {
+      setIsLoading(true);
       const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         credentials: 'include',
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to get suggestion');
+        throw new Error('Failed to get suggestion');
       }
 
       const data = await response.json();
       if (data.suggestion) {
         setCurrentSuggestion(data.suggestion);
-        setShowPreview(true);
+        setShowDialog(true);
       }
     } catch (error) {
       console.error('Error getting suggestion:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get reply suggestion",
+        description: "Failed to get reply suggestion",
         variant: "destructive",
       });
-      setShowPreview(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAccept = () => {
-    if (currentSuggestion) {
-      // Remove any formatting tags and name prefix before setting the suggestion
-      let plainText = currentSuggestion
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1');
-
-      // Remove name prefix if it exists (format: "Name: message")
-      plainText = plainText.replace(/^[^:]+:\s*/, '');
-      onSuggestion(plainText);
-      setShowPreview(false);
-      setCurrentSuggestion("");
-    }
-  };
-
-  const handleDecline = () => {
-    setShowPreview(false);
-    setCurrentSuggestion("");
+  const handleUseSuggestion = () => {
+    onSuggestion(currentSuggestion);
+    setShowDialog(false);
   };
 
   return (
     <>
-      {showPreview && (
-        <div className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm p-4 border-b shadow-lg z-50" style={{ marginTop: "var(--header-height, 64px)" }}>
-          <div className="max-w-2xl mx-auto">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h3 className="font-semibold">Suggested Reply</h3>
-                <p className="text-sm text-muted-foreground">
-                  {isLoading ? "Analyzing conversation style and generating suggestion..." : "Here's a suggested reply based on the conversation:"}
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleDecline}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="bg-muted p-3 rounded-md mb-3">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-8 gap-2">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground animate-pulse">
-                    Generating personalized suggestion...
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
-              )}
-            </div>
-            {!isLoading && (
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handleDecline}>
-                  <X className="h-4 w-4 mr-2" />
-                  Decline
-                </Button>
-                <Button size="sm" onClick={handleAccept}>
-                  <Check className="h-4 w-4 mr-2" />
-                  Accept
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       <Button
-        type="button"
-        variant={isLoading ? "secondary" : "ghost"}
+        variant="ghost"
         size="icon"
         onClick={handleGetSuggestion}
         disabled={disabled || isLoading}
-        title={isLoading ? "Generating suggestion..." : "Get AI reply suggestion"}
-        className={cn(
-          "hover:bg-accent hover:text-accent-foreground relative",
-          isLoading && "cursor-wait"
-        )}
+        title="Get AI reply suggestion"
       >
         {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <Lightbulb className="h-4 w-4" />
         )}
       </Button>
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="absolute top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Suggested Reply</DialogTitle>
+            <DialogDescription>
+              Here's a suggested reply based on your communication style:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 p-4 bg-muted rounded-md">
+            <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUseSuggestion}>
+              Use This Reply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

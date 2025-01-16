@@ -37,6 +37,8 @@ export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({
     server,
     path: '/ws',
+    clientTracking: true,
+    maxPayload: 65536
   });
 
   const clients = new Map<string, AuthenticatedWebSocket>();

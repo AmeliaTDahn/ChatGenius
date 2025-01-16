@@ -1075,7 +1075,7 @@ export function registerRoutes(app: Express): Server {
             username: users.username,
             avatarUrl: users.avatarUrl,
             isOnline: users.isOnline,
-            hideActivity: users.hideActivity,
+            hideActivity: users.hideActivity
           })
           .from(users)
           .where(eq(users.id, request.senderId))
@@ -1211,80 +1211,91 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/friends/:friendId", async (req, res) => {
+    const friendId = parseInt(req.params.friendId);
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
-    const friendId = parseInt(req.params.friendId);
     if (isNaN(friendId)) {
       return res.status(400).send("Invalid friend ID");
     }
 
     try {
+      // Find the direct message channel between these users
       const [dmChannel] = await db
-        .select({
-          channelId: directMessageChannels.channelId
-        })
+        .select()
         .from(directMessageChannels)
-        .where(or(
-          and(
-            eq(directMessageChannels.user1Id, req.user.id),
-            eq(directMessageChannels.user2Id, friendId)
-          ),
-          and(
-            eq(directMessageChannels.user1Id, friendId),
-            eq(directMessageChannels.user2Id, req.user.id)
+        .where(
+          or(
+            and(
+              eq(directMessageChannels.user1Id, req.user.id),
+              eq(directMessageChannels.user2Id, friendId)
+            ),
+            and(
+              eq(directMessageChannels.user1Id, friendId),
+              eq(directMessageChannels.user2Id, req.user.id)
+            )
           )
-        ))
+        )
         .limit(1);
 
       if (dmChannel) {
-        const channelMessages = await db
+        // Get all message IDs in this channel
+        const messageIds = await db
           .select({ id: messages.id })
           .from(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
 
-        const messageIds = channelMessages.map(m => m.id);
+        const messageIdArray = messageIds.map(m => m.id);
 
-        if (messageIds.length > 0) {
+        if (messageIdArray.length > 0) {
+          // First delete message reactions
           await db
             .delete(messageReactions)
-            .where(inArray(messageReactions.messageId, messageIds));
+            .where(inArray(messageReactions.messageId, messageIdArray));
 
+          // Then delete message reads
           await db
             .delete(messageReads)
-            .where(inArray(messageReads.messageId, messageIds));
+            .where(inArray(messageReads.messageId, messageIdArray));
+
+          // Then delete message attachments
+          await db
+            .delete(messageAttachments)
+            .where(inArray(messageAttachments.messageId, messageIdArray));
         }
 
+        // Delete all messages in the channel
         await db
           .delete(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
 
-        await db
-          .delete(channelMembers)
-          .where(eq(channelMembers.channelId, dmChannel.channelId));
-
+        // Delete the direct message channel record
         await db
           .delete(directMessageChannels)
-          .where(eq(directMessageChannels.channelId, dmChannel.channelId));
+          .where(eq(directMessageChannels.id, dmChannel.id));
 
+        // Finally delete the channel itself
         await db
           .delete(channels)
           .where(eq(channels.id, dmChannel.channelId));
       }
 
+      // Remove the friend relationship
       await db
         .delete(friends)
-        .where(or(
-          and(
-            eq(friends.user1Id, req.user.id),
-            eq(friends.user2Id, friendId)
-          ),
-          and(
-            eq(friends.user1Id, friendId),
-            eq(friends.user2Id, req.user.id)
+        .where(
+          or(
+            and(
+              eq(friends.user1Id, req.user.id),
+              eq(friends.user2Id, friendId)
+            ),
+            and(
+              eq(friends.user1Id, friendId),
+              eq(friends.user2Id, req.user.id)
+            )
           )
-        ));
+        );
 
       res.json({ message: "Friend removed successfully" });
     } catch (error) {
@@ -2117,16 +2128,17 @@ export function registerRoutes(app: Express): Server {
 
       if (existingUser) {
         if (existingUser.email === email) {
-          return res.status(400).send("A user with this email is already registered");
+          return res.status(400).send("A user with this email isalready registered");
         }
         return res.status(400).send("Username already exists");
       }
 
       // Hash the password
-      consthashedPassword = await crypto.hash(password);
+      const hashedPassword = await crypto.hash(password);
 
       // Create the new user
-      const [newUser] = await db        .insert(users)
+      const [newUser] = await db
+        .insert(users)
         .values({
           username,
           email,
@@ -2165,9 +2177,9 @@ export function registerRoutes(app: Express): Server {
       res.json({ suggestion });
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
-      if (error.message === "Cannot suggest a reply to your own message" || 
+      if (error.message === "Cannot suggest a reply to your own message" ||
         error.message === "Cannot suggest a reply when you have already participated in the conversation after this message") {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: error.message
         });
       }
