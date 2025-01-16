@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Lightbulb, Loader2, X, Check } from "lucide-react";
@@ -44,17 +43,20 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   };
 
   const handleAccept = () => {
-    if (currentSuggestion) {
-      // Remove any formatting tags before setting the suggestion
-      const plainText = currentSuggestion
-        .replace(/\[color=#[0-9a-f]{6}\](.*?)\[\/color\]/gi, '$1')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1');
-      onSuggestion(plainText);
-      setShowPreview(false);
-      setCurrentSuggestion("");
-    }
-  };
+        if (currentSuggestion) {
+          // Remove any formatting tags and name prefix before setting the suggestion
+          let plainText = currentSuggestion
+            .replace(/\[color=#[0-9a-f]{6}\](.*?)\[\/color\]/gi, '$1')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\*(.*?)\*/g, '$1');
+
+          // Remove name prefix if it exists (format: "Name: message")
+          plainText = plainText.replace(/^[^:]+:\s*/, '');
+          onSuggestion(plainText);
+          setShowPreview(false);
+          setCurrentSuggestion("");
+        }
+      };
 
   const handleDecline = () => {
     setShowPreview(false);
