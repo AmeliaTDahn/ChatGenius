@@ -65,6 +65,7 @@ export function MessageList({ channelId }: MessageListProps) {
               if (textarea) {
                 textarea.value = data.suggestion;
                 textarea.focus();
+                toast.dismiss(); // Dismiss the toast after using the suggestion
               }
             }}
           >
