@@ -3,7 +3,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
+import { Loader2, FileIcon, Download, Reply, Lightbulb, Check, X } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
@@ -36,6 +36,7 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
   const [showThread, setShowThread] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
+  const [currentSuggestion, setCurrentSuggestion] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,24 +56,7 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
       }
 
       const data = await response.json();
-      toast({
-        title: "Suggested Reply",
-        description: data.suggestion,
-        action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (onUseSuggestion) {
-                onUseSuggestion(data.suggestion);
-                toast.dismiss();
-              }
-            }}
-          >
-            Use This
-          </Button>
-        ),
-      });
+      setCurrentSuggestion(data.suggestion);
     } catch (error) {
       console.error('Error getting suggestion:', error);
       toast({
@@ -83,6 +67,17 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
     } finally {
       setIsGeneratingSuggestion(false);
     }
+  };
+
+  const handleAcceptSuggestion = () => {
+    if (currentSuggestion && onUseSuggestion) {
+      onUseSuggestion(currentSuggestion);
+      setCurrentSuggestion(null);
+    }
+  };
+
+  const handleRejectSuggestion = () => {
+    setCurrentSuggestion(null);
   };
 
   const MessageComponent = ({ message }: { message: Message }) => {
@@ -251,6 +246,38 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
 
   return (
     <div className="flex h-full overflow-hidden relative">
+      {currentSuggestion && (
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-background/95 backdrop-blur-sm border-b shadow-lg">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <h3 className="text-sm font-medium mb-2">Suggested Reply:</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{currentSuggestion}</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleAcceptSuggestion}
+                  className="w-24"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Use This
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRejectSuggestion}
+                  className="w-24"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <Button
