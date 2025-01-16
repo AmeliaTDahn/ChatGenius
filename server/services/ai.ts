@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
 import { messages } from "@db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -15,7 +15,7 @@ async function getUserChatHistory(userId: number): Promise<string> {
   try {
     const userMessages = await db.query.messages.findMany({
       where: eq(messages.userId, userId),
-      orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+      orderBy: [desc(messages.createdAt)],
       limit: 50,
     });
 
@@ -49,24 +49,63 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const SUGGESTION_PROMPT = `You are tasked with generating a single response that replies ONLY to the most recent message in the conversation, while matching the user's emotional tone and communication style.
+const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's authentic communication style, including their use of strong language and casual expressions. Focus on:
 
-Previous conversation for context (DO NOT reply to these messages):
-{previousMessages}
+1. Language and Expression Style:
+   - Their natural vocabulary, including swear words or strong language
+   - How they express emotions and emphasis
+   - Any unique phrases or expressions they regularly use
 
-Message to reply to:
-{lastMessage}
+2. Communication Patterns:
+   - Their typical message structure and length
+   - Use of formatting, punctuation, or special characters
+   - How they express agreement/disagreement
 
-The user you're helping communicates and expresses emotions like this:
+3. Tone and Attitude:
+   - Their overall communication style (casual, intense, etc.)
+   - How they react in different emotional states
+   - Their use of humor or sarcasm
+
+4. Characteristic Elements:
+   - Preferred emoji usage
+   - Punctuation patterns
+   - Capitalization style
+   - Use of abbreviations or slang
+
+User's message history:
 {userHistory}
 
+Provide a detailed analysis of their authentic communication style, preserving their natural language patterns:`;
+
+const SUGGESTION_PROMPT = `Generate a reply that authentically matches this user's communication style:
+
+Previous context:
+{previousMessages}
+
+Most recent message to reply to:
+{lastMessage}
+
+User's typical communication style analysis:
+{personalityAnalysis}
+
 Guidelines:
-1. Generate ONE response that ONLY addresses the last message shown above
-2. Match the user's emotional intensity about this specific topic
-3. Mirror their communication style (vocabulary, emojis, formatting)
-4. Keep the response authentic to their personality
-5. Never explain that you're an AI - respond as if you are the user
-6. Ignore all previous messages except for understanding context`;
+1. Maintain absolute authenticity:
+   - Keep their exact vocabulary, including any swear words or strong language
+   - Use their natural expression patterns
+   - Match their casual/formal balance
+   - Preserve their emoji and punctuation style
+
+2. Match their style precisely:
+   - Use similar message structure and length
+   - Copy their formatting patterns
+   - Mirror their emphasis techniques
+   - Keep their characteristic expressions
+
+3. IMPORTANT:
+   - Don't sanitize or tone down their language
+   - Keep it brief and natural
+   - Never mention being AI
+   - Match their baseline communication style`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -92,6 +131,19 @@ class AIService {
         throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
       }
 
+      // Get personality analysis first
+      const personalityAnalysis = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: PERSONALITY_ANALYSIS_PROMPT.replace("{userHistory}", userHistory)
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      });
+
       // Separate the last message from previous messages for context
       const previousMessages = recentMessages
         .slice(0, -1)
@@ -99,7 +151,7 @@ class AIService {
         .join('\n');
 
       const prompt = SUGGESTION_PROMPT
-        .replace("{userHistory}", userHistory)
+        .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
         .replace("{previousMessages}", previousMessages)
         .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
 
@@ -111,13 +163,13 @@ class AIService {
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 60,
+        temperature: 0.9,
+        max_tokens: 150,
         presence_penalty: 0.3,
-        frequency_penalty: 0.5
+        frequency_penalty: 0.3
       });
 
-      return response.choices[0].message.content || "Hey! How's it going?";
+      return response.choices[0].message.content || "I'd need more context to generate a good suggestion.";
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
       throw error;
