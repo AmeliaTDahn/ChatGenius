@@ -123,14 +123,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
               </Button>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                onClick={handleUseSuggestion}
-                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <Copy className="h-4 w-4" />
-                Copy to Input
-              </Button>
               <Button variant="outline" onClick={() => setShowDialog(false)}>
                 Close
               </Button>
