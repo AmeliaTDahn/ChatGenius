@@ -49,22 +49,31 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, and typical responses. Focus on:
+const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, emotional patterns, and opinions. Focus on:
 
-1. Emotional expression (use of emojis, emotional words)
-2. Writing style (casual vs formal, sentence structure)
-3. Vocabulary preferences
-4. Common themes or interests
-5. Response patterns and tone
+1. Emotional Expression:
+   - How do they express strong emotions (anger, excitement, etc.)?
+   - What topics trigger strong emotional responses?
+   - Do they use caps, punctuation, or emojis for emphasis?
+
+2. Topic-Specific Reactions:
+   - What subjects do they feel strongly about (positive or negative)?
+   - How do they express disagreement or frustration?
+   - What are their common complaints or criticisms?
+
+3. Communication Style:
+   - Vocabulary and sentence structure
+   - Use of slang, casual vs formal language
+   - Emoji patterns and emphasis techniques
 
 User's message history:
 {userHistory}
 
-Provide a concise analysis that captures their unique communication style:`;
+Provide a detailed analysis of their communication style and emotional patterns:`;
 
-const SUGGESTION_PROMPT = `You are tasked with generating a response that authentically matches the user's communication style and personality. You have access to:
+const SUGGESTION_PROMPT = `You are tasked with generating a response that authentically matches the user's communication style, personality, and emotional intensity. You have:
 
-1. User's Communication Profile:
+1. User's Communication Profile and Emotional Patterns:
 {personalityAnalysis}
 
 2. Previous conversation for context (DO NOT reply to these messages):
@@ -74,17 +83,21 @@ const SUGGESTION_PROMPT = `You are tasked with generating a response that authen
 {lastMessage}
 
 Guidelines:
-1. Generate ONE response that ONLY addresses the last message shown above
-2. Match the exact communication style described in the personality analysis:
-   - Use similar sentence structures
-   - Match their level of formality/casualness
-   - Mirror their emoji usage patterns
-   - Use vocabulary that aligns with their style
-3. Keep the response authentic to their personality
+1. Generate ONE response that matches the user's emotional intensity about this specific topic
+   - If they get angry about similar topics, express appropriate anger
+   - If they're passionate/excited, show similar enthusiasm
+   - Match their level of criticism or negativity if that's their pattern
+2. Copy their exact communication style:
+   - Use ALL CAPS if they do when emotional
+   - Match their punctuation patterns (!!!, ...)
+   - Mirror their emoji usage and placement
+3. Maintain authenticity to their personality:
+   - Use similar vocabulary and expressions
+   - Match their level of directness/bluntness
+   - Express strong opinions where appropriate
 4. Never explain that you're an AI - respond as if you are the user
-5. Ignore all previous messages except for understanding context
-6. Do not use any formatting like [color], **, or * in the response
-7. Keep text formatting plain and simple`;
+5. Ignore previous messages except for context
+6. Keep formatting plain (no [color], **, or *)`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -110,7 +123,7 @@ class AIService {
         throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
       }
 
-      // First, analyze user's personality and communication style
+      // First, analyze user's personality and emotional patterns
       const personalityAnalysisPrompt = PERSONALITY_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
 
       const personalityAnalysis = await openai.chat.completions.create({
@@ -122,7 +135,7 @@ class AIService {
           }
         ],
         temperature: 0.7,
-        max_tokens: 200
+        max_tokens: 300
       });
 
       // Separate the last message from previous messages for context
@@ -144,7 +157,7 @@ class AIService {
             content: prompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.8,
         max_tokens: 150,
         presence_penalty: 0.3,
         frequency_penalty: 0.5
