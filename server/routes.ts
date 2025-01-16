@@ -2123,7 +2123,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Hash the password
-      const hashedPassword = await crypto.hash(password);
+      consthashedPassword = await crypto.hash(password);
 
       // Create the new user
       const [newUser] = await db        .insert(users)
@@ -2165,6 +2165,11 @@ export function registerRoutes(app: Express): Server {
       res.json({ suggestion });
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
+      if (error.message === "Cannot suggest a reply to your own message") {
+        return res.status(400).json({ 
+          error: "Cannot generate a suggestion for your own message"
+        });
+      }
       res.status(500).send("Error generating reply suggestion");
     }
   });

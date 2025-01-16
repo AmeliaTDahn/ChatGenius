@@ -114,6 +114,11 @@ class AIService {
         return "Hey! How's it going?";
       }
 
+      // Check if the last message is from the current user
+      if (recentMessages[recentMessages.length - 1].userId === userId) {
+        throw new Error("Cannot suggest a reply to your own message");
+      }
+
       const context = recentMessages
         .map(msg => `${msg.user.username}: ${msg.content}`)
         .join('\n');

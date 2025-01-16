@@ -9,6 +9,7 @@ import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-user";
 
 function parseFormattedText(text: string) {
   // Replace color tags with spans
@@ -30,6 +31,7 @@ type MessageListProps = {
 
 export function MessageList({ channelId }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
+  const { user } = useUser();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showThread, setShowThread] = useState(false);
@@ -253,11 +255,13 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   };
 
+  const lastMessageFromOthers = messages.length > 0 && messages[messages.length - 1].userId !== user?.id;
+
   return (
     <div className="flex h-full overflow-hidden">
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {messages.length > 0 && channelId !== -1 && (
+          {messages.length > 0 && channelId !== -1 && lastMessageFromOthers && (
             <div className="flex justify-end mb-4">
               <Button
                 variant="secondary"
