@@ -12,14 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
 
 function parseFormattedText(text: string) {
-  // Replace color tags with spans
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
     (_, color, content) => `<span style="color: ${color}">${content}</span>`);
 
-  // Replace bold tags
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-  // Replace italic tags
   text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
   return text;
@@ -54,7 +51,6 @@ export function MessageList({ channelId }: MessageListProps) {
       }
 
       const data = await response.json();
-      // Show suggestion in a toast
       toast({
         title: "Suggested Reply",
         description: data.suggestion,
@@ -106,7 +102,6 @@ export function MessageList({ channelId }: MessageListProps) {
       setFailedImages(prev => new Set([...prev, fileUrl]));
     };
 
-    // Group reactions by emoji
     const reactionGroups = message.reactions?.reduce<Record<string, number>>((acc, reaction) => {
       acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
       return acc;
@@ -258,22 +253,22 @@ export function MessageList({ channelId }: MessageListProps) {
   const lastMessageFromOthers = messages.length > 0 && messages[messages.length - 1].userId !== user?.id;
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
+      {messages.length > 0 && channelId !== -1 && lastMessageFromOthers && (
+        <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleGetSuggestion}
+            className="shadow-lg"
+          >
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Get Reply Suggestion
+          </Button>
+        </div>
+      )}
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.length > 0 && channelId !== -1 && lastMessageFromOthers && (
-            <div className="flex justify-end mb-4">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleGetSuggestion}
-                className="shadow-lg"
-              >
-                <Lightbulb className="h-4 w-4 mr-2" />
-                Get Reply Suggestion
-              </Button>
-            </div>
-          )}
+        <div className="space-y-4 pt-14">
           {messages.map((message) => (
             <MessageComponent key={message.id} message={message} />
           ))}
