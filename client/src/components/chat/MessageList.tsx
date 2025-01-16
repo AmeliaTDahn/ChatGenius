@@ -335,7 +335,7 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
         </div>
       )}
       {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
-        <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
+        <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg mt-14">
           <Button
             variant="secondary"
             size="sm"
