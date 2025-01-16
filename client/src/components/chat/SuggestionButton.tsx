@@ -50,7 +50,12 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
 
   const handleAccept = () => {
     if (currentSuggestion) {
-      onSuggestion(currentSuggestion);
+      // Remove any formatting tags before setting the suggestion
+      const plainText = currentSuggestion
+        .replace(/\[color=#[0-9a-f]{6}\](.*?)\[\/color\]/gi, '$1')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1');
+      onSuggestion(plainText);
       setShowPreview(false);
       setCurrentSuggestion("");
     }
