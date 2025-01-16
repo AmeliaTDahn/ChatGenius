@@ -241,7 +241,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
               </div>
             </PopoverContent>
           </Popover>
-          {/* Only show suggestion button for non-AI assistant chats */}
           {channelId && channelId !== -1 && (
             <SuggestionButton
               channelId={channelId}
