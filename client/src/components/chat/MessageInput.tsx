@@ -250,13 +250,11 @@ export function MessageInput({
               </div>
             </PopoverContent>
           </Popover>
-          {channelId && (
-            <SuggestionButton
-              channelId={channelId}
-              onSuggestion={handleSuggestedReply}
-              disabled={disabled}
-            />
-          )}
+          <SuggestionButton
+            channelId={channelId || -1}
+            onSuggestion={handleSuggestedReply}
+            disabled={disabled || !channelId}
+          />
         </div>
         <div className="flex-1 relative">
           <Textarea
