@@ -114,6 +114,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       )}
 
       <Button
+        type="button"
         variant="ghost"
         size="icon"
         onClick={handleGetSuggestion}
