@@ -29,7 +29,8 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       });
 
       if (!response.ok) {
-        return;
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to get suggestion');
       }
 
       const data = await response.json();
@@ -39,25 +40,31 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       }
     } catch (error) {
       console.error('Error getting suggestion:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get reply suggestion",
+        variant: "destructive",
+      });
+      setShowPreview(false);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleAccept = () => {
-        if (currentSuggestion) {
-          // Remove any formatting tags and name prefix before setting the suggestion
-          let plainText = currentSuggestion
-            .replace(/\*\*(.*?)\*\*/g, '$1')
-            .replace(/\*(.*?)\*/g, '$1');
+    if (currentSuggestion) {
+      // Remove any formatting tags and name prefix before setting the suggestion
+      let plainText = currentSuggestion
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1');
 
-          // Remove name prefix if it exists (format: "Name: message")
-          plainText = plainText.replace(/^[^:]+:\s*/, '');
-          onSuggestion(plainText);
-          setShowPreview(false);
-          setCurrentSuggestion("");
-        }
-      };
+      // Remove name prefix if it exists (format: "Name: message")
+      plainText = plainText.replace(/^[^:]+:\s*/, '');
+      onSuggestion(plainText);
+      setShowPreview(false);
+      setCurrentSuggestion("");
+    }
+  };
 
   const handleDecline = () => {
     setShowPreview(false);
@@ -72,7 +79,9 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
             <div className="flex justify-between items-start mb-2">
               <div>
                 <h3 className="font-semibold">Suggested Reply</h3>
-                <p className="text-sm text-muted-foreground">Here's a suggested reply based on the conversation:</p>
+                <p className="text-sm text-muted-foreground">
+                  {isLoading ? "Analyzing conversation style and generating suggestion..." : "Here's a suggested reply based on the conversation:"}
+                </p>
               </div>
               <Button variant="ghost" size="icon" onClick={handleDecline}>
                 <X className="h-4 w-4" />
@@ -80,8 +89,11 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
             </div>
             <div className="bg-muted p-3 rounded-md mb-3">
               {isLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground animate-pulse">
+                    Generating personalized suggestion...
+                  </p>
                 </div>
               ) : (
                 <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
