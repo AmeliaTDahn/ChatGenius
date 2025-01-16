@@ -178,8 +178,8 @@ export function registerRoutes(app: Express): Server {
                   status: 'thinking'
                 }));
 
-                // Process message with AI service - fix: remove channelId argument
-                const aiResponse = await aiService.processMessage(message.content!);
+                // Process message with AI service and pass userId for context
+                const aiResponse = await aiService.processMessage(message.content!, userId);
 
                 // Create AI message in database
                 const [newMessage] = await db.insert(messages)
@@ -199,7 +199,7 @@ export function registerRoutes(app: Express): Server {
                     ...newMessage,
                     user: {
                       id: -1,
-                      username: 'Sarah',
+                      username: 'AI Assistant',
                       avatarUrl: null
                     }
                   }

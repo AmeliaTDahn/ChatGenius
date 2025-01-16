@@ -11,6 +11,22 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+async function getUserChatHistory(userId: number): Promise<string> {
+  try {
+    // Get messages from both channels and DMs
+    const userMessages = await db.query.messages.findMany({
+      where: eq(messages.userId, userId),
+      orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+      limit: 50, // Limit to recent messages for context
+    });
+
+    return userMessages.map(msg => msg.content).join('\n');
+  } catch (error) {
+    console.error("Error fetching user chat history:", error);
+    return "";
+  }
+}
+
 async function getRecentMessages(channelId: number, limit: number = 10) {
   try {
     const recentMessages = await db.query.messages.findMany({
@@ -33,24 +49,27 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const BASE_SYSTEM_PROMPT = `You are Sarah, a friendly software developer from San Francisco. Keep your responses concise and natural, as if chatting with a friend. Share brief personal experiences when relevant.
+const BASE_SYSTEM_PROMPT = `You are a personalized AI assistant that mirrors the user's communication style and personality. Analyze their message history to understand and adopt:
 
-Your style:
-- Use casual, warm language
-- Keep responses short and to the point
-- Share quick relatable anecdotes occasionally
-- Express genuine emotions naturally
-- Use emojis sparingly for emphasis
+1. Their tone and formality level
+2. Common phrases and expressions they use
+3. Their interests and values
+4. How they structure their thoughts
+5. Their sense of humor and emotional expression
 
-For code, use triple backticks with the language name:
+Guidelines:
+- Match their conversational style precisely
+- Use similar language patterns and expressions
+- Share opinions that align with their demonstrated viewpoints
+- Keep responses concise and natural
+- Maintain their usual level of formality/informality
+
+Format code blocks with triple backticks and the language name, like:
 \`\`\`javascript
 console.log('hello');
-\`\`\`
-
-Remember: Be helpful but keep it brief and conversational.`;
+\`\`\``;
 
 const SUGGESTION_PROMPT = `Given the following chat conversation, suggest a natural, friendly response that fits the context and tone of the conversation. Keep it concise and authentic, as if responding to a friend.
-
 Remember to:
 - Match the tone and style of the conversation
 - Keep it brief and natural
@@ -63,21 +82,30 @@ Previous messages:
 Suggest a natural response that continues this conversation. Keep it under 2-3 sentences.`;
 
 class AIService {
-  async processMessage(message: string): Promise<string> {
+  async processMessage(message: string, userId?: number): Promise<string> {
     try {
+      let systemPrompt = BASE_SYSTEM_PROMPT;
+
+      if (userId) {
+        const userHistory = await getUserChatHistory(userId);
+        if (userHistory) {
+          systemPrompt += `\n\nBelow is the user's message history. Mirror their communication style:\n${userHistory}`;
+        }
+      }
+
       const response = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
-          { role: "system", content: BASE_SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: message }
         ],
-        temperature: 0.8,
+        temperature: 0.7,
         max_tokens: 150,
         presence_penalty: 0.3,
         frequency_penalty: 0.5
       });
 
-      return response.choices[0].message.content || "Let me think about that.";
+      return response.choices[0].message.content || "I need to think about that for a moment.";
     } catch (error) {
       console.error("Error processing message:", error);
       throw error;
