@@ -69,31 +69,10 @@ export function MessageList({ channelId, onUseSuggestion }: MessageListProps) {
     }
   };
 
-  const handleAcceptSuggestion = async () => {
-    if (currentSuggestion) {
-      try {
-        await fetch(`/api/channels/${channelId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content: currentSuggestion }),
-          credentials: 'include',
-        });
-        setCurrentSuggestion(null);
-        toast({
-          title: "Success",
-          description: "Message sent successfully",
-          variant: "success",
-        });
-      } catch (error) {
-        console.error('Error sending message:', error);
-        toast({
-          title: "Error",
-          description: "Failed to send message",
-          variant: "destructive",
-        });
-      }
+  const handleAcceptSuggestion = () => {
+    if (currentSuggestion && onUseSuggestion) {
+      onUseSuggestion(currentSuggestion);
+      setCurrentSuggestion(null);
     }
   };
 

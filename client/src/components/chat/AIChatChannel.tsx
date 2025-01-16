@@ -26,6 +26,10 @@ export function AIChatChannel() {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const handleSetMessage = (message: string) => {
+    setCurrentMessage(message);
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -76,9 +80,6 @@ export function AIChatChannel() {
     }
   };
 
-  const handleSetMessage = (message: string) => {
-    setCurrentMessage(message);
-  };
 
   return (
     <div className="flex flex-col h-full bg-background">
