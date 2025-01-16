@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { SuggestionButton } from "./SuggestionButton";
 import {
   Popover,
   PopoverContent,
@@ -13,12 +12,12 @@ import {
 import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
-  onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
+  onSendMessage: (content: string, files?: File[]) => void;
   channelId?: number;
   disabled?: boolean;
   placeholder?: string;
-  message?: string;
-  onMessageChange?: (message: string) => void;
+  message: string;
+  onMessageChange: (message: string) => void;
 };
 
 export function MessageInput({ 
@@ -26,7 +25,7 @@ export function MessageInput({
   channelId, 
   disabled, 
   placeholder,
-  message = "",
+  message,
   onMessageChange
 }: MessageInputProps) {
   const [files, setFiles] = useState<File[]>([]);
@@ -40,15 +39,10 @@ export function MessageInput({
     color: null
   });
   const [isUploading, setIsUploading] = useState(false);
-  const [localMessage, setLocalMessage] = useState(message);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    setLocalMessage(message);
-  }, [message]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -58,14 +52,14 @@ export function MessageInput({
         200
       )}px`;
     }
-  }, [localMessage]);
+  }, [message]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (localMessage.trim() || files.length > 0) {
+    if (message.trim() || files.length > 0) {
       try {
         setIsUploading(true);
-        let finalMessage = localMessage;
+        let finalMessage = message;
 
         // Apply formatting in reverse order to handle nested formats
         if (currentFormat.color) {
@@ -78,11 +72,8 @@ export function MessageInput({
           finalMessage = `**${finalMessage}**`;
         }
 
-        await onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
-        setLocalMessage("");
-        if (onMessageChange) {
-          onMessageChange("");
-        }
+        await onSendMessage(finalMessage, files);
+        onMessageChange("");
         setFiles([]);
         setCurrentFormat({
           bold: false,
@@ -137,7 +128,7 @@ export function MessageInput({
     if (type === 'color') {
       setCurrentFormat(prev => ({
         ...prev,
-        color: value === prev.color ? null : value
+        color: value || null
       }));
     } else {
       setCurrentFormat(prev => ({
@@ -250,24 +241,12 @@ export function MessageInput({
               </div>
             </PopoverContent>
           </Popover>
-          {channelId && channelId !== -1 && (
-            <SuggestionButton
-              channelId={channelId}
-              onSuggestion={handleSuggestion}
-              disabled={disabled}
-            />
-          )}
         </div>
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
-            value={localMessage}
-            onChange={(e) => {
-              setLocalMessage(e.target.value);
-              if (onMessageChange) {
-                onMessageChange(e.target.value);
-              }
-            }}
+            value={message}
+            onChange={(e) => onMessageChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
@@ -280,7 +259,7 @@ export function MessageInput({
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!localMessage.trim() && files.length === 0) || isUploading || disabled}>
+        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
