@@ -19,7 +19,12 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const handleGetSuggestion = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
+      const response = await fetch(`/api/chat/suggest-reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channelId }),
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
