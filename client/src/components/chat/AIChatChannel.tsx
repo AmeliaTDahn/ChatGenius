@@ -22,13 +22,8 @@ export function AIChatChannel() {
     timestamp: new Date()
   }]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentMessage, setCurrentMessage] = useState("");
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const handleSetMessage = (message: string) => {
-    setCurrentMessage(message);
-  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -80,7 +75,6 @@ export function AIChatChannel() {
     }
   };
 
-
   return (
     <div className="flex flex-col h-full bg-background">
       <ScrollArea className="flex-1 px-4 py-6">
@@ -109,13 +103,7 @@ export function AIChatChannel() {
         </div>
       </ScrollArea>
       <div className="p-4 border-t mt-auto max-w-2xl mx-auto w-full">
-        <MessageInput 
-          onSendMessage={handleSendMessage}
-          disabled={isLoading}
-          placeholder="Ask me anything..."
-          message={currentMessage}
-          onMessageChange={handleSetMessage}
-        />
+        <MessageList channelId={-1} />
       </div>
     </div>
   );
