@@ -16,7 +16,7 @@ type MessageInputProps = {
   channelId?: number;
   disabled?: boolean;
   placeholder?: string;
-  message: string;
+  message?: string;
   onMessageChange: (message: string) => void;
 };
 
@@ -24,8 +24,8 @@ export function MessageInput({
   onSendMessage, 
   channelId, 
   disabled, 
-  placeholder,
-  message,
+  placeholder = "Type a message...",
+  message = "",
   onMessageChange
 }: MessageInputProps) {
   const [files, setFiles] = useState<File[]>([]);
@@ -56,10 +56,11 @@ export function MessageInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() || files.length > 0) {
+    const messageContent = message?.trim() || "";
+    if (messageContent || files.length > 0) {
       try {
         setIsUploading(true);
-        let finalMessage = message;
+        let finalMessage = messageContent;
 
         // Apply formatting in reverse order to handle nested formats
         if (currentFormat.color) {
@@ -248,7 +249,7 @@ export function MessageInput({
             value={message}
             onChange={(e) => onMessageChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder || "Type a message..."}
+            placeholder={placeholder}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
               fontWeight: currentFormat.bold ? 'bold' : 'normal',
@@ -259,7 +260,7 @@ export function MessageInput({
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading || disabled}>
+        <Button type="submit" size="icon" disabled={(!(message?.trim()) && files.length === 0) || isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
