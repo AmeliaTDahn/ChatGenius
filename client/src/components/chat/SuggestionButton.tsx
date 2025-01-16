@@ -16,8 +16,10 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const { toast } = useToast();
 
   const handleGetSuggestion = async () => {
+    setShowPreview(true);
+    setCurrentSuggestion("");
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
         headers: {
