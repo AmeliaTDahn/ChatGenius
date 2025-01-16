@@ -17,10 +17,18 @@ type MessageInputProps = {
   channelId?: number;
   disabled?: boolean;
   placeholder?: string;
+  message?: string;
+  onMessageChange?: (message: string) => void;
 };
 
-export function MessageInput({ onSendMessage, channelId, disabled, placeholder }: MessageInputProps) {
-  const [message, setMessage] = useState("");
+export function MessageInput({ 
+  onSendMessage, 
+  channelId, 
+  disabled, 
+  placeholder,
+  message = "",
+  onMessageChange
+}: MessageInputProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [currentFormat, setCurrentFormat] = useState<{
     bold: boolean;
@@ -38,9 +46,10 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   const { toast } = useToast();
 
   const handleSuggestion = (suggestion: string) => {
-    setMessage(suggestion);
+    if (onMessageChange) {
+      onMessageChange(suggestion);
+    }
     if (textareaRef.current) {
-      textareaRef.current.value = suggestion;
       textareaRef.current.focus();
     }
   };
@@ -74,7 +83,9 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
         }
 
         await onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
-        setMessage("");
+        if (onMessageChange) {
+          onMessageChange("");
+        }
         setFiles([]);
         setCurrentFormat({
           bold: false,
@@ -254,7 +265,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
           <Textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => onMessageChange?.(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
