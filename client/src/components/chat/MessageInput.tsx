@@ -128,7 +128,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     if (type === 'color') {
       setCurrentFormat(prev => ({
         ...prev,
-        color: value === prev.color ? null : value
+        color: value || null
       }));
     } else {
       setCurrentFormat(prev => ({

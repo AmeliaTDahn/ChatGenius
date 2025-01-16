@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import type { Message } from "@db/schema";
 
 interface SuggestionButtonProps {
   channelId: number;
@@ -27,7 +26,10 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       }
 
       const data = await response.json();
-      onSuggestion(data.suggestion);
+      // Directly call the onSuggestion callback with the suggestion text
+      if (data.suggestion) {
+        onSuggestion(data.suggestion);
+      }
     } catch (error) {
       console.error('Error getting suggestion:', error);
       toast({
