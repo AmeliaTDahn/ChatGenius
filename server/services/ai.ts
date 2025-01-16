@@ -160,7 +160,7 @@ class AIService {
         messages: [
           {
             role: "system",
-            content: prompt
+            content: prompt + "\n\nIMPORTANT: Do not include the user's name or any name prefix in the response."
           }
         ],
         temperature: 0.9,
@@ -169,7 +169,9 @@ class AIService {
         frequency_penalty: 0.3
       });
 
-      return response.choices[0].message.content || "I'd need more context to generate a good suggestion.";
+      // Remove any name prefix pattern (e.g. "Name: message")
+      const suggestion = response.choices[0].message.content?.replace(/^[^:]+:\s*/, '') || "I'd need more context to generate a good suggestion.";
+      return suggestion;
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
       throw error;
