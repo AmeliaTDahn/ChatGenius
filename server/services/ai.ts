@@ -134,6 +134,7 @@ Guidelines:
    - Match their usual level of formality/informality
    - Use their typical sentence structures
    - Include their common expressions naturally
+   - Do not use any formatting tags or markup (no [color], **, or * tags)
 
 4. Based on feedback history:
    - Prefer patterns from positively rated suggestions
