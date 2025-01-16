@@ -28,7 +28,8 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get suggestion');
+        setIsLoading(false);
+        return;
       }
 
       const data = await response.json();
@@ -38,11 +39,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       }
     } catch (error) {
       console.error('Error getting suggestion:', error);
-      toast({
-        title: "Error",
-        description: "Failed to get reply suggestion",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
