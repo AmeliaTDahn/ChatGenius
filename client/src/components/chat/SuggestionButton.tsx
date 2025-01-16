@@ -47,9 +47,10 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   };
 
   const handleUseSuggestion = () => {
-    onSuggestion(currentSuggestion);
-    setShowDialog(false);
-    setCurrentSuggestion("");
+    if (currentSuggestion) {
+      onSuggestion(currentSuggestion);
+      setShowDialog(false);
+    }
   };
 
   return (
@@ -69,7 +70,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       </Button>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Suggested Reply</DialogTitle>
             <DialogDescription>
@@ -79,7 +80,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>
               Cancel
             </Button>
