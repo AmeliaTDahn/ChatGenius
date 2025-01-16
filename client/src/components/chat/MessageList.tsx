@@ -3,7 +3,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { FileIcon, Download, Reply } from "lucide-react";
+import { Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
@@ -38,6 +38,55 @@ export function MessageList({ channelId }: MessageListProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleGetSuggestion = async () => {
+    try {
+      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get suggestion');
+      }
+
+      const data = await response.json();
+      toast({
+        title: "Suggested Reply",
+        description: data.suggestion,
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+              if (textarea) {
+                textarea.value = data.suggestion;
+                textarea.focus();
+              }
+            }}
+          >
+            Use This
+          </Button>
+        ),
+      });
+    } catch (error) {
+      console.error('Error getting suggestion:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get reply suggestion",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const MessageComponent = ({ message }: { message: Message }) => {
     const handleReaction = async (emoji: string) => {
@@ -201,10 +250,25 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   };
 
+  const lastMessageFromOthers = messages.length > 0 && messages[messages.length - 1].userId !== user?.id;
+
   return (
     <div className="flex h-full overflow-hidden relative">
+      {messages.length > 0 && channelId !== -1 && lastMessageFromOthers && (
+        <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleGetSuggestion}
+            className="shadow-lg"
+          >
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Get Reply Suggestion
+          </Button>
+        </div>
+      )}
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+        <div className="space-y-4 pt-14">
           {messages.map((message) => (
             <MessageComponent key={message.id} message={message} />
           ))}

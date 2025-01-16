@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
 import { messages } from "@db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -49,62 +49,24 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, emotional patterns, and opinions. Focus on:
+const SUGGESTION_PROMPT = `You are tasked with generating a single response that replies ONLY to the most recent message in the conversation, while matching the user's emotional tone and communication style.
 
-1. Emotional Intensity and Expression:
-   - How strongly do they express emotions?
-   - Do they use emojis, punctuation, or formatting for emphasis?
-   - What triggers their most intense reactions?
-
-2. Opinion Strength and Topics:
-   - Which topics do they engage with most?
-   - How do they express agreement/disagreement?
-   - What language patterns indicate their views?
-
-3. Characteristic Style:
-   - Specific phrases or expressions they frequently use
-   - Their typical level of formality or casualness
-   - Use of emojis, punctuation, or formatting
-
-4. Response Patterns:
-   - How do they typically start conversations?
-   - How do they react to different types of messages?
-   - What's their usual message length and structure?
-
-User's message history:
-{userHistory}
-
-Provide a detailed analysis of their communication style and emotional patterns:`;
-
-const SUGGESTION_PROMPT = `Generate a reply that naturally matches this user's communication style:
-
-1. User's Communication Profile:
-{personalityAnalysis}
-
-2. Previous conversation for context:
+Previous conversation for context (DO NOT reply to these messages):
 {previousMessages}
 
-3. Message to reply to:
+Message to reply to:
 {lastMessage}
 
+The user you're helping communicates and expresses emotions like this:
+{userHistory}
+
 Guidelines:
-1. Match their communication style authentically:
-   - Use similar formatting patterns and emphasis
-   - Mirror their vocabulary level and tone
-   - Keep their characteristic expressions
-   - Match their emoji usage pattern
-
-2. Keep it natural:
-   - Maintain their level of formality
-   - Use their typical sentence structure
-   - Keep their common expressions
-   - Match their usual message length
-
-3. IMPORTANT:
-   - Keep it brief and natural
-   - Never mention being AI
-   - Match their baseline style
-   - Be direct but friendly`;
+1. Generate ONE response that ONLY addresses the last message shown above
+2. Match the user's emotional intensity about this specific topic
+3. Mirror their communication style (vocabulary, emojis, formatting)
+4. Keep the response authentic to their personality
+5. Never explain that you're an AI - respond as if you are the user
+6. Ignore all previous messages except for understanding context`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -112,43 +74,32 @@ class AIService {
       const recentMessages = await getRecentMessages(channelId);
       const userHistory = await getUserChatHistory(userId);
 
-      const lastMessage = recentMessages[recentMessages.length - 1];
-      
-      if (!lastMessage) {
+      if (recentMessages.length === 0) {
         throw new Error("No messages to reply to");
       }
 
+      const lastMessage = recentMessages[recentMessages.length - 1];
+
+      // Never suggest replies to user's own messages
       if (lastMessage.userId === userId) {
         throw new Error("Cannot suggest a reply to your own message");
       }
 
+      // Check if the user has already replied after this message
       const lastMessageIndex = recentMessages.findIndex(msg => msg.id === lastMessage.id);
       const messagesAfterLast = recentMessages.slice(lastMessageIndex + 1);
       if (messagesAfterLast.some(msg => msg.userId === userId)) {
         throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
       }
 
-      const personalityAnalysisPrompt = PERSONALITY_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
-
-      const personalityAnalysis = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: personalityAnalysisPrompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      });
-
+      // Separate the last message from previous messages for context
       const previousMessages = recentMessages
         .slice(0, -1)
         .map(msg => `${msg.user.username}: ${msg.content}`)
         .join('\n');
 
       const prompt = SUGGESTION_PROMPT
-        .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
+        .replace("{userHistory}", userHistory)
         .replace("{previousMessages}", previousMessages)
         .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
 
@@ -161,12 +112,12 @@ class AIService {
           }
         ],
         temperature: 0.7,
-        max_tokens: 100,
-        presence_penalty: 0.2,
-        frequency_penalty: 0.3
+        max_tokens: 60,
+        presence_penalty: 0.3,
+        frequency_penalty: 0.5
       });
 
-      return response.choices[0].message.content || "I'd need more context to generate a good suggestion.";
+      return response.choices[0].message.content || "Hey! How's it going?";
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
       throw error;

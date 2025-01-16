@@ -160,6 +160,7 @@ export const documentEmbeddingRelations = relations(documentEmbeddings, ({ one }
   }),
 }));
 
+
 export const insertMessageSchema = createInsertSchema(messages);
 export const selectMessageSchema = createSelectSchema(messages);
 
@@ -300,30 +301,3 @@ export const selectDocumentSchema = createSelectSchema(documents);
 
 export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddings);
 export const selectDocumentEmbeddingSchema = createSelectSchema(documentEmbeddings);
-
-
-export const suggestionFeedback = pgTable("suggestion_feedback", {
-  id: serial("id").primaryKey(),
-  suggestion: text("suggestion").notNull(),
-  isPositive: boolean("is_positive").notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  channelId: integer("channel_id").references(() => channels.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type SuggestionFeedback = typeof suggestionFeedback.$inferSelect;
-export type InsertSuggestionFeedback = typeof suggestionFeedback.$inferInsert;
-
-export const suggestionFeedbackRelations = relations(suggestionFeedback, ({ one }) => ({
-  user: one(users, {
-    fields: [suggestionFeedback.userId],
-    references: [users.id],
-  }),
-  channel: one(channels, {
-    fields: [suggestionFeedback.channelId],
-    references: [channels.id],
-  }),
-}));
-
-export const insertSuggestionFeedbackSchema = createInsertSchema(suggestionFeedback);
-export const selectSuggestionFeedbackSchema = createSelectSchema(suggestionFeedback);

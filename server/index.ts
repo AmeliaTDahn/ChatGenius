@@ -83,7 +83,6 @@ app.use((req, res, next) => {
 
   const PORT = 5000;
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server and WebSocket running on 0.0.0.0:${PORT}`);
     log(`serving on port ${PORT}`);
   });
 })();

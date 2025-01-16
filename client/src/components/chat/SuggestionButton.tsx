@@ -1,9 +1,15 @@
-
 import { useState } from "react";
+import { Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Lightbulb, Loader2, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SuggestionButtonProps {
   channelId: number;
@@ -20,17 +26,17 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const handleGetSuggestion = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/chat/suggest-reply`, {
+      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channelId }),
-        credentials: 'include'
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get suggestion');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to get suggestion');
       }
 
       const data = await response.json();
@@ -50,17 +56,14 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleAccept = () => {
-    if (currentSuggestion) {
-      onSuggestion(currentSuggestion);
-      setShowDialog(false);
-      setCurrentSuggestion("");
-    }
+  const handleUseSuggestion = () => {
+    onSuggestion(currentSuggestion);
+    handleCloseDialog();
   };
 
-  const handleDecline = () => {
+  const handleCloseDialog = () => {
     setShowDialog(false);
-    setCurrentSuggestion("");
+    setCurrentSuggestion(""); // Clear the suggestion when dialog closes
   };
 
   return (
@@ -80,25 +83,23 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         )}
       </Button>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+      <Dialog open={showDialog} onOpenChange={handleCloseDialog}>
+        <DialogContent className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-lg">
           <DialogHeader>
             <DialogTitle>Suggested Reply</DialogTitle>
             <DialogDescription>
-              Here's a suggested reply based on the conversation:
+              Here's a suggested reply based on your communication style:
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
-          <DialogFooter className="flex justify-between items-center">
-            <Button variant="outline" onClick={handleDecline}>
-              <X className="h-4 w-4 mr-2" />
-              Decline
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={handleCloseDialog}>
+              Cancel
             </Button>
-            <Button onClick={handleAccept}>
-              <Check className="h-4 w-4 mr-2" />
-              Accept
+            <Button onClick={handleUseSuggestion}>
+              Use This Reply
             </Button>
           </DialogFooter>
         </DialogContent>

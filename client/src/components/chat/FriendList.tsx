@@ -42,10 +42,10 @@ export function FriendList() {
       return res.json();
     },
     onSuccess: (data, friendId) => {
-      // Invalidate the friends query to force a refetch
-      queryClient.invalidateQueries({ queryKey: ['/api/friends'] });
+      queryClient.setQueryData<Friend[]>(['/api/friends'], (oldFriends = []) => {
+        return oldFriends.filter(friend => friend.id !== friendId);
+      });
 
-      // Update the direct messages cache
       queryClient.setQueryData<any[]>(['/api/direct-messages'], (oldDMs = []) => {
         return oldDMs.filter(dm => dm.otherUser.id !== friendId);
       });

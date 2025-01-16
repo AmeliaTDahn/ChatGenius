@@ -4,31 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { SuggestionButton } from "./SuggestionButton";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { SuggestionButton } from './SuggestionButton'; // Fixed import to use named import
 
 type MessageInputProps = {
-  onSendMessage: (content: string, files?: File[]) => void;
+  onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
   channelId?: number;
   disabled?: boolean;
   placeholder?: string;
-  message?: string;
-  onMessageChange: (message: string) => void;
 };
 
-export function MessageInput({ 
-  onSendMessage, 
-  channelId, 
-  disabled, 
-  placeholder = "Type a message...",
-  message = "",
-  onMessageChange
-}: MessageInputProps) {
+export function MessageInput({ onSendMessage, channelId, disabled, placeholder }: MessageInputProps) {
+  const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [currentFormat, setCurrentFormat] = useState<{
     bold: boolean;
@@ -45,6 +37,16 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  const handleSuggestion = (suggestion: string) => {
+    // Set the suggestion text
+    setMessage(suggestion);
+
+    // Focus the textarea for immediate editing
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "inherit";
@@ -57,11 +59,10 @@ export function MessageInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const messageContent = message?.trim() || "";
-    if (messageContent || files.length > 0) {
+    if (message.trim() || files.length > 0) {
       try {
         setIsUploading(true);
-        let finalMessage = messageContent;
+        let finalMessage = message;
 
         // Apply formatting in reverse order to handle nested formats
         if (currentFormat.color) {
@@ -74,8 +75,8 @@ export function MessageInput({
           finalMessage = `**${finalMessage}**`;
         }
 
-        await onSendMessage(finalMessage, files);
-        onMessageChange("");
+        await onSendMessage(finalMessage, files, localStorage.getItem('tabId'));
+        setMessage("");
         setFiles([]);
         setCurrentFormat({
           bold: false,
@@ -130,7 +131,7 @@ export function MessageInput({
     if (type === 'color') {
       setCurrentFormat(prev => ({
         ...prev,
-        color: value || null
+        color: value === prev.color ? null : value
       }));
     } else {
       setCurrentFormat(prev => ({
@@ -139,13 +140,6 @@ export function MessageInput({
       }));
     }
     textareaRef.current?.focus();
-  };
-
-  const handleSuggestedReply = (suggestion: string) => {
-    onMessageChange(suggestion);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
   };
 
   const COLORS = [
@@ -250,19 +244,21 @@ export function MessageInput({
               </div>
             </PopoverContent>
           </Popover>
-          <SuggestionButton
-            channelId={channelId || -1}
-            onSuggestion={handleSuggestedReply}
-            disabled={disabled || !channelId}
-          />
+          {channelId && channelId !== -1 && (
+            <SuggestionButton
+              channelId={channelId}
+              onSuggestion={handleSuggestion}
+              disabled={disabled}
+            />
+          )}
         </div>
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => onMessageChange(e.target.value)}
+            onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
               fontWeight: currentFormat.bold ? 'bold' : 'normal',
@@ -273,7 +269,7 @@ export function MessageInput({
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!(message?.trim()) && files.length === 0) || isUploading || disabled}>
+        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>

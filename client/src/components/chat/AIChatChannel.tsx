@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { MessageInput } from "./MessageInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -5,7 +6,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { marked } from 'marked';
-import { MessageList } from "./MessageList";
 
 interface AIChatMessage {
   content: string;
@@ -22,13 +22,8 @@ export function AIChatChannel() {
     timestamp: new Date()
   }]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentMessage, setCurrentMessage] = useState("");
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const handleSetMessage = (message: string) => {
-    setCurrentMessage(message);
-  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -41,7 +36,7 @@ export function AIChatChannel() {
   const handleSendMessage = async (content: string) => {
     try {
       setIsLoading(true);
-
+      
       setMessages(prev => [...prev, {
         content,
         isBot: false,
@@ -62,7 +57,7 @@ export function AIChatChannel() {
       }
 
       const data = await response.json();
-
+      
       setMessages(prev => [...prev, {
         content: data.response,
         isBot: true,
@@ -80,6 +75,14 @@ export function AIChatChannel() {
     }
   };
 
+  const renderMessage = (content: string) => {
+    try {
+      return { __html: marked.parse(content) };
+    } catch (error) {
+      console.error('Error parsing markdown:', error);
+      return { __html: content };
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -94,7 +97,7 @@ export function AIChatChannel() {
               </Avatar>
               <div className={`flex-1 ${!message.isBot ? 'ml-12' : 'mr-12'}`}>
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: marked.parse(message.content) }} />
+                  <div dangerouslySetInnerHTML={renderMessage(message.content)} />
                 </div>
               </div>
             </div>
@@ -113,8 +116,6 @@ export function AIChatChannel() {
           onSendMessage={handleSendMessage}
           disabled={isLoading}
           placeholder="Ask me anything..."
-          message={currentMessage}
-          onMessageChange={handleSetMessage}
         />
       </div>
     </div>
