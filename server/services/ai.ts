@@ -93,7 +93,8 @@ Guidelines:
    - Use natural vocabulary and expression patterns
    - Match their casual/formal balance
    - Use emojis and punctuation naturally
-   - Avoid mirroring excessive capitalization
+   - Keep capitalization minimal and natural
+   - Only capitalize proper nouns and sentence beginnings
 
 2. Match their style precisely:
    - Use similar message structure and length
