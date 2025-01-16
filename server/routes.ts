@@ -1076,7 +1076,7 @@ export function registerRoutes(app: Express): Server {
             avatarUrl: users.avatarUrl,
             isOnline: users.isOnline,
             hideActivity: users.hideActivity,
-          })
+                    })
           .from(users)
           .where(eq(users.id, request.senderId))
           .limit(1);
@@ -1221,70 +1221,69 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
+      // Find the direct message channel between these users
       const [dmChannel] = await db
-        .select({
-          channelId: directMessageChannels.channelId
-        })
+        .select()
         .from(directMessageChannels)
-        .where(or(
-          and(
-            eq(directMessageChannels.user1Id, req.user.id),
-            eq(directMessageChannels.user2Id, friendId)
-          ),
-          and(
-            eq(directMessageChannels.user1Id, friendId),
-            eq(directMessageChannels.user2Id, req.user.id)
+        .where(
+          or(
+            and(
+              eq(directMessageChannels.user1Id, req.user.id),
+              eq(directMessageChannels.user2Id, friendId)
+            ),
+            and(
+              eq(directMessageChannels.user1Id, friendId),
+              eq(directMessageChannels.user2Id, req.user.id)
+            )
           )
-        ))
+        )
         .limit(1);
 
       if (dmChannel) {
-        const channelMessages = await db
-          .select({ id: messages.id })
-          .from(messages)
-          .where(eq(messages.channelId, dmChannel.channelId));
+        // First delete all message attachments
+        await db
+          .delete(messageAttachments)
+          .where(
+            inArray(
+              messageAttachments.messageId,
+              db
+                .select({ id: messages.id })
+                .from(messages)
+                .where(eq(messages.channelId, dmChannel.channelId))
+            )
+          );
 
-        const messageIds = channelMessages.map(m => m.id);
-
-        if (messageIds.length > 0) {
-          await db
-            .delete(messageReactions)
-            .where(inArray(messageReactions.messageId, messageIds));
-
-          await db
-            .delete(messageReads)
-            .where(inArray(messageReads.messageId, messageIds));
-        }
-
+        // Then delete all messages in the channel
         await db
           .delete(messages)
           .where(eq(messages.channelId, dmChannel.channelId));
 
-        await db
-          .delete(channelMembers)
-          .where(eq(channelMembers.channelId, dmChannel.channelId));
-
+        // Delete the direct message channel entry
         await db
           .delete(directMessageChannels)
           .where(eq(directMessageChannels.channelId, dmChannel.channelId));
 
+        // Delete the channel itself
         await db
           .delete(channels)
           .where(eq(channels.id, dmChannel.channelId));
       }
 
+      // Finally remove the friend relationship
       await db
         .delete(friends)
-        .where(or(
-          and(
-            eq(friends.user1Id, req.user.id),
-            eq(friends.user2Id, friendId)
-          ),
-          and(
-            eq(friends.user1Id, friendId),
-            eq(friends.user2Id, req.user.id)
+        .where(
+          or(
+            and(
+              eq(friends.user1Id, req.user.id),
+              eq(friends.user2Id, friendId)
+            ),
+            and(
+              eq(friends.user1Id, friendId),
+              eq(friends.user2Id, req.user.id)
+            )
           )
-        ));
+        );
 
       res.json({ message: "Friend removed successfully" });
     } catch (error) {
@@ -2123,10 +2122,11 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Hash the password
-      consthashedPassword = await crypto.hash(password);
+      const hashedPassword = await crypto.hash(password);
 
       // Create the new user
-      const [newUser] = await db        .insert(users)
+      const [newUser] = await db
+        .insert(users)
         .values({
           username,
           email,
@@ -2165,9 +2165,9 @@ export function registerRoutes(app: Express): Server {
       res.json({ suggestion });
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
-      if (error.message === "Cannot suggest a reply to your own message" || 
+      if (error.message === "Cannot suggest a reply to your own message" ||
         error.message === "Cannot suggest a reply when you have already participated in the conversation after this message") {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: error.message
         });
       }
