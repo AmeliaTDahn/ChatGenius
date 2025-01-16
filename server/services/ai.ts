@@ -89,11 +89,11 @@ User's typical communication style analysis:
 {personalityAnalysis}
 
 Guidelines:
-1. Maintain absolute authenticity:
-   - Keep their exact vocabulary, including any swear words or strong language
-   - Use their natural expression patterns
+1. Maintain natural authenticity:
+   - Use natural vocabulary and expression patterns
    - Match their casual/formal balance
-   - Preserve their emoji and punctuation style
+   - Use emojis and punctuation naturally
+   - Avoid mirroring excessive capitalization
 
 2. Match their style precisely:
    - Use similar message structure and length
