@@ -99,16 +99,18 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
                 <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
               )}
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={handleDecline}>
-                <X className="h-4 w-4 mr-2" />
-                Decline
-              </Button>
-              <Button size="sm" onClick={handleAccept}>
-                <Check className="h-4 w-4 mr-2" />
-                Accept
-              </Button>
-            </div>
+            {!isLoading && (
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleDecline}>
+                  <X className="h-4 w-4 mr-2" />
+                  Decline
+                </Button>
+                <Button size="sm" onClick={handleAccept}>
+                  <Check className="h-4 w-4 mr-2" />
+                  Accept
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
