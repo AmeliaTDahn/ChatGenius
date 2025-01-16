@@ -19,17 +19,17 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const handleGetSuggestion = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/chat/suggest-reply`, {
+      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ channelId }),
         credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get suggestion');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to get suggestion');
       }
 
       const data = await response.json();
@@ -41,7 +41,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       console.error('Error getting suggestion:', error);
       toast({
         title: "Error",
-        description: "Failed to get reply suggestion",
+        description: error instanceof Error ? error.message : "Failed to get reply suggestion",
         variant: "destructive",
       });
     } finally {
@@ -65,6 +65,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         onClick={handleGetSuggestion}
         disabled={disabled || isLoading}
         title="Get AI reply suggestion"
+        className="hover:bg-accent hover:text-accent-foreground"
       >
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
