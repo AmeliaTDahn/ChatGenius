@@ -49,26 +49,42 @@ async function getRecentMessages(channelId: number, limit: number = 10) {
   }
 }
 
-const SUGGESTION_PROMPT = `You are tasked with generating a single response that replies ONLY to the most recent message in the conversation, while matching the user's emotional tone and communication style.
+const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, and typical responses. Focus on:
 
-Previous conversation for context (DO NOT reply to these messages):
+1. Emotional expression (use of emojis, emotional words)
+2. Writing style (casual vs formal, sentence structure)
+3. Vocabulary preferences
+4. Common themes or interests
+5. Response patterns and tone
+
+User's message history:
+{userHistory}
+
+Provide a concise analysis that captures their unique communication style:`;
+
+const SUGGESTION_PROMPT = `You are tasked with generating a response that authentically matches the user's communication style and personality. You have access to:
+
+1. User's Communication Profile:
+{personalityAnalysis}
+
+2. Previous conversation for context (DO NOT reply to these messages):
 {previousMessages}
 
-Message to reply to:
+3. Message to reply to:
 {lastMessage}
-
-The user you're helping communicates and expresses emotions like this:
-{userHistory}
 
 Guidelines:
 1. Generate ONE response that ONLY addresses the last message shown above
-2. Match the user's emotional intensity about this specific topic
-3. Mirror their communication style (vocabulary and emojis only)
-4. Keep the response authentic to their personality
-5. Never explain that you're an AI - respond as if you are the user
-6. Ignore all previous messages except for understanding context
-7. Do not use any formatting like [color], **, or * in the response
-8. Keep text formatting plain and simple`;
+2. Match the exact communication style described in the personality analysis:
+   - Use similar sentence structures
+   - Match their level of formality/casualness
+   - Mirror their emoji usage patterns
+   - Use vocabulary that aligns with their style
+3. Keep the response authentic to their personality
+4. Never explain that you're an AI - respond as if you are the user
+5. Ignore all previous messages except for understanding context
+6. Do not use any formatting like [color], **, or * in the response
+7. Keep text formatting plain and simple`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
@@ -94,6 +110,21 @@ class AIService {
         throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
       }
 
+      // First, analyze user's personality and communication style
+      const personalityAnalysisPrompt = PERSONALITY_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
+
+      const personalityAnalysis = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: personalityAnalysisPrompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 200
+      });
+
       // Separate the last message from previous messages for context
       const previousMessages = recentMessages
         .slice(0, -1)
@@ -101,7 +132,7 @@ class AIService {
         .join('\n');
 
       const prompt = SUGGESTION_PROMPT
-        .replace("{userHistory}", userHistory)
+        .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
         .replace("{previousMessages}", previousMessages)
         .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
 
@@ -114,7 +145,7 @@ class AIService {
           }
         ],
         temperature: 0.7,
-        max_tokens: 60,
+        max_tokens: 150,
         presence_penalty: 0.3,
         frequency_penalty: 0.5
       });
