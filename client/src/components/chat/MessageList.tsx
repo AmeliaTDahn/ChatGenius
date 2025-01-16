@@ -3,7 +3,7 @@ import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ThumbsUp, ThumbsDown, Check, X, Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Copy, X, Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
 import type { Message, MessageAttachment } from "@db/schema";
