@@ -128,7 +128,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     if (type === 'color') {
       setCurrentFormat(prev => ({
         ...prev,
-        color: value || null
+        color: value === prev.color ? null : value
       }));
     } else {
       setCurrentFormat(prev => ({
@@ -241,7 +241,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
               </div>
             </PopoverContent>
           </Popover>
-          {channelId !== undefined && channelId !== -1 && (
+          {/* Only show suggestion button for non-AI assistant chats */}
+          {channelId && channelId !== -1 && (
             <SuggestionButton
               channelId={channelId}
               onSuggestion={handleSuggestion}

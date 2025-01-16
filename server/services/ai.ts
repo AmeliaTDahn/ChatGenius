@@ -13,7 +13,6 @@ const openai = new OpenAI({
 
 async function getUserChatHistory(userId: number): Promise<string> {
   try {
-    // Get messages from both channels and DMs
     const userMessages = await db.query.messages.findMany({
       where: eq(messages.userId, userId),
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
@@ -56,22 +55,24 @@ Key points:
 2. Never mention being an AI or assistant
 3. Respond as if you are truly them, sharing their perspectives and experiences
 4. If asked about your day or personal matters, draw from context in their recent messages
-5. Maintain complete authenticity to their persona
+5. Maintain complete authenticity to their persona`;
 
-Example: If asked "How was your weekend?", look at their recent messages for actual activities or experiences they've mentioned and respond about those specific events.`;
-
-const SUGGESTION_PROMPT = `Given the following chat conversation, suggest a natural response that the user would make based on their usual conversation patterns and style.
+const SUGGESTION_PROMPT = `As an AI trained to understand and replicate this user's communication style and personality, suggest a response that they would naturally give in this conversation. Use their message history to inform the response.
 
 Remember to:
-- Keep the response authentic to how this specific user would reply
-- Reference relevant context from the conversation
-- Match their casual/formal balance
-- Keep it brief and natural
+1. Match their exact communication style, tone, and vocabulary preferences
+2. Reference their actual experiences and perspectives from their message history
+3. Maintain their usual level of formality/casualness
+4. Include their typical conversation patterns (e.g., if they often use emojis, specific phrases, or formatting)
+5. Stay authentic to their personality and views as shown in their past messages
 
-Previous messages:
+User's message history for context:
+{userHistory}
+
+Recent conversation:
 {context}
 
-Suggest a natural response that continues this conversation. Keep it under 2-3 sentences.`;
+Suggest a natural response that this specific user would give, keeping their personality and past messages in mind. Keep it under 2-3 sentences.`;
 
 class AIService {
   async processMessage(message: string, userId?: number): Promise<string> {
@@ -104,9 +105,10 @@ class AIService {
     }
   }
 
-  async generateReplySuggestion(channelId: number): Promise<string> {
+  async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const recentMessages = await getRecentMessages(channelId);
+      const userHistory = await getUserChatHistory(userId);
 
       if (recentMessages.length === 0) {
         return "Hey! How's it going?";
@@ -116,12 +118,16 @@ class AIService {
         .map(msg => `${msg.user.username}: ${msg.content}`)
         .join('\n');
 
+      const prompt = SUGGESTION_PROMPT
+        .replace("{userHistory}", userHistory)
+        .replace("{context}", context);
+
       const response = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
             role: "system",
-            content: SUGGESTION_PROMPT.replace("{context}", context)
+            content: prompt
           }
         ],
         temperature: 0.7,

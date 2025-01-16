@@ -2161,21 +2161,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Check if user is a member of this channel
-      const [membership] = await db
-        .select()
-        .from(channelMembers)
-        .where(and(
-          eq(channelMembers.channelId, channelId),
-          eq(channelMembers.userId, req.user.id)
-        ))
-        .limit(1);
-
-      if (!membership) {
-        return res.status(403).send("You are not a member of this channel");
-      }
-
-      const suggestion = await aiService.generateReplySuggestion(channelId);
+      const suggestion = await aiService.generateReplySuggestion(channelId, req.user.id);
       res.json({ suggestion });
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
