@@ -64,9 +64,8 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         variant="ghost"
         size="icon"
         onClick={handleGetSuggestion}
-        disabled={disabled || isLoading}
         title="Get AI reply suggestion"
-        className="hover:bg-accent hover:text-accent-foreground"
+        className="hover:bg-accent hover:text-accent-foreground cursor-pointer"
       >
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
