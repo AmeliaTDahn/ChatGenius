@@ -63,10 +63,12 @@ The user you're helping communicates and expresses emotions like this:
 Guidelines:
 1. Generate ONE response that ONLY addresses the last message shown above
 2. Match the user's emotional intensity about this specific topic
-3. Mirror their communication style (vocabulary, emojis, formatting)
+3. Mirror their communication style (vocabulary and emojis only)
 4. Keep the response authentic to their personality
 5. Never explain that you're an AI - respond as if you are the user
-6. Ignore all previous messages except for understanding context`;
+6. Ignore all previous messages except for understanding context
+7. Do not use any formatting like [color], **, or * in the response
+8. Keep text formatting plain and simple`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
