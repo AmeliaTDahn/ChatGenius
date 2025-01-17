@@ -127,10 +127,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     if (pastedText) {
       setMessage(pastedText);
       e.preventDefault();
-      setTimeout(() => {
-        handleSubmit(new Event('submit') as unknown as React.FormEvent);
-      }, 0);
       setIsFromPaste(true);
+      setIsFromSuggestion(false);
     }
   };
 
