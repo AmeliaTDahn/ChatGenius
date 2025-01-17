@@ -134,13 +134,13 @@ class AIService {
 
       const previousMessages = recentMessages
         .slice(0, -1)
-        .map(msg => `${msg.user.username}: ${msg.content}`)
+        .map(msg => msg.content)
         .join('\n');
 
       const prompt = SUGGESTION_PROMPT
         .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
         .replace("{previousMessages}", previousMessages)
-        .replace("{lastMessage}", `${lastMessage.user.username}: ${lastMessage.content}`);
+        .replace("{lastMessage}", lastMessage.content);
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
