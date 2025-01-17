@@ -49,6 +49,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
         textareaRef.current.scrollHeight,
         200
       )}px`;
+      // Trigger a submit since we have a valid suggestion
+      handleSubmit(new Event('submit') as unknown as React.FormEvent);
     }
   };
 
