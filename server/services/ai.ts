@@ -92,7 +92,7 @@ Guidelines:
    - Use CAPS/punctuation (!!!) if they do when emotional
    - Include their typical emojis
    - Use their common phrases/slang
-4. Never mention being AI - respond as them
+4. Never mention being AI or include usernames - just provide the direct response
 5. Keep formatting plain (no [color], **, or *)`;
 
 class AIService {
