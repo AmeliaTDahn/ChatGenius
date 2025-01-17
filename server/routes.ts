@@ -2121,7 +2121,7 @@ export function registerRoutes(app: Express): Server {
       // Check if user already exists withconst sameUsernameOrEmail = await db.query.users.findFirst({
       const sameUsernameOrEmail = await db.query.users.findFirst({
         where: or(
-          eq(users.username, username),
+          eq(users.usernameusername),
           eq(users.email, email)
         ),
       });
@@ -2324,6 +2324,34 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error updating preferred voice:", error);
       res.status(500).send("Error updating preferred voice");
+    }
+  });
+
+  app.post("/api/voice/test", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const { voiceId, text } = req.body;
+
+      if (!voiceId || !text) {
+        return res.status(400).send("Voice ID and text are required");
+      }
+
+      const audioBuffer = await voiceService.convertTextToSpeech(text, voiceId);
+
+      // Set headers for audio streaming
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Transfer-Encoding': 'chunked'
+      });
+
+      // Send the audio buffer directly to the client
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error("Error testing voice:", error);
+      res.status(500).send("Error testing voice");
     }
   });
 

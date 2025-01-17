@@ -36,6 +36,8 @@ import type { User } from "@db/schema";
 import { useDebouncedCallback } from "use-debounce";
 import { Label } from "@/components/ui/label";
 import { UploadCloud } from "lucide-react";
+import { Play } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const avatarOptions = [
   "https://api.dicebear.com/7.x/bottts/svg?seed=panda&backgroundColor=b6e3f4",
@@ -68,6 +70,7 @@ const formSchema = z.object({
   hideActivity: z.boolean(),
   avatarUrl: z.string().url("Invalid avatar URL"),
   timezone: z.string().min(1, "Please select a timezone"),
+  preferredVoiceId: z.string().min(1, "Please select a voice"),
 });
 
 type UserSettingsFormData = z.infer<typeof formSchema>;
@@ -82,6 +85,7 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -120,6 +124,7 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
       hideActivity: user.hideActivity,
       avatarUrl: user.avatarUrl || avatarOptions[0],
       timezone: user.timezone || "UTC",
+      preferredVoiceId: user.preferredVoiceId || "21m00Tcm4TlvDq8ikWAM", // Rachel voice as default
     },
   });
 
@@ -159,6 +164,7 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
         hideActivity: updatedUser.hideActivity,
         avatarUrl: updatedUser.avatarUrl || avatarOptions[0],
         timezone: updatedUser.timezone || "UTC",
+        preferredVoiceId: updatedUser.preferredVoiceId || "21m00Tcm4TlvDq8ikWAM",
       }, { keepValues: true });
       setIsAutoSaving(false);
       toast({
@@ -200,6 +206,42 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
 
   const handleDeleteAccount = () => {
     deleteAccount.mutate();
+  };
+
+  const { data: voices = [] } = useQuery({
+    queryKey: ["/api/voices"],
+  });
+
+  const testVoice = async (voiceId: string) => {
+    setIsTestingVoice(true);
+    try {
+      const response = await fetch("/api/voice/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          voiceId,
+          text: "Hello! This is a test of my voice. How do I sound?" 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      await audio.play();
+      URL.revokeObjectURL(audioUrl);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingVoice(false);
+    }
   };
 
   return (
@@ -396,6 +438,45 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
                   </div>
                 </div>
               </div>
+
+              <FormField
+                control={form.control}
+                name="preferredVoiceId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preferred Voice</FormLabel>
+                    <div className="flex gap-2">
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select a voice" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {voices.map((voice: any) => (
+                            <SelectItem key={voice.voice_id} value={voice.voice_id}>
+                              {voice.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={isTestingVoice || !field.value}
+                        onClick={() => testVoice(field.value)}
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-end pt-4 border-t">
                 <Button type="submit" disabled={updateProfile.isPending}>
