@@ -79,121 +79,67 @@ class VoiceService {
       return settings;
     }
 
-    // Check for direct emotional expressions
-    const lowerText = text.toLowerCase();
+    // Direct emotional expressions with intensity patterns
     const directEmotionPatterns = [
-      { regex: /(?:i am|i'm|i feel|feeling) (?:sad|down|depressed|upset)/i, emotion: 'sad' },
-      { regex: /(?:i am|i'm|i feel|feeling) (?:happy|excited|joyful|great)/i, emotion: 'happy' },
-      { regex: /(?:i am|i'm|i feel|feeling) (?:angry|mad|furious|outraged)/i, emotion: 'angry' },
-      { regex: /(?:i am|i'm|i feel|feeling) (?:calm|peaceful|relaxed)/i, emotion: 'calm' },
-      { regex: /(?:i am|i'm|i feel|feeling) (?:worried|anxious|nervous)/i, emotion: 'worried' }
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(sad|down|upset)/i, emotion: 'sad', intensity: 'low' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(happy|excited|joyful|thrilled|ecstatic)/i, emotion: 'happy', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(happy|cheerful|good)/i, emotion: 'happy', intensity: 'low' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(angry|furious|mad|outraged|livid)/i, emotion: 'angry', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(angry|annoyed|irritated)/i, emotion: 'angry', intensity: 'low' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(calm|peaceful|relaxed|serene)/i, emotion: 'calm', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(calm|relaxed)/i, emotion: 'calm', intensity: 'low' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(worried|anxious|nervous|scared|terrified)/i, emotion: 'worried', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(worried|concerned|uneasy)/i, emotion: 'worried', intensity: 'low' }
     ];
 
     // Check for direct emotional expressions first
     for (const pattern of directEmotionPatterns) {
-      if (pattern.regex.test(lowerText)) {
+      if (pattern.regex.test(text)) {
         switch (pattern.emotion) {
           case 'sad':
             return {
-              stability: 0.8,            // High stability for consistent, somber tone
-              similarity_boost: 0.7,     // Lower boost for more subdued voice
-              speaking_rate: 0.85,       // Slower speaking rate
-              pitch: 0.9                // Lower pitch for sadness
+              stability: pattern.intensity === 'high' ? 0.9 : 0.8,            // Higher stability for deeper sadness
+              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,    // Lower boost for more subdued voice
+              speaking_rate: pattern.intensity === 'high' ? 0.8 : 0.9,        // Slower for deeper sadness
+              pitch: pattern.intensity === 'high' ? 0.85 : 0.9                // Lower pitch for sadness
             };
           case 'happy':
             return {
-              stability: 0.3,            // Lower stability for more dynamic, energetic voice
-              similarity_boost: 0.8,     // Higher boost for clearer emotion
-              speaking_rate: 1.15,       // Slightly faster for excitement
-              pitch: 1.05               // Slightly higher pitch for happiness
+              stability: pattern.intensity === 'high' ? 0.2 : 0.3,            // Lower stability for more dynamic voice
+              similarity_boost: pattern.intensity === 'high' ? 0.85 : 0.8,    // Higher boost for clearer emotion
+              speaking_rate: pattern.intensity === 'high' ? 1.2 : 1.1,        // Faster for more excitement
+              pitch: pattern.intensity === 'high' ? 1.1 : 1.05                // Higher pitch for happiness
             };
           case 'angry':
             return {
-              stability: 0.25,           // Very low stability for intense variation
-              similarity_boost: 0.9,     // High boost for strong emotion
-              speaking_rate: 1.3,        // Faster speaking rate
-              pitch: 1.15               // Higher pitch for intensity
+              stability: pattern.intensity === 'high' ? 0.15 : 0.25,          // Very low stability for intense anger
+              similarity_boost: pattern.intensity === 'high' ? 0.95 : 0.9,    // High boost for strong emotion
+              speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3,        // Much faster for intense anger
+              pitch: pattern.intensity === 'high' ? 1.2 : 1.15                // Higher pitch for intensity
             };
           case 'calm':
             return {
-              stability: 0.9,            // Very high stability for steady voice
-              similarity_boost: 0.7,     // Lower boost for gentle tone
-              speaking_rate: 0.9,        // Slightly slower for calmness
-              pitch: 0.95               // Slightly lower pitch for soothing effect
+              stability: pattern.intensity === 'high' ? 0.95 : 0.9,           // Very high stability for deep calm
+              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,    // Lower boost for gentler tone
+              speaking_rate: pattern.intensity === 'high' ? 0.85 : 0.9,       // Slower for deeper calm
+              pitch: pattern.intensity === 'high' ? 0.9 : 0.95                // Lower pitch for soothing effect
             };
           case 'worried':
             return {
-              stability: 0.6,            // Medium stability for slight nervousness
-              similarity_boost: 0.75,    // Balanced boost
-              speaking_rate: 1.1,        // Slightly faster for anxiety
-              pitch: 1.05               // Slightly higher pitch for concern
+              stability: pattern.intensity === 'high' ? 0.5 : 0.6,            // Lower stability for anxiety
+              similarity_boost: pattern.intensity === 'high' ? 0.8 : 0.75,    // Higher boost for urgency
+              speaking_rate: pattern.intensity === 'high' ? 1.15 : 1.1,       // Faster for anxiety
+              pitch: pattern.intensity === 'high' ? 1.1 : 1.05                // Higher pitch for worry
             };
         }
-      }
-    }
-
-    // If no direct emotion expression, analyze the dominant emotion in the message
-    const words = text.toLowerCase().split(/\W+/);
-    const emotionCounts = {
-      positive: words.filter(word => positiveWords.includes(word)).length,
-      negative: words.filter(word => negativeWords.includes(word)).length,
-      angry: words.filter(word => angryWords.includes(word)).length,
-      excited: words.filter(word => excitedWords.includes(word)).length,
-      calm: words.filter(word => calmWords.includes(word)).length
-    };
-
-    // Find the dominant emotion
-    const emotions = Object.entries(emotionCounts);
-    const maxEmotion = emotions.reduce((max, current) => 
-      current[1] > max[1] ? current : max, ['none', 0]
-    );
-
-    // Only adjust voice if we have a clear dominant emotion
-    if (maxEmotion[1] > 0) {
-      switch (maxEmotion[0]) {
-        case 'positive':
-          return {
-            stability: 0.4,            // More dynamic for positive emotion
-            similarity_boost: 0.8,     // Clear, energetic voice
-            speaking_rate: 1.1,        // Slightly faster for excitement
-            pitch: 1.05               // Slightly higher for positivity
-          };
-        case 'negative':
-          return {
-            stability: 0.7,            // More stable for negative emotion
-            similarity_boost: 0.75,    // Balanced voice quality
-            speaking_rate: 0.9,        // Slower for solemnity
-            pitch: 0.95               // Slightly lower for sadness
-          };
-        case 'angry':
-          return {
-            stability: 0.25,           // Very dynamic for anger
-            similarity_boost: 0.9,     // Strong emotional expression
-            speaking_rate: 1.25,       // Faster for intensity
-            pitch: 1.1                // Higher for emphasis
-          };
-        case 'excited':
-          return {
-            stability: 0.3,            // Very dynamic for excitement
-            similarity_boost: 0.85,    // Clear emotional expression
-            speaking_rate: 1.2,        // Faster for enthusiasm
-            pitch: 1.1                // Higher for excitement
-          };
-        case 'calm':
-          return {
-            stability: 0.85,           // Very stable for calmness
-            similarity_boost: 0.7,     // Gentle voice quality
-            speaking_rate: 0.9,        // Slower for peacefulness
-            pitch: 0.95               // Slightly lower for serenity
-          };
       }
     }
 
     // Log the analysis for debugging
     console.log("Text emotion analysis:", {
       text,
-      emotionCounts,
-      dominantEmotion: maxEmotion[0],
+      directEmotionMatch: directEmotionPatterns.find(p => p.regex.test(text)),
       settings
     });
 
