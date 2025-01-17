@@ -59,41 +59,38 @@ class AIService {
   // Helper method to format message history for context
   private formatMessageHistory(messages: Array<{ content: string; createdAt: Date; }>): string {
     return messages
-      .map(msg => `[${msg.createdAt.toISOString()}] ${msg.content}`)
+      .map(msg => `${msg.content}`)
       .join('\n');
   }
 
   async processMessage(content: string, userId: number): Promise<string> {
     try {
-      // Get user's message history
       const userMessages = await getUserMessages(userId);
       const messageHistory = this.formatMessageHistory(userMessages);
       const { acceptedSuggestions } = await getPastSuggestionFeedback(userId);
 
       // Different system prompts based on whether the message appears to be a question about past messages
       const isQueryAboutHistory = content.toLowerCase().includes('what') ||
-                                content.toLowerCase().includes('when') ||
-                                content.toLowerCase().includes('who') ||
-                                content.toLowerCase().includes('how') ||
-                                content.toLowerCase().includes('why') ||
-                                content.toLowerCase().includes('?');
+                               content.toLowerCase().includes('when') ||
+                               content.toLowerCase().includes('who') ||
+                               content.toLowerCase().includes('how') ||
+                               content.toLowerCase().includes('why') ||
+                               content.toLowerCase().includes('?');
 
       let systemPrompt = isQueryAboutHistory
-        ? `You are a helpful AI assistant with access to the user's message history. When answering questions about past messages, refer to specific dates and times when relevant. Be precise and helpful.
+        ? `You are a helpful AI assistant with access to the user's message history. Be concise and direct.
 
-Your available context:
-1. User's message history:
+Your context:
 ${messageHistory}
 
-2. Current query: ${content}
+Current query: ${content}
 
 Guidelines:
-- If the user asks about their past messages, provide specific references with dates/times
-- If the user asks about patterns in their communication, analyze the history
-- For questions not related to message history, provide helpful general responses
-- Be conversational but precise
-- Include specific examples from their message history when relevant`
-        : `You are a helpful AI assistant. Analyze the user's communication style from their message history and respond in a similar tone and style.
+- Keep responses under 2-3 sentences unless more detail is explicitly requested
+- Only mention timestamps if specifically asked about timing
+- Be direct and to the point
+- Focus on answering the specific question asked`
+        : `You are a helpful AI assistant. Be concise and match the user's communication style.
 
 User's message history for context:
 ${messageHistory}
@@ -102,11 +99,10 @@ Previous successful responses they liked:
 ${acceptedSuggestions.join('\n')}
 
 Guidelines:
-1. Match their communication style (casual/formal, emoji usage, etc.)
-2. Keep responses concise and natural
-3. Don't mention being AI or analyzing their style
-4. Focus on being helpful while maintaining their preferred tone
-5. Follow patterns from previously successful responses`;
+1. Keep responses short and direct (2-3 sentences max)
+2. Match their communication style
+3. Focus only on the current topic
+4. Be helpful while being concise`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -120,8 +116,8 @@ Guidelines:
             content: content
           }
         ],
-        temperature: 0.8,
-        max_tokens: 150
+        temperature: 0.7,
+        max_tokens: 100 
       });
 
       return response.choices[0].message.content || "I understand. Could you tell me more?";
