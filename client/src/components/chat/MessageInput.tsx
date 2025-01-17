@@ -33,6 +33,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   });
   const [isUploading, setIsUploading] = useState(false);
   const [isFromSuggestion, setIsFromSuggestion] = useState(false);
+  const [isFromPaste, setIsFromPaste] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +94,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
           color: null
         });
         setIsFromSuggestion(false);
+        setIsFromPaste(false);
       } catch (error) {
         toast({
           title: "Error",
@@ -114,7 +116,22 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-    setIsFromSuggestion(false); // Reset the suggestion flag on manual input
+    if (!isFromPaste) {
+      setIsFromSuggestion(false);
+    }
+    setIsFromPaste(false);
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (pastedText) {
+      setMessage(pastedText);
+      setIsFromPaste(true);
+      // Submit immediately after paste
+      setTimeout(() => {
+        handleSubmit(new Event('submit') as unknown as React.FormEvent);
+      }, 0);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -272,6 +289,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
             value={message}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
