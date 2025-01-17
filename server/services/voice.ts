@@ -66,15 +66,24 @@ class VoiceService {
     const negativeCount = words.filter(word => negativeWords.includes(word)).length;
     const angryCount = words.filter(word => angryWords.includes(word)).length;
 
-    // Default settings for neutral tone
+    // Default settings for neutral tone - more natural speaking parameters
     let settings: VoiceEmotionSettings = {
-      stability: 0.5,
-      similarity_boost: 0.75,
-      speaking_rate: 1.0
+      stability: 0.75,       // Increased for more consistent, natural speech
+      similarity_boost: 0.75, // Balanced for natural voice reproduction
+      speaking_rate: 1.0     // Normal speaking rate
     };
 
+    // Only adjust voice if we detect clear emotional content
+    const hasEmotionalContent = positiveCount > 0 || negativeCount > 0 || angryCount > 0 || 
+                               (exclamationCount > 1) || (uppercaseRatio > 0.4);
+
+    if (!hasEmotionalContent) {
+      // Return natural settings for neutral messages
+      return settings;
+    }
+
     // Adjust for excitement/emphasis (exclamation marks and uppercase)
-    if (exclamationCount > 0 || uppercaseRatio > 0.3) {
+    if (exclamationCount > 1 || uppercaseRatio > 0.4) {
       settings.stability = 0.3;
       settings.similarity_boost = 0.85;
       settings.speaking_rate = 1.2;
@@ -117,6 +126,7 @@ class VoiceService {
       positiveCount,
       negativeCount,
       angryCount,
+      hasEmotionalContent,
       settings
     });
 
