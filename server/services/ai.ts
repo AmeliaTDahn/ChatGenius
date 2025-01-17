@@ -129,6 +129,10 @@ class AIService {
         throw new Error("No message found to reply to");
       }
 
+      if (messageToReply.userId === userId) {
+        throw new Error("Cannot suggest a reply to your own message");
+      }
+
       // First, analyze user's personal communication style
       const personalStyleAnalysisPrompt = PERSONAL_STYLE_ANALYSIS_PROMPT
         .replace("{userHistory}", userHistory)
