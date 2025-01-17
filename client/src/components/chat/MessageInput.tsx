@@ -72,7 +72,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message || files.length > 0) {
+    if (message.length > 0 || files.length > 0) {
       try {
         setIsUploading(true);
         let finalMessage = message;
