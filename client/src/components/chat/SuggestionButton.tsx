@@ -60,7 +60,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleSendSuggestion = async () => {
+  const handleUseSuggestion = async () => {
     if (currentSuggestion) {
       await recordFeedback(currentSuggestion, true);
       onSuggestion(currentSuggestion);
@@ -69,23 +69,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleEditSuggestion = async () => {
-    if (currentSuggestion) {
-      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-      if (textarea) {
-        textarea.value = currentSuggestion;
-        textarea.focus();
-        const length = currentSuggestion.length;
-        textarea.setSelectionRange(length, length);
-        const event = new Event('input', { bubbles: true });
-        textarea.dispatchEvent(event);
-      }
-      setShowDialog(false);
-      setCurrentSuggestion("");
-    }
-  };
-
-  const handleDenySuggestion = async () => {
+  const handleRejectSuggestion = async () => {
     if (currentSuggestion) {
       await recordFeedback(currentSuggestion, false);
       setShowDialog(false);
@@ -120,18 +104,13 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
-          <DialogFooter className="mt-4 flex justify-between">
-            <Button variant="destructive" onClick={handleDenySuggestion}>
-              Deny
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={handleRejectSuggestion}>
+              Reject
             </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleEditSuggestion}>
-                Edit
-              </Button>
-              <Button onClick={handleSendSuggestion}>
-                Send
-              </Button>
-            </div>
+            <Button onClick={handleUseSuggestion}>
+              Use This Reply
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
