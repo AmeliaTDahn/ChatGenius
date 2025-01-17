@@ -10,6 +10,8 @@ import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
+import { SuggestionButton } from "./SuggestionButton";
+
 
 function parseFormattedText(text: string) {
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
@@ -35,6 +37,7 @@ export function MessageList({ channelId }: MessageListProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const { toast } = useToast();
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -85,6 +88,18 @@ export function MessageList({ channelId }: MessageListProps) {
       });
     } finally {
       setIsGeneratingSuggestion(false);
+    }
+  };
+
+  const handleSuggestion = (suggestion: string) => {
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+    if (textarea) {
+      textarea.value = suggestion;
+      textarea.focus();
+      const length = suggestion.length;
+      textarea.setSelectionRange(length, length);
+      const event = new Event('input', { bubbles: true });
+      textarea.dispatchEvent(event);
     }
   };
 
@@ -256,25 +271,11 @@ export function MessageList({ channelId }: MessageListProps) {
     <div className="flex h-full overflow-hidden relative">
       {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleGetSuggestion}
+          <SuggestionButton
+            channelId={channelId}
+            onSuggestion={handleSuggestion}
             disabled={isGeneratingSuggestion}
-            className="shadow-lg"
-          >
-            {isGeneratingSuggestion ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Lightbulb className="h-4 w-4 mr-2" />
-                Get Reply Suggestion
-              </>
-            )}
-          </Button>
+          />
         </div>
       )}
       <ScrollArea className="flex-1 p-4">

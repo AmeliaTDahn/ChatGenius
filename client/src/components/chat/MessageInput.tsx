@@ -39,12 +39,16 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSuggestion = (suggestion: string) => {
     setMessage(suggestion);
-    // Focus the textarea after setting the suggestion
     if (textareaRef.current) {
       textareaRef.current.focus();
-      // Set cursor at the end of the text
       const length = suggestion.length;
       textareaRef.current.setSelectionRange(length, length);
+      // Ensure the textarea height updates
+      textareaRef.current.style.height = "inherit";
+      textareaRef.current.style.height = `${Math.min(
+        textareaRef.current.scrollHeight,
+        200
+      )}px`;
     }
   };
 
