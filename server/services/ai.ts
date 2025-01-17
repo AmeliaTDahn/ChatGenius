@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback } from "@db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { messages, suggestionFeedback, channelMembers } from "@db/schema";
+import { eq, desc, and, or, inArray } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -11,21 +11,36 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function getUserMessages(userId: number, limit: number = 100): Promise<Array<{ content: string; createdAt: Date; }>> {
+async function getUserMessages(userId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
   try {
-    const userMessages = await db.query.messages.findMany({
-      where: eq(messages.userId, userId),
+    // Get all channels the user is a member of
+    const userChannels = await db
+      .select({ channelId: channelMembers.channelId })
+      .from(channelMembers)
+      .where(eq(channelMembers.userId, userId));
+
+    const channelIds = userChannels.map(uc => uc.channelId);
+
+    // Get messages from all these channels
+    const channelMessages = await db.query.messages.findMany({
+      where: inArray(messages.channelId, channelIds),
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
-      columns: {
-        content: true,
-        createdAt: true
+      with: {
+        user: {
+          columns: {
+            username: true
+          }
+        }
       }
     });
 
-    return userMessages;
+    return channelMessages.map(msg => ({
+      content: msg.content,
+      username: msg.user?.username || 'AI Assistant'
+    }));
   } catch (error) {
-    console.error("Error fetching user messages:", error);
+    console.error("Error fetching channel messages:", error);
     return [];
   }
 }
@@ -57,16 +72,16 @@ async function getPastSuggestionFeedback(userId: number): Promise<{
 
 class AIService {
   // Helper method to format message history for context
-  private formatMessageHistory(messages: Array<{ content: string; createdAt: Date; }>): string {
+  private formatMessageHistory(messages: Array<{ content: string; username: string; }>): string {
     return messages
-      .map(msg => `${msg.content}`)
+      .map(msg => `${msg.username}: ${msg.content}`)
       .join('\n');
   }
 
   async processMessage(content: string, userId: number): Promise<string> {
     try {
-      const userMessages = await getUserMessages(userId);
-      const messageHistory = this.formatMessageHistory(userMessages);
+      const channelMessages = await getUserMessages(userId);
+      const messageHistory = this.formatMessageHistory(channelMessages);
       const { acceptedSuggestions } = await getPastSuggestionFeedback(userId);
 
       // Different system prompts based on whether the message appears to be a question about past messages
@@ -78,7 +93,7 @@ class AIService {
                                content.toLowerCase().includes('?');
 
       let systemPrompt = isQueryAboutHistory
-        ? `You are a helpful AI assistant with access to the user's message history. Be concise and direct.
+        ? `You are a helpful AI assistant with access to the conversation history. Be concise and direct.
 
 Your context:
 ${messageHistory}
@@ -89,10 +104,11 @@ Guidelines:
 - Keep responses under 2-3 sentences unless more detail is explicitly requested
 - Only mention timestamps if specifically asked about timing
 - Be direct and to the point
-- Focus on answering the specific question asked`
+- Focus on answering the specific question asked
+- Include usernames when referring to specific messages`
         : `You are a helpful AI assistant. Be concise and match the user's communication style.
 
-User's message history for context:
+Conversation history for context:
 ${messageHistory}
 
 Previous successful responses they liked:
