@@ -11,6 +11,13 @@ interface ElevenLabsVoice {
   category: string;
 }
 
+interface VoiceEmotionSettings {
+  stability: number;
+  similarity_boost: number;
+  speaking_rate?: number;
+  pitch?: number;
+}
+
 class VoiceService {
   private apiKey: string;
   private baseUrl = "https://api.elevenlabs.io/v1";
@@ -43,11 +50,87 @@ class VoiceService {
     }
   }
 
+  private analyzeTextEmotion(text: string): VoiceEmotionSettings {
+    // Count emotional indicators
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const questionCount = (text.match(/\?/g) || []).length;
+    const uppercaseRatio = text.split('').filter(char => char === char.toUpperCase()).length / text.length;
+
+    // Basic sentiment analysis
+    const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased'];
+    const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed'];
+    const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated'];
+
+    const words = text.toLowerCase().split(/\W+/);
+    const positiveCount = words.filter(word => positiveWords.includes(word)).length;
+    const negativeCount = words.filter(word => negativeWords.includes(word)).length;
+    const angryCount = words.filter(word => angryWords.includes(word)).length;
+
+    // Default settings for neutral tone
+    let settings: VoiceEmotionSettings = {
+      stability: 0.5,
+      similarity_boost: 0.75,
+      speaking_rate: 1.0
+    };
+
+    // Adjust for excitement/emphasis (exclamation marks and uppercase)
+    if (exclamationCount > 0 || uppercaseRatio > 0.3) {
+      settings.stability = 0.3;
+      settings.similarity_boost = 0.85;
+      settings.speaking_rate = 1.2;
+    }
+
+    // Adjust for questions
+    if (questionCount > 0) {
+      settings.stability = 0.4;
+      settings.similarity_boost = 0.8;
+      settings.pitch = 1.1;
+    }
+
+    // Adjust for positive emotion
+    if (positiveCount > 0) {
+      settings.stability = 0.35;
+      settings.similarity_boost = 0.8;
+      settings.speaking_rate = 1.1;
+    }
+
+    // Adjust for negative emotion
+    if (negativeCount > 0) {
+      settings.stability = 0.6;
+      settings.similarity_boost = 0.7;
+      settings.speaking_rate = 0.9;
+    }
+
+    // Adjust for anger
+    if (angryCount > 0) {
+      settings.stability = 0.25;
+      settings.similarity_boost = 0.9;
+      settings.speaking_rate = 1.3;
+    }
+
+    // Log the analysis for debugging
+    console.log("Text emotion analysis:", {
+      text,
+      exclamationCount,
+      questionCount,
+      uppercaseRatio,
+      positiveCount,
+      negativeCount,
+      angryCount,
+      settings
+    });
+
+    return settings;
+  }
+
   async convertTextToSpeech(text: string, voiceId: string | undefined): Promise<Buffer> {
     try {
       // Use provided voice ID or Rachel voice as default
       const finalVoiceId = voiceId || "21m00Tcm4TlvDq8ikWAM";
-      console.log("Using voice ID:", finalVoiceId); // Debug log
+      console.log("Using voice ID:", finalVoiceId);
+
+      // Analyze text and get emotion-based settings
+      const emotionSettings = this.analyzeTextEmotion(text);
 
       const response = await fetch(
         `${this.baseUrl}/text-to-speech/${finalVoiceId}/stream`,
@@ -60,10 +143,7 @@ class VoiceService {
           body: JSON.stringify({
             text,
             model_id: "eleven_monolingual_v1",
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
-            },
+            voice_settings: emotionSettings
           }),
         }
       );
