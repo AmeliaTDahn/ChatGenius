@@ -11,24 +11,28 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function getUserMessages(userId: number, limit: number = 50): Promise<string> {
+async function getUserMessages(userId: number, limit: number = 100): Promise<Array<{ content: string; createdAt: Date; }>> {
   try {
     const userMessages = await db.query.messages.findMany({
       where: eq(messages.userId, userId),
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
+      columns: {
+        content: true,
+        createdAt: true
+      }
     });
 
-    return userMessages.map(msg => msg.content).join('\n');
+    return userMessages;
   } catch (error) {
     console.error("Error fetching user messages:", error);
-    return "";
+    return [];
   }
 }
 
-async function getPastSuggestionFeedback(userId: number): Promise<{ 
-  acceptedSuggestions: string[], 
-  rejectedSuggestions: string[] 
+async function getPastSuggestionFeedback(userId: number): Promise<{
+  acceptedSuggestions: string[];
+  rejectedSuggestions: string[];
 }> {
   try {
     const feedback = await db.query.suggestionFeedback.findMany({
@@ -51,64 +55,82 @@ async function getPastSuggestionFeedback(userId: number): Promise<{
   }
 }
 
-const PERSONAL_STYLE_ANALYSIS_PROMPT = `Analyze the following message history from a single user to understand their unique communication style. Focus on:
+class AIService {
+  // Helper method to format message history for context
+  private formatMessageHistory(messages: Array<{ content: string; createdAt: Date; }>): string {
+    return messages
+      .map(msg => `[${msg.createdAt.toISOString()}] ${msg.content}`)
+      .join('\n');
+  }
 
-1. Personal Expression:
-   - Their typical emotional tone and intensity
-   - Common phrases, slang, or expressions they use
-   - How they emphasize things (caps, punctuation, emojis)
+  async processMessage(content: string, userId: number): Promise<string> {
+    try {
+      // Get user's message history
+      const userMessages = await getUserMessages(userId);
+      const messageHistory = this.formatMessageHistory(userMessages);
+      const { acceptedSuggestions } = await getPastSuggestionFeedback(userId);
 
-2. Opinion Patterns:
-   - Topics they feel strongly about
-   - How they express agreement/disagreement
-   - Their typical stance on different subjects
+      // Different system prompts based on whether the message appears to be a question about past messages
+      const isQueryAboutHistory = content.toLowerCase().includes('what') ||
+                                content.toLowerCase().includes('when') ||
+                                content.toLowerCase().includes('who') ||
+                                content.toLowerCase().includes('how') ||
+                                content.toLowerCase().includes('why') ||
+                                content.toLowerCase().includes('?');
 
-3. Writing Style:
-   - Vocabulary level and complexity
-   - Sentence structure
-   - Use of formatting (paragraphs, lists, etc.)
-   - Emoji and punctuation patterns
+      let systemPrompt = isQueryAboutHistory
+        ? `You are a helpful AI assistant with access to the user's message history. When answering questions about past messages, refer to specific dates and times when relevant. Be precise and helpful.
 
-User's message history:
-{userHistory}
+Your available context:
+1. User's message history:
+${messageHistory}
 
-Previous well-received suggestions:
-{acceptedSuggestions}
-
-Previously rejected suggestions (avoid similar patterns):
-{rejectedSuggestions}
-
-Provide a detailed analysis of their personal communication style:`;
-
-const PERSONALIZED_SUGGESTION_PROMPT = `Generate a brief reply that matches this user's personal style:
-
-1. User's Personal Communication Style Analysis:
-{personalityAnalysis}
-
-2. Message to reply to:
-{messageToReply}
-
-3. Learning from past feedback:
-Successful suggestions that the user liked:
-{acceptedSuggestions}
-
-Suggestions the user rejected (avoid similar patterns):
-{rejectedSuggestions}
+2. Current query: ${content}
 
 Guidelines:
-1. Keep it SHORT (1-2 sentences max)
-2. Match their personal style exactly:
-   - Use CAPS/punctuation if they typically do
-   - Include their commonly used emojis
-   - Mirror their typical phrases and expressions
-3. Reflect their usual opinion patterns and stance
-4. Keep formatting clean (no special formatting tags)
-5. Sound natural and casual like them
-6. Never mention being AI or include usernames
-7. Follow patterns from accepted suggestions
-8. Avoid patterns from rejected suggestions`;
+- If the user asks about their past messages, provide specific references with dates/times
+- If the user asks about patterns in their communication, analyze the history
+- For questions not related to message history, provide helpful general responses
+- Be conversational but precise
+- Include specific examples from their message history when relevant`
+        : `You are a helpful AI assistant. Analyze the user's communication style from their message history and respond in a similar tone and style.
 
-class AIService {
+User's message history for context:
+${messageHistory}
+
+Previous successful responses they liked:
+${acceptedSuggestions.join('\n')}
+
+Guidelines:
+1. Match their communication style (casual/formal, emoji usage, etc.)
+2. Keep responses concise and natural
+3. Don't mention being AI or analyzing their style
+4. Focus on being helpful while maintaining their preferred tone
+5. Follow patterns from previously successful responses`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: content
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 150
+      });
+
+      return response.choices[0].message.content || "I understand. Could you tell me more?";
+    } catch (error) {
+      console.error("Error processing message:", error);
+      throw error;
+    }
+  }
+
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
@@ -133,91 +155,19 @@ class AIService {
         throw new Error("Cannot suggest a reply to your own message");
       }
 
-      // First, analyze user's personal communication style
-      const personalStyleAnalysisPrompt = PERSONAL_STYLE_ANALYSIS_PROMPT
-        .replace("{userHistory}", userHistory)
-        .replace("{acceptedSuggestions}", acceptedSuggestions.join('\n'))
-        .replace("{rejectedSuggestions}", rejectedSuggestions.join('\n'));
-
-      const personalityAnalysis = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: personalStyleAnalysisPrompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 300
-      });
-
-      const suggestionPrompt = PERSONALIZED_SUGGESTION_PROMPT
-        .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
-        .replace("{messageToReply}", messageToReply.content)
-        .replace("{acceptedSuggestions}", acceptedSuggestions.join('\n'))
-        .replace("{rejectedSuggestions}", rejectedSuggestions.join('\n'));
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: suggestionPrompt
-          }
-        ],
-        temperature: 0.8,
-        max_tokens: 60,
-        presence_penalty: 0.3,
-        frequency_penalty: 0.5
-      });
-
-      const suggestion = response.choices[0].message.content || "Hey! How's it going?";
-
-      // Store the generated suggestion in the feedback table (initially not accepted)
-      await db.insert(suggestionFeedback).values({
-        userId,
-        channelId,
-        suggestedContent: suggestion,
-        wasAccepted: false
-      });
-
-      return suggestion;
-    } catch (error) {
-      console.error("Error generating reply suggestion:", error);
-      throw error;
-    }
-  }
-
-  async recordSuggestionFeedback(userId: number, channelId: number, content: string, wasAccepted: boolean): Promise<void> {
-    try {
-      await db.update(suggestionFeedback)
-        .set({ wasAccepted })
-        .where(and(
-          eq(suggestionFeedback.userId, userId),
-          eq(suggestionFeedback.channelId, channelId),
-          eq(suggestionFeedback.suggestedContent, content)
-        ));
-    } catch (error) {
-      console.error("Error recording suggestion feedback:", error);
-      throw error;
-    }
-  }
-
-  async processMessage(content: string, userId: number): Promise<string> {
-    try {
-      const userHistory = await getUserMessages(userId);
-      const { acceptedSuggestions } = await getPastSuggestionFeedback(userId);
+      // Format history for context
+      const messageHistory = this.formatMessageHistory(userHistory);
 
       const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
 
 User's message history for context:
-${userHistory}
+${messageHistory}
 
 Previous successful responses they liked:
 ${acceptedSuggestions.join('\n')}
 
 Current message to respond to:
-${content}
+${messageToReply.content}
 
 Guidelines:
 1. Match their communication style (casual/formal, emoji usage, etc.)
@@ -240,7 +190,27 @@ Guidelines:
 
       return response.choices[0].message.content || "I understand. Could you tell me more?";
     } catch (error) {
-      console.error("Error processing message:", error);
+      console.error("Error generating reply suggestion:", error);
+      throw error;
+    }
+  }
+
+  async recordSuggestionFeedback(
+    userId: number,
+    channelId: number,
+    content: string,
+    wasAccepted: boolean
+  ): Promise<void> {
+    try {
+      await db.update(suggestionFeedback)
+        .set({ wasAccepted })
+        .where(and(
+          eq(suggestionFeedback.userId, userId),
+          eq(suggestionFeedback.channelId, channelId),
+          eq(suggestionFeedback.suggestedContent, content)
+        ));
+    } catch (error) {
+      console.error("Error recording suggestion feedback:", error);
       throw error;
     }
   }
