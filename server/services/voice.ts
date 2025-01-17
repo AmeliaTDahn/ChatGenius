@@ -54,6 +54,7 @@ class VoiceService {
   }
 
   private analyzeTextEmotion(text: string): VoiceEmotionSettings {
+    // Enhanced sentiment analysis with comprehensive emotion patterns
     const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased', 'excited', 'joy', 'amazing', 'perfect', 'fantastic'];
     const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed', 'upset', 'regret', 'worried', 'concerned'];
     const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated', 'frustrated', 'rage', 'hate'];
@@ -67,7 +68,6 @@ class VoiceService {
     };
 
     const endsWithQuestion = text.trim().endsWith('?');
-
     if (endsWithQuestion) {
       settings = {
         stability: 0.7,
@@ -78,6 +78,7 @@ class VoiceService {
       return settings;
     }
 
+    // Direct emotional expressions with intensity patterns
     const directEmotionPatterns = [
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad', intensity: 'high' },
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(sad|down|upset)/i, emotion: 'sad', intensity: 'low' },
@@ -133,9 +134,72 @@ class VoiceService {
       }
     }
 
+    // If no direct emotion matches, analyze word patterns
+    const words = text.toLowerCase().split(/\W+/);
+    const emotionCounts = {
+      positive: words.filter(word => positiveWords.includes(word)).length,
+      negative: words.filter(word => negativeWords.includes(word)).length,
+      angry: words.filter(word => angryWords.includes(word)).length,
+      excited: words.filter(word => excitedWords.includes(word)).length,
+      calm: words.filter(word => calmWords.includes(word)).length
+    };
+
+    // Find dominant emotion
+    const emotions = Object.entries(emotionCounts);
+    const maxEmotion = emotions.reduce((max, current) => 
+      current[1] > max[1] ? current : max, ['none', 0]
+    );
+
+    // Apply settings based on dominant emotion
+    if (maxEmotion[1] > 0) {
+      switch (maxEmotion[0]) {
+        case 'positive':
+          settings = {
+            stability: 0.3,
+            similarity_boost: 0.8,
+            speaking_rate: 1.15,
+            pitch: 1.1
+          };
+          break;
+        case 'negative':
+          settings = {
+            stability: 0.75,
+            similarity_boost: 0.7,
+            speaking_rate: 0.9,
+            pitch: 0.95
+          };
+          break;
+        case 'angry':
+          settings = {
+            stability: 0.2,
+            similarity_boost: 0.9,
+            speaking_rate: 1.3,
+            pitch: 1.15
+          };
+          break;
+        case 'excited':
+          settings = {
+            stability: 0.25,
+            similarity_boost: 0.85,
+            speaking_rate: 1.25,
+            pitch: 1.1
+          };
+          break;
+        case 'calm':
+          settings = {
+            stability: 0.85,
+            similarity_boost: 0.7,
+            speaking_rate: 0.9,
+            pitch: 0.95
+          };
+          break;
+      }
+    }
+
     console.log("Text emotion analysis:", {
       text,
-      directEmotionMatch: directEmotionPatterns.find(p => p.regex.test(text)),
+      emotionCounts,
+      dominantEmotion: maxEmotion[0],
       settings
     });
 
@@ -206,16 +270,18 @@ class VoiceService {
     return (longer.length - costs[shorter.length]) / longer.length;
   }
 
-  async convertTextToSpeech(text: string, voiceId: string | undefined, userId?: number): Promise<Buffer> {
+  async convertTextToSpeech(text: string, voiceId: string | undefined, userId?: number): Promise<{ audioBuffer: Buffer; voiceSettings: VoiceEmotionSettings }> {
     try {
       const finalVoiceId = voiceId || "21m00Tcm4TlvDq8ikWAM";
       console.log("Using voice ID:", finalVoiceId);
 
+      // First try to find similar message settings from user feedback
       let emotionSettings: VoiceEmotionSettings | null = null;
       if (userId) {
         emotionSettings = await this.findSimilarMessageSettings(text, userId);
       }
 
+      // If no similar message found, use text analysis
       if (!emotionSettings) {
         emotionSettings = this.analyzeTextEmotion(text);
       }
@@ -242,7 +308,10 @@ class VoiceService {
       }
 
       const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer);
+      return {
+        audioBuffer: Buffer.from(arrayBuffer),
+        voiceSettings: emotionSettings
+      };
     } catch (error) {
       console.error("Error converting text to speech:", error);
       throw error;
