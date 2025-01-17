@@ -91,12 +91,6 @@ export function useWebSocket() {
             reconnectAttempts.current++;
             connect();
           }, delay);
-        } else {
-          toast({
-            title: 'Connection Error',
-            description: 'Failed to reconnect to the server. Please refresh the page.',
-            variant: 'destructive',
-          });
         }
       };
 
