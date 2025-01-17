@@ -2121,7 +2121,7 @@ export function registerRoutes(app: Express): Server {
       // Check if user already exists withconst sameUsernameOrEmail = await db.query.users.findFirst({
       const sameUsernameOrEmail = await db.query.users.findFirst({
         where: or(
-          eq(users.usernameusername),
+          eq(users.username, username),
           eq(users.email, email)
         ),
       });
@@ -2227,22 +2227,22 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid message ID");
       }
 
-      const [message] = await db
-        .select()
-        .from(messages)
-        .where(eq(messages.id, messageId))
-        .limit(1);
+      const message = await db.query.messages.findFirst({
+        where: eq(messages.id, messageId)
+      });
 
       if (!message) {
         return res.status(404).send("Message not found");
       }
 
+      // Get user's preferred voice
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, req.user.id))
         .limit(1);
 
+      // Convert text to speech using user's preferred voice
       const audioBuffer = await voiceService.convertTextToSpeech(
         message.content,
         user.preferredVoiceId
@@ -2251,18 +2251,17 @@ export function registerRoutes(app: Express): Server {
       // Set headers for audio streaming
       res.set({
         'Content-Type': 'audio/mpeg',
-        'Content-Length': audioBuffer.length,
-        'Cache-Control': 'no-cache',
-        'Content-Disposition': 'inline'
+        'Transfer-Encoding': 'chunked'
       });
 
-      // Stream the audio buffer directly
+      // Send the audio buffer directly to the client
       res.send(audioBuffer);
     } catch (error) {
-      console.error("Error generating speech:", error);
-      res.status(500).send("Error generating speech");
+      console.error("Error converting text to speech:", error);
+      res.status(500).send("Error converting text to speech");
     }
   });
+
   // Text-to-speech endpoint
   app.post("/api/tts", async (req, res) => {
     if (!req.isAuthenticated()) {
