@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Lightbulb, Loader2, SendHorizontal } from "lucide-react";
+import { Lightbulb, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface SuggestionButtonProps {
   channelId: number;
-  onSuggestion: (suggestion: string, sendImmediately?: boolean) => void;
+  onSuggestion: (suggestion: string) => void;
   disabled?: boolean;
 }
 
@@ -45,9 +45,9 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleUseSuggestion = (sendImmediately: boolean = false) => {
+  const handleUseSuggestion = () => {
     if (currentSuggestion) {
-      onSuggestion(currentSuggestion, sendImmediately);
+      onSuggestion(currentSuggestion); // Call the callback with the suggestion
       setShowDialog(false);
       setCurrentSuggestion("");
     }
@@ -80,18 +80,12 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
-          <DialogFooter className="mt-4 flex justify-between">
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => handleUseSuggestion(false)}>
-                Edit
-              </Button>
-            </div>
-            <Button onClick={() => handleUseSuggestion(true)} variant="default">
-              <SendHorizontal className="h-4 w-4 mr-2" />
-              Send Now
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUseSuggestion}>
+              Use This Reply
             </Button>
           </DialogFooter>
         </DialogContent>

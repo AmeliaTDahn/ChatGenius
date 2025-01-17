@@ -37,7 +37,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleSuggestion = async (suggestion: string, sendImmediately: boolean = false) => {
+  const handleSuggestion = (suggestion: string) => {
     setMessage(suggestion);
     if (textareaRef.current) {
       textareaRef.current.focus();
@@ -49,10 +49,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
         200
       )}px`;
       textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    if (sendImmediately) {
-      await handleSubmit(new Event('submit') as React.FormEvent);
     }
   };
 
@@ -68,7 +64,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message || files.length > 0) {
+    if (message || files.length > 0) { // Allow any non-empty message or files
       try {
         setIsUploading(true);
         let finalMessage = message;
