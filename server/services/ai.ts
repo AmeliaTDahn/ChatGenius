@@ -177,7 +177,6 @@ class AIService {
         userId,
         channelId,
         suggestedContent: suggestion,
-        messageLength: suggestion.length,
         wasAccepted: false
       });
 
@@ -192,10 +191,7 @@ class AIService {
   async recordSuggestionFeedback(userId: number, channelId: number, content: string, wasAccepted: boolean): Promise<void> {
     try {
       await db.update(suggestionFeedback)
-        .set({ 
-          wasAccepted,
-          messageLength: content.length 
-        })
+        .set({ wasAccepted })
         .where(and(
           eq(suggestionFeedback.userId, userId),
           eq(suggestionFeedback.channelId, channelId),
