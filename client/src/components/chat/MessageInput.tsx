@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { SuggestionButton } from "./SuggestionButton";
-import { VoiceMessage } from "./VoiceMessage";
 import {
   Popover,
   PopoverContent,
@@ -14,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type MessageInputProps = {
-  onSendMessage: (content: string, files?: File[], tabId?: string | null, audioBlob?: Blob) => void;
+  onSendMessage: (content: string, files?: File[], tabId?: string | null) => void;
   channelId?: number;
   disabled?: boolean;
   placeholder?: string;
@@ -56,21 +55,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
       textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
     }
     await handleSubmit(new Event('submit') as unknown as React.FormEvent);
-  };
-
-  const handleVoiceMessage = async (audioBlob: Blob) => {
-    try {
-      setIsUploading(true);
-      const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
-      await onSendMessage('', [], localStorage.getItem('tabId'), audioBlob); // Send audioBlob directly
-      setIsUploading(false);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send voice message. Please try again.",
-        variant: "destructive",
-      });
-    }
   };
 
   useEffect(() => {
@@ -299,10 +283,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
               disabled={disabled}
             />
           )}
-          <VoiceMessage
-            onSendVoice={handleVoiceMessage}
-            disabled={disabled || isUploading}
-          />
         </div>
         <div className="flex-1 relative">
           <Textarea

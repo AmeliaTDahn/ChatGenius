@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, FileIcon, Download, Reply, Lightbulb } from "lucide-react";
 import { ReactionPicker } from "./ReactionPicker";
 import { ThreadView } from "./ThreadView";
+import { TextToSpeechButton } from "./TextToSpeechButton";
 import type { Message, MessageAttachment } from "@db/schema";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -259,6 +260,7 @@ export function MessageList({ channelId }: MessageListProps) {
               ))}
             </div>
             <ReactionPicker onSelectEmoji={handleReaction} />
+            <TextToSpeechButton messageId={message.id} />
           </div>
         </div>
       </div>
