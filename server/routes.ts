@@ -2107,18 +2107,15 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", async (req, res) => {
+    if (!req.body.username || !req.body.password || !req.body.email) {
+      return res.status(400).send("Username, password and email are required");
+    }
+
+    const { username, password, email } = req.body;
+
     try {
-      const result = insertUserSchema.safeParse(req.body);
-      if (!result.success) {
-        return res
-          .status(400)
-          .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
-      }
-
-      const { username, email, password } = result.data;
-
-      // Check if user already exists withconst sameUsernameOrEmail = await db.query.users.findFirst({
+      // Check if user already exists
       const sameUsernameOrEmail = await db.query.users.findFirst({
         where: or(
           eq(users.username, username),
@@ -2127,37 +2124,34 @@ export function registerRoutes(app: Express): Server {
       });
 
       if (sameUsernameOrEmail) {
-        if (sameUsernameOrEmail.email === email) {
-          return res.status(400).send("A user with this email is already registered");
-        }
-        return res.status(400).send("Username already exists");
+        return res.status(400).send(
+          sameUsernameOrEmail.username === username
+            ? "Username already exists"
+            : "Email already exists"
+        );
       }
 
-      // Hash the password
-      const hashedPassword = await crypto.hash(password);
-
-      // Create the new user
-      const [newUser] = await db
+      // Create new user
+      const [user] = await db
         .insert(users)
         .values({
           username,
+          password,
           email,
-          password: hashedPassword,
+          preferredVoiceId: "21m00Tcm4TlvDq8ikWAM", // Set default voice
         })
         .returning();
 
-      // Log the user in after registration
-      req.login(newUser, (err) => {
+      // Log the user in
+      req.logIn(user, (err) => {
         if (err) {
-          return next(err);
+          return res.status(500).send("Error logging in after registration");
         }
-        return res.json({
-          message: "Registration successful",
-          user: { id: newUser.id, username: newUser.username },
-        });
+        res.json(user);
       });
     } catch (error) {
-      next(error);
+      console.error("Error registering user:", error);
+      res.status(500).send("Error registering user");
     }
   });
 
