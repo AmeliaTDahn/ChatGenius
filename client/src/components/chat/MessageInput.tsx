@@ -126,12 +126,10 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     const pastedText = e.clipboardData.getData('text');
     if (pastedText) {
       setMessage(pastedText);
-      if (isFromSuggestion) {
-        e.preventDefault();
-        setTimeout(() => {
-          handleSubmit(new Event('submit') as unknown as React.FormEvent);
-        }, 0);
-      }
+      e.preventDefault();
+      setTimeout(() => {
+        handleSubmit(new Event('submit') as unknown as React.FormEvent);
+      }, 0);
       setIsFromPaste(true);
     }
   };
