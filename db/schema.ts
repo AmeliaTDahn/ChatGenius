@@ -280,6 +280,8 @@ export const messageAttachments = pgTable("message_attachments", {
   fileUrl: text("file_url").notNull(),
   fileSize: integer("file_size").notNull(),
   mimeType: text("mime_type").notNull(),
+  isVoiceMessage: boolean("is_voice_message").default(false).notNull(),
+  duration: integer("duration"), // Duration in seconds for voice messages
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

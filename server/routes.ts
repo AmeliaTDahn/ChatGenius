@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import { sendPasswordResetEmail, generateResetToken } from './utils/email';
 import { channels, channelMembers, channelInvites, messageReactions, friendRequests, friends, directMessageChannels, messageReads, messageAttachments } from "@db/schema";
 import { eq, and, ne, ilike, or, inArray, desc, gt, sql, not } from "drizzle-orm";
-
+import { voiceService } from "./services/voice";
 
 interface ExtendedWebSocket extends WebSocket {
   userId?: number;
@@ -1075,8 +1075,7 @@ export function registerRoutes(app: Express): Server {
             username: users.username,
             avatarUrl: users.avatarUrl,
             isOnline: users.isOnline,
-            hideActivity: users.hideActivity
-          })
+            hideActivity: users.hideActivity          })
           .from(users)
           .where(eq(users.id, request.senderId))
           .limit(1);
@@ -2127,8 +2126,7 @@ export function registerRoutes(app: Express): Server {
       });
 
       if (existingUser) {
-        if (existingUser.email === email) {
-          return res.status(400).send("A user with this email isalready registered");
+        if (existingUser.email === email) {          return res.status(400).send(""A user with this email isalready registered");
         }
         return res.status(400).send("Username already exists");
       }
@@ -2186,6 +2184,165 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error generating reply suggestion");
     }
   });
+
+  app.post("/api/channels/:channelId/suggestion-feedback", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const { content, wasAccepted, messageLength } = req.body;
+    const channelId = parseInt(req.params.channelId);
+
+    if (!content || typeof wasAccepted !== 'boolean' || !channelId) {
+      return res.status(400).send("Invalid request data");
+    }
+
+    try {
+      await aiService.recordSuggestionFeedback(
+        req.user.id,
+        channelId,
+        content,
+        wasAccepted,
+        messageLength // Pass message length to the service
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error recording suggestion feedback:", error);
+      res.status(500).send("Error recording suggestion feedback");
+    }
+  });
+
+  // Add this new endpoint before the return statement
+  app.post("/api/messages/:messageId/text-to-speech", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const messageId = parseInt(req.params.messageId);
+
+      const [message] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, messageId))
+        .limit(1);
+
+      if (!message) {
+        return res.status(404).send("Message not found");
+      }
+
+      const audioBuffer = await voiceService.convertTextToSpeech(message.content);
+
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      res.status(500).send("Error generating speech");
+    }
+  });
+  // Add this new middleware before the routes
+  const voiceMessageUpload = multer({
+    storage: multer.diskStorage({
+      destination: "./uploads/voice",
+      filename: (_req, file, cb) => {
+        const uniqueSuffix = randomBytes(16).toString("hex");
+        cb(null, `voice-${uniqueSuffix}${path.extname(file.originalname)}`);
+      },
+    }),
+    fileFilter: (_req, file, cb) => {
+      // Accept only audio files
+      if (file.mimetype.startsWith('audio/')) {
+        cb(null, true);
+      } else {
+        cb(null, false);
+      }
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB limit for voice messages
+    }
+  });
+
+  // Create voice messages directory
+  (async () => {
+    await fs.mkdir("./uploads/voice", { recursive: true });
+  })();
+
+  // Add these new endpoints before the return statement
+  app.post("/api/messages/:channelId/voice", voiceMessageUpload.single('audio'), async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).send("No audio file provided");
+      }
+
+      const channelId = parseInt(req.params.channelId);
+      if (isNaN(channelId)) {
+        return res.status(400).send("Invalid channel ID");
+      }
+
+      // Create the message first
+      const [message] = await db
+        .insert(messages)
+        .values({
+          content: "",
+          channelId,
+          userId: req.user.id
+        })
+        .returning();
+
+      // Then create the attachment
+      const [attachment] = await db
+        .insert(messageAttachments)
+        .values({
+          messageId: message.id,
+          filename: req.file.filename,
+          fileUrl: `/uploads/voice/${req.file.filename}`,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          isVoiceMessage: true,
+          duration: parseInt(req.body.duration || "0")
+        })
+        .returning();
+
+      // Get the full message with user and attachment info
+      const fullMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, message.id),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            }
+          },
+          attachments: true
+        }
+      });
+
+      // Broadcast the message to all clients in the channel
+      wss.clients.forEach((client: ExtendedWebSocket) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'message',
+            channelId,
+            message: fullMessage
+          }));
+        }
+      });
+
+      res.json(fullMessage);
+    } catch (error) {
+      console.error("Error handling voice message:", error);
+      res.status(500).send("Error handling voice message");
+    }
+  });
+
+  // Serve voice message files
+  app.use('/uploads/voice', express.static(path.join(process.cwd(), 'uploads/voice')));
 
   return httpServer;
 }

@@ -23,7 +23,11 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content, wasAccepted }),
+        body: JSON.stringify({ 
+          content, 
+          wasAccepted,
+          messageLength: content.length 
+        }),
         credentials: 'include',
       });
     } catch (error) {
