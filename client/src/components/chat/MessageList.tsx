@@ -65,6 +65,10 @@ export function MessageList({ channelId }: MessageListProps) {
               if (textarea) {
                 textarea.value = data.suggestion;
                 textarea.focus();
+                toast({
+                    duration: 0,
+                    onOpenChange: () => {}
+                  });
               }
             }}
           >
