@@ -1072,10 +1072,12 @@ export function registerRoutes(app: Express): Server {
         const [friend] = await db
           .select({
             id: users.id,
-            username: users.username,            avatarUrl: users.avatarUrl,
+            username: users.username,
+            avatarUrl: users.avatarUrl,
             isOnline: users.isOnline,
             hideActivity: users.hideActivity
-          })          .from(users)
+          })
+          .from(users)
           .where(eq(users.id, request.senderId))
           .limit(1);
         res.json({
@@ -2125,8 +2127,8 @@ export function registerRoutes(app: Express): Server {
       });
 
       if (existingUser) {
-        if (existingUser.email === email) {
-                    return res.status(400).send("A user with this email is already registered");
+        if (existingUser.email=== email) {
+          return res.status(400).send("A user with this email is already registered");
         }
         return res.status(400).send("Username already exists");
       }
@@ -2235,7 +2237,15 @@ export function registerRoutes(app: Express): Server {
 
       const audioBuffer = await voiceService.convertTextToSpeech(message.content);
 
-      res.setHeader('Content-Type', 'audio/mpeg');
+      // Set headers for audio streaming
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length,
+        'Cache-Control': 'no-cache',
+        'Content-Disposition': 'inline'
+      });
+
+      // Stream the audio buffer directly
       res.send(audioBuffer);
     } catch (error) {
       console.error("Error generating speech:", error);
