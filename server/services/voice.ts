@@ -1,7 +1,4 @@
 import { Voice, VoiceSettings } from "elevenlabs/api";
-import { voiceFeedback } from "@db/schema";
-import { db } from "@db";
-import { eq, desc, and } from "drizzle-orm";
 
 if (!process.env.ELEVENLABS_API_KEY) {
   throw new Error("ELEVENLABS_API_KEY must be set");
@@ -196,95 +193,16 @@ class VoiceService {
       }
     }
 
-    console.log("Text emotion analysis:", {
-      text,
-      emotionCounts,
-      dominantEmotion: maxEmotion[0],
-      settings
-    });
-
     return settings;
   }
 
-  private async findSimilarMessageSettings(text: string, userId: number): Promise<VoiceEmotionSettings | null> {
-    try {
-      const recentFeedback = await db
-        .select({
-          messageContent: voiceFeedback.messageContent,
-          voiceSettings: voiceFeedback.voiceSettings,
-          wasLiked: voiceFeedback.wasLiked
-        })
-        .from(voiceFeedback)
-        .where(and(
-          eq(voiceFeedback.userId, userId),
-          eq(voiceFeedback.wasLiked, true)
-        ))
-        .orderBy(desc(voiceFeedback.createdAt))
-        .limit(5);
-
-      let bestMatch = null;
-      let highestSimilarity = 0;
-
-      for (const feedback of recentFeedback) {
-        const similarity = this.calculateStringSimilarity(text, feedback.messageContent);
-        if (similarity > highestSimilarity && similarity > 0.7) {
-          highestSimilarity = similarity;
-          bestMatch = feedback;
-        }
-      }
-
-      if (bestMatch) {
-        return JSON.parse(bestMatch.voiceSettings);
-      }
-
-      return null;
-    } catch (error) {
-      console.error("Error finding similar message settings:", error);
-      return null;
-    }
-  }
-
-  private calculateStringSimilarity(str1: string, str2: string): number {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-
-    if (longer.length === 0) return 1.0;
-
-    const costs = new Array();
-    for (let i = 0; i <= longer.length; i++) {
-      let lastValue = i;
-      for (let j = 0; j <= shorter.length; j++) {
-        if (i === 0) {
-          costs[j] = j;
-        } else if (j > 0) {
-          let newValue = costs[j - 1];
-          if (longer.charAt(i - 1) !== shorter.charAt(j - 1)) {
-            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-          }
-          costs[j - 1] = lastValue;
-          lastValue = newValue;
-        }
-      }
-      if (i > 0) costs[shorter.length] = lastValue;
-    }
-    return (longer.length - costs[shorter.length]) / longer.length;
-  }
-
-  async convertTextToSpeech(text: string, voiceId: string | undefined, userId?: number): Promise<{ audioBuffer: Buffer; voiceSettings: VoiceEmotionSettings }> {
+  async convertTextToSpeech(text: string, voiceId?: string): Promise<Buffer> {
     try {
       const finalVoiceId = voiceId || "21m00Tcm4TlvDq8ikWAM";
       console.log("Using voice ID:", finalVoiceId);
 
-      // First try to find similar message settings from user feedback
-      let emotionSettings: VoiceEmotionSettings | null = null;
-      if (userId) {
-        emotionSettings = await this.findSimilarMessageSettings(text, userId);
-      }
-
-      // If no similar message found, use text analysis
-      if (!emotionSettings) {
-        emotionSettings = this.analyzeTextEmotion(text);
-      }
+      // Analyze text for emotion-based settings
+      const emotionSettings = this.analyzeTextEmotion(text);
 
       const response = await fetch(
         `${this.baseUrl}/text-to-speech/${finalVoiceId}/stream`,
@@ -308,10 +226,7 @@ class VoiceService {
       }
 
       const arrayBuffer = await response.arrayBuffer();
-      return {
-        audioBuffer: Buffer.from(arrayBuffer),
-        voiceSettings: emotionSettings
-      };
+      return Buffer.from(arrayBuffer);
     } catch (error) {
       console.error("Error converting text to speech:", error);
       throw error;

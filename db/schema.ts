@@ -327,22 +327,3 @@ export const suggestionFeedbackRelations = relations(suggestionFeedback, ({ one 
     references: [channels.id],
   }),
 }));
-
-export const voiceFeedback = pgTable("voice_feedback", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  messageContent: text("message_content").notNull(),
-  voiceSettings: text("voice_settings").notNull(), // JSON string of voice settings
-  wasLiked: boolean("was_liked").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type VoiceFeedback = typeof voiceFeedback.$inferSelect;
-export type InsertVoiceFeedback = typeof voiceFeedback.$inferInsert;
-
-export const voiceFeedbackRelations = relations(voiceFeedback, ({ one }) => ({
-  user: one(users, {
-    fields: [voiceFeedback.userId],
-    references: [users.id],
-  }),
-}));
