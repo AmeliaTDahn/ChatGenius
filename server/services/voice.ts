@@ -51,22 +51,12 @@ class VoiceService {
   }
 
   private analyzeTextEmotion(text: string): VoiceEmotionSettings {
-    // Count emotional indicators
-    const exclamationCount = (text.match(/!/g) || []).length;
-    const questionCount = (text.match(/\?/g) || []).length;
-    const uppercaseRatio = text.split('').filter(char => char === char.toUpperCase()).length / text.length;
-
-    // Enhanced sentiment analysis
+    // Enhanced sentiment analysis with more specific emotion words
     const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased', 'excited', 'joy', 'amazing', 'perfect', 'fantastic'];
     const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed', 'upset', 'regret', 'worried', 'concerned'];
     const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated', 'frustrated', 'rage', 'hate'];
     const excitedWords = ['wow', 'omg', 'amazing', 'incredible', 'awesome', 'fantastic', 'unbelievable'];
     const calmWords = ['calm', 'peaceful', 'gentle', 'quiet', 'relaxed', 'steady', 'balanced'];
-
-    const words = text.toLowerCase().split(/\W+/);
-    const positiveCount = words.filter(word => positiveWords.includes(word)).length;
-    const negativeCount = words.filter(word => negativeWords.includes(word)).length;
-    const angryCount = words.filter(word => angryWords.includes(word)).length;
 
     // Default settings for neutral tone - more natural speaking parameters
     let settings: VoiceEmotionSettings = {
@@ -142,69 +132,68 @@ class VoiceService {
       }
     }
 
-    // Only adjust voice if we detect clear emotional content
-    const hasEmotionalContent = positiveCount > 0 || negativeCount > 0 || angryCount > 0 || 
-                               (exclamationCount > 1) || (uppercaseRatio > 0.4);
+    // If no direct emotion expression, analyze the dominant emotion in the message
+    const words = text.toLowerCase().split(/\W+/);
+    const emotionCounts = {
+      positive: words.filter(word => positiveWords.includes(word)).length,
+      negative: words.filter(word => negativeWords.includes(word)).length,
+      angry: words.filter(word => angryWords.includes(word)).length,
+      excited: words.filter(word => excitedWords.includes(word)).length,
+      calm: words.filter(word => calmWords.includes(word)).length
+    };
 
-    if (!hasEmotionalContent) {
-      // Return natural settings for neutral messages
-      return settings;
-    }
+    // Find the dominant emotion
+    const emotions = Object.entries(emotionCounts);
+    const maxEmotion = emotions.reduce((max, current) => 
+      current[1] > max[1] ? current : max, ['none', 0]
+    );
 
-    // Adjust for excitement/emphasis (exclamation marks and uppercase)
-    if (exclamationCount > 1 || uppercaseRatio > 0.4) {
-      settings.stability = 0.3;
-      settings.similarity_boost = 0.85;
-      settings.speaking_rate = 1.2;
-    }
-
-    // Enhanced emotion adjustments
-    const excitedCount = words.filter(word => excitedWords.includes(word)).length;
-    const calmCount = words.filter(word => calmWords.includes(word)).length;
-
-    // Adjust for positive emotion with excitement levels
-    if (positiveCount > 0) {
-      settings.stability = excitedCount > 0 ? 0.3 : 0.4;
-      settings.similarity_boost = 0.8;
-      settings.speaking_rate = excitedCount > 0 ? 1.2 : 1.1;
-      settings.pitch = excitedCount > 0 ? 1.1 : 1.0;
-    }
-
-    // Adjust for negative emotion with intensity
-    if (negativeCount > 0) {
-      settings.stability = 0.6;
-      settings.similarity_boost = 0.75;
-      settings.speaking_rate = 0.9;
-      settings.pitch = 0.95;
-    }
-
-    // Adjust for anger with intensity
-    if (angryCount > 0) {
-      settings.stability = 0.25;
-      settings.similarity_boost = 0.9;
-      settings.speaking_rate = 1.3;
-      settings.pitch = 1.15;
-    }
-
-    // Adjust for calm messages
-    if (calmCount > 0) {
-      settings.stability = 0.8;
-      settings.similarity_boost = 0.7;
-      settings.speaking_rate = 0.9;
-      settings.pitch = 0.95;
+    // Only adjust voice if we have a clear dominant emotion
+    if (maxEmotion[1] > 0) {
+      switch (maxEmotion[0]) {
+        case 'positive':
+          return {
+            stability: 0.4,            // More dynamic for positive emotion
+            similarity_boost: 0.8,     // Clear, energetic voice
+            speaking_rate: 1.1,        // Slightly faster for excitement
+            pitch: 1.05               // Slightly higher for positivity
+          };
+        case 'negative':
+          return {
+            stability: 0.7,            // More stable for negative emotion
+            similarity_boost: 0.75,    // Balanced voice quality
+            speaking_rate: 0.9,        // Slower for solemnity
+            pitch: 0.95               // Slightly lower for sadness
+          };
+        case 'angry':
+          return {
+            stability: 0.25,           // Very dynamic for anger
+            similarity_boost: 0.9,     // Strong emotional expression
+            speaking_rate: 1.25,       // Faster for intensity
+            pitch: 1.1                // Higher for emphasis
+          };
+        case 'excited':
+          return {
+            stability: 0.3,            // Very dynamic for excitement
+            similarity_boost: 0.85,    // Clear emotional expression
+            speaking_rate: 1.2,        // Faster for enthusiasm
+            pitch: 1.1                // Higher for excitement
+          };
+        case 'calm':
+          return {
+            stability: 0.85,           // Very stable for calmness
+            similarity_boost: 0.7,     // Gentle voice quality
+            speaking_rate: 0.9,        // Slower for peacefulness
+            pitch: 0.95               // Slightly lower for serenity
+          };
+      }
     }
 
     // Log the analysis for debugging
     console.log("Text emotion analysis:", {
       text,
-      exclamationCount,
-      questionCount,
-      uppercaseRatio,
-      positiveCount,
-      negativeCount,
-      angryCount,
-      hasEmotionalContent,
-      endsWithQuestion,
+      emotionCounts,
+      dominantEmotion: maxEmotion[0],
       settings
     });
 
