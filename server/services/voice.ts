@@ -89,6 +89,59 @@ class VoiceService {
       return settings;
     }
 
+    // Check for direct emotional expressions
+    const lowerText = text.toLowerCase();
+    const directEmotionPatterns = [
+      { regex: /(?:i am|i'm|i feel|feeling) (?:sad|down|depressed|upset)/i, emotion: 'sad' },
+      { regex: /(?:i am|i'm|i feel|feeling) (?:happy|excited|joyful|great)/i, emotion: 'happy' },
+      { regex: /(?:i am|i'm|i feel|feeling) (?:angry|mad|furious|outraged)/i, emotion: 'angry' },
+      { regex: /(?:i am|i'm|i feel|feeling) (?:calm|peaceful|relaxed)/i, emotion: 'calm' },
+      { regex: /(?:i am|i'm|i feel|feeling) (?:worried|anxious|nervous)/i, emotion: 'worried' }
+    ];
+
+    // Check for direct emotional expressions first
+    for (const pattern of directEmotionPatterns) {
+      if (pattern.regex.test(lowerText)) {
+        switch (pattern.emotion) {
+          case 'sad':
+            return {
+              stability: 0.8,            // High stability for consistent, somber tone
+              similarity_boost: 0.7,     // Lower boost for more subdued voice
+              speaking_rate: 0.85,       // Slower speaking rate
+              pitch: 0.9                // Lower pitch for sadness
+            };
+          case 'happy':
+            return {
+              stability: 0.3,            // Lower stability for more dynamic, energetic voice
+              similarity_boost: 0.8,     // Higher boost for clearer emotion
+              speaking_rate: 1.15,       // Slightly faster for excitement
+              pitch: 1.05               // Slightly higher pitch for happiness
+            };
+          case 'angry':
+            return {
+              stability: 0.25,           // Very low stability for intense variation
+              similarity_boost: 0.9,     // High boost for strong emotion
+              speaking_rate: 1.3,        // Faster speaking rate
+              pitch: 1.15               // Higher pitch for intensity
+            };
+          case 'calm':
+            return {
+              stability: 0.9,            // Very high stability for steady voice
+              similarity_boost: 0.7,     // Lower boost for gentle tone
+              speaking_rate: 0.9,        // Slightly slower for calmness
+              pitch: 0.95               // Slightly lower pitch for soothing effect
+            };
+          case 'worried':
+            return {
+              stability: 0.6,            // Medium stability for slight nervousness
+              similarity_boost: 0.75,    // Balanced boost
+              speaking_rate: 1.1,        // Slightly faster for anxiety
+              pitch: 1.05               // Slightly higher pitch for concern
+            };
+        }
+      }
+    }
+
     // Only adjust voice if we detect clear emotional content
     const hasEmotionalContent = positiveCount > 0 || negativeCount > 0 || angryCount > 0 || 
                                (exclamationCount > 1) || (uppercaseRatio > 0.4);
@@ -125,7 +178,7 @@ class VoiceService {
       settings.pitch = 0.95;
     }
 
-    // Adjust for anger with intensity scaling
+    // Adjust for anger with intensity
     if (angryCount > 0) {
       settings.stability = 0.25;
       settings.similarity_boost = 0.9;
