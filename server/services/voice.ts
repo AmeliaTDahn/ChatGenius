@@ -1,4 +1,7 @@
 import { Voice, VoiceSettings } from "elevenlabs/api";
+import { voiceFeedback } from "@db/schema";
+import { db } from "@db";
+import { eq, desc, and } from "drizzle-orm";
 
 if (!process.env.ELEVENLABS_API_KEY) {
   throw new Error("ELEVENLABS_API_KEY must be set");
@@ -51,35 +54,30 @@ class VoiceService {
   }
 
   private analyzeTextEmotion(text: string): VoiceEmotionSettings {
-    // Enhanced sentiment analysis with more specific emotion words
     const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased', 'excited', 'joy', 'amazing', 'perfect', 'fantastic'];
     const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed', 'upset', 'regret', 'worried', 'concerned'];
     const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated', 'frustrated', 'rage', 'hate'];
     const excitedWords = ['wow', 'omg', 'amazing', 'incredible', 'awesome', 'fantastic', 'unbelievable'];
     const calmWords = ['calm', 'peaceful', 'gentle', 'quiet', 'relaxed', 'steady', 'balanced'];
 
-    // Default settings for neutral tone - more natural speaking parameters
     let settings: VoiceEmotionSettings = {
-      stability: 0.75,       // Increased for more consistent, natural speech
-      similarity_boost: 0.75, // Balanced for natural voice reproduction
-      speaking_rate: 1.0     // Normal speaking rate
+      stability: 0.75,
+      similarity_boost: 0.75,
+      speaking_rate: 1.0
     };
 
-    // Check if the text ends with a question mark
     const endsWithQuestion = text.trim().endsWith('?');
 
-    // If it's a question, apply questioning tone settings
     if (endsWithQuestion) {
       settings = {
-        stability: 0.7,            // Slightly reduced for more variation
-        similarity_boost: 0.75,    // Keep natural voice quality
-        speaking_rate: 0.95,       // Slightly slower for emphasis
-        pitch: 1.15               // Higher pitch for questioning tone
+        stability: 0.7,
+        similarity_boost: 0.75,
+        speaking_rate: 0.95,
+        pitch: 1.15
       };
       return settings;
     }
 
-    // Direct emotional expressions with intensity patterns
     const directEmotionPatterns = [
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad', intensity: 'high' },
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(sad|down|upset)/i, emotion: 'sad', intensity: 'low' },
@@ -93,50 +91,48 @@ class VoiceService {
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(worried|concerned|uneasy)/i, emotion: 'worried', intensity: 'low' }
     ];
 
-    // Check for direct emotional expressions first
     for (const pattern of directEmotionPatterns) {
       if (pattern.regex.test(text)) {
         switch (pattern.emotion) {
           case 'sad':
             return {
-              stability: pattern.intensity === 'high' ? 0.9 : 0.8,            // Higher stability for deeper sadness
-              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,    // Lower boost for more subdued voice
-              speaking_rate: pattern.intensity === 'high' ? 0.8 : 0.9,        // Slower for deeper sadness
-              pitch: pattern.intensity === 'high' ? 0.85 : 0.9                // Lower pitch for sadness
+              stability: pattern.intensity === 'high' ? 0.9 : 0.8,
+              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,
+              speaking_rate: pattern.intensity === 'high' ? 0.8 : 0.9,
+              pitch: pattern.intensity === 'high' ? 0.85 : 0.9
             };
           case 'happy':
             return {
-              stability: pattern.intensity === 'high' ? 0.2 : 0.3,            // Lower stability for more dynamic voice
-              similarity_boost: pattern.intensity === 'high' ? 0.85 : 0.8,    // Higher boost for clearer emotion
-              speaking_rate: pattern.intensity === 'high' ? 1.2 : 1.1,        // Faster for more excitement
-              pitch: pattern.intensity === 'high' ? 1.1 : 1.05                // Higher pitch for happiness
+              stability: pattern.intensity === 'high' ? 0.2 : 0.3,
+              similarity_boost: pattern.intensity === 'high' ? 0.85 : 0.8,
+              speaking_rate: pattern.intensity === 'high' ? 1.2 : 1.1,
+              pitch: pattern.intensity === 'high' ? 1.1 : 1.05
             };
           case 'angry':
             return {
-              stability: pattern.intensity === 'high' ? 0.15 : 0.25,          // Very low stability for intense anger
-              similarity_boost: pattern.intensity === 'high' ? 0.95 : 0.9,    // High boost for strong emotion
-              speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3,        // Much faster for intense anger
-              pitch: pattern.intensity === 'high' ? 1.2 : 1.15                // Higher pitch for intensity
+              stability: pattern.intensity === 'high' ? 0.15 : 0.25,
+              similarity_boost: pattern.intensity === 'high' ? 0.95 : 0.9,
+              speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3,
+              pitch: pattern.intensity === 'high' ? 1.2 : 1.15
             };
           case 'calm':
             return {
-              stability: pattern.intensity === 'high' ? 0.95 : 0.9,           // Very high stability for deep calm
-              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,    // Lower boost for gentler tone
-              speaking_rate: pattern.intensity === 'high' ? 0.85 : 0.9,       // Slower for deeper calm
-              pitch: pattern.intensity === 'high' ? 0.9 : 0.95                // Lower pitch for soothing effect
+              stability: pattern.intensity === 'high' ? 0.95 : 0.9,
+              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,
+              speaking_rate: pattern.intensity === 'high' ? 0.85 : 0.9,
+              pitch: pattern.intensity === 'high' ? 0.9 : 0.95
             };
           case 'worried':
             return {
-              stability: pattern.intensity === 'high' ? 0.5 : 0.6,            // Lower stability for anxiety
-              similarity_boost: pattern.intensity === 'high' ? 0.8 : 0.75,    // Higher boost for urgency
-              speaking_rate: pattern.intensity === 'high' ? 1.15 : 1.1,       // Faster for anxiety
-              pitch: pattern.intensity === 'high' ? 1.1 : 1.05                // Higher pitch for worry
+              stability: pattern.intensity === 'high' ? 0.5 : 0.6,
+              similarity_boost: pattern.intensity === 'high' ? 0.8 : 0.75,
+              speaking_rate: pattern.intensity === 'high' ? 1.15 : 1.1,
+              pitch: pattern.intensity === 'high' ? 1.1 : 1.05
             };
         }
       }
     }
 
-    // Log the analysis for debugging
     console.log("Text emotion analysis:", {
       text,
       directEmotionMatch: directEmotionPatterns.find(p => p.regex.test(text)),
@@ -146,14 +142,83 @@ class VoiceService {
     return settings;
   }
 
-  async convertTextToSpeech(text: string, voiceId: string | undefined): Promise<Buffer> {
+  private async findSimilarMessageSettings(text: string, userId: number): Promise<VoiceEmotionSettings | null> {
     try {
-      // Use provided voice ID or Rachel voice as default
+      const recentFeedback = await db
+        .select({
+          messageContent: voiceFeedback.messageContent,
+          voiceSettings: voiceFeedback.voiceSettings,
+          wasLiked: voiceFeedback.wasLiked
+        })
+        .from(voiceFeedback)
+        .where(and(
+          eq(voiceFeedback.userId, userId),
+          eq(voiceFeedback.wasLiked, true)
+        ))
+        .orderBy(desc(voiceFeedback.createdAt))
+        .limit(5);
+
+      let bestMatch = null;
+      let highestSimilarity = 0;
+
+      for (const feedback of recentFeedback) {
+        const similarity = this.calculateStringSimilarity(text, feedback.messageContent);
+        if (similarity > highestSimilarity && similarity > 0.7) {
+          highestSimilarity = similarity;
+          bestMatch = feedback;
+        }
+      }
+
+      if (bestMatch) {
+        return JSON.parse(bestMatch.voiceSettings);
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error finding similar message settings:", error);
+      return null;
+    }
+  }
+
+  private calculateStringSimilarity(str1: string, str2: string): number {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+
+    if (longer.length === 0) return 1.0;
+
+    const costs = new Array();
+    for (let i = 0; i <= longer.length; i++) {
+      let lastValue = i;
+      for (let j = 0; j <= shorter.length; j++) {
+        if (i === 0) {
+          costs[j] = j;
+        } else if (j > 0) {
+          let newValue = costs[j - 1];
+          if (longer.charAt(i - 1) !== shorter.charAt(j - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          }
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+      if (i > 0) costs[shorter.length] = lastValue;
+    }
+    return (longer.length - costs[shorter.length]) / longer.length;
+  }
+
+  async convertTextToSpeech(text: string, voiceId: string | undefined, userId?: number): Promise<Buffer> {
+    try {
       const finalVoiceId = voiceId || "21m00Tcm4TlvDq8ikWAM";
       console.log("Using voice ID:", finalVoiceId);
 
-      // Analyze text and get emotion-based settings
-      const emotionSettings = this.analyzeTextEmotion(text);
+      let emotionSettings: VoiceEmotionSettings | null = null;
+      if (userId) {
+        emotionSettings = await this.findSimilarMessageSettings(text, userId);
+      }
+
+      if (!emotionSettings) {
+        emotionSettings = this.analyzeTextEmotion(text);
+      }
 
       const response = await fetch(
         `${this.baseUrl}/text-to-speech/${finalVoiceId}/stream`,
