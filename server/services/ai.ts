@@ -11,143 +11,111 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function getUserChatHistory(userId: number): Promise<string> {
+async function getUserMessages(userId: number, limit: number = 50): Promise<string> {
   try {
     const userMessages = await db.query.messages.findMany({
       where: eq(messages.userId, userId),
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
-      limit: 50,
+      limit,
     });
 
     return userMessages.map(msg => msg.content).join('\n');
   } catch (error) {
-    console.error("Error fetching user chat history:", error);
+    console.error("Error fetching user messages:", error);
     return "";
   }
 }
 
-async function getRecentMessages(channelId: number, limit: number = 10) {
-  try {
-    const recentMessages = await db.query.messages.findMany({
-      where: eq(messages.channelId, channelId),
-      orderBy: [desc(messages.createdAt)],
-      limit,
-      with: {
-        user: {
-          columns: {
-            username: true,
-            id: true
-          }
-        }
-      }
-    });
+const PERSONAL_STYLE_ANALYSIS_PROMPT = `Analyze the following message history from a single user to understand their unique communication style. Focus on:
 
-    return recentMessages.reverse();
-  } catch (error) {
-    console.error("Error fetching recent messages:", error);
-    return [];
-  }
-}
+1. Personal Expression:
+   - Their typical emotional tone and intensity
+   - Common phrases, slang, or expressions they use
+   - How they emphasize things (caps, punctuation, emojis)
 
-const PERSONALITY_ANALYSIS_PROMPT = `Analyze the following message history to understand the user's personality, communication style, emotional patterns, and opinions. Focus on:
+2. Opinion Patterns:
+   - Topics they feel strongly about
+   - How they express agreement/disagreement
+   - Their typical stance on different subjects
 
-1. Emotional Expression:
-   - How do they express strong emotions (anger, excitement, etc.)?
-   - What topics trigger strong emotional responses?
-   - Do they use caps, punctuation, or emojis for emphasis?
-
-2. Topic-Specific Reactions:
-   - What subjects do they feel strongly about (positive or negative)?
-   - How do they express disagreement or frustration?
-   - What are their common complaints or criticisms?
-
-3. Communication Style:
-   - Vocabulary and sentence structure
-   - Use of slang, casual vs formal language
-   - Emoji patterns and emphasis techniques
+3. Writing Style:
+   - Vocabulary level and complexity
+   - Sentence structure
+   - Use of formatting (paragraphs, lists, etc.)
+   - Emoji and punctuation patterns
 
 User's message history:
 {userHistory}
 
-Provide a detailed analysis of their communication style and emotional patterns:`;
+Provide a detailed analysis of their personal communication style:`;
 
-const SUGGESTION_PROMPT = `Generate a brief but emotionally matched response based on this information:
+const PERSONALIZED_SUGGESTION_PROMPT = `Generate a brief reply that matches this user's personal style:
 
-1. User's Communication Profile and Emotional Patterns:
+1. User's Personal Communication Style Analysis:
 {personalityAnalysis}
 
-2. Previous conversation for context:
-{previousMessages}
-
-3. Message to reply to:
-{lastMessage}
+2. Message to reply to:
+{messageToReply}
 
 Guidelines:
-1. Keep the response SHORT and CONCISE (1-2 sentences max)
-2. Match their emotional intensity about this topic:
-   - Use their anger style if they get angry about similar topics
-   - Mirror their excitement patterns if it's a positive topic
-   - Match their criticism style if they're typically critical
-3. Copy their style exactly:
-   - Use CAPS/punctuation (!!!) if they do when emotional
-   - Include their typical emojis
-   - Use their common phrases/slang
-4. Never mention being AI or include usernames - just provide the direct response
-5. Keep formatting plain (no [color], **, or *)`;
+1. Keep it SHORT (1-2 sentences max)
+2. Match their personal style exactly:
+   - Use CAPS/punctuation if they typically do
+   - Include their commonly used emojis
+   - Mirror their typical phrases and expressions
+3. Reflect their usual opinion patterns and stance
+4. Keep formatting clean (no special formatting tags)
+5. Sound natural and casual like them
+6. Never mention being AI or include usernames`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
-      const recentMessages = await getRecentMessages(channelId);
-      const userHistory = await getUserChatHistory(userId);
+      const userHistory = await getUserMessages(userId);
 
-      if (recentMessages.length === 0) {
-        throw new Error("No messages to reply to");
+      if (!userHistory) {
+        throw new Error("No message history found for user");
       }
 
-      const lastMessage = recentMessages[recentMessages.length - 1];
+      // Get message to reply to
+      const [messageToReply] = await db.query.messages.findMany({
+        where: and(
+          eq(messages.channelId, channelId),
+          eq(messages.userId, userId)
+        ),
+        orderBy: [desc(messages.createdAt)],
+        limit: 1
+      });
 
-      if (lastMessage.userId === userId) {
-        throw new Error("Cannot suggest a reply to your own message");
+      if (!messageToReply) {
+        throw new Error("No message found to reply to");
       }
 
-      const lastMessageIndex = recentMessages.findIndex(msg => msg.id === lastMessage.id);
-      const messagesAfterLast = recentMessages.slice(lastMessageIndex + 1);
-      if (messagesAfterLast.some(msg => msg.userId === userId)) {
-        throw new Error("Cannot suggest a reply when you have already participated in the conversation after this message");
-      }
-
-      // First, analyze user's personality and emotional patterns
-      const personalityAnalysisPrompt = PERSONALITY_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
+      // First, analyze user's personal communication style
+      const personalStyleAnalysisPrompt = PERSONAL_STYLE_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
 
       const personalityAnalysis = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
             role: "system",
-            content: personalityAnalysisPrompt
+            content: personalStyleAnalysisPrompt
           }
         ],
         temperature: 0.7,
         max_tokens: 300
       });
 
-      const previousMessages = recentMessages
-        .slice(0, -1)
-        .map(msg => msg.content)
-        .join('\n');
-
-      const prompt = SUGGESTION_PROMPT
+      const suggestionPrompt = PERSONALIZED_SUGGESTION_PROMPT
         .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
-        .replace("{previousMessages}", previousMessages)
-        .replace("{lastMessage}", lastMessage.content);
+        .replace("{messageToReply}", messageToReply.content);
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
             role: "system",
-            content: prompt
+            content: suggestionPrompt
           }
         ],
         temperature: 0.8,
@@ -159,6 +127,43 @@ class AIService {
       return response.choices[0].message.content || "Hey! How's it going?";
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
+      throw error;
+    }
+  }
+
+  async processMessage(content: string, userId: number): Promise<string> {
+    try {
+      const userHistory = await getUserMessages(userId);
+
+      const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
+
+User's message history for context:
+${userHistory}
+
+Current message to respond to:
+${content}
+
+Guidelines:
+1. Match their communication style (casual/formal, emoji usage, etc.)
+2. Keep responses concise and natural
+3. Don't mention being AI or analyzing their style
+4. Focus on being helpful while maintaining their preferred tone`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: prompt
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 150
+      });
+
+      return response.choices[0].message.content || "I understand. Could you tell me more?";
+    } catch (error) {
+      console.error("Error processing message:", error);
       throw error;
     }
   }
