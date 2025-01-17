@@ -28,6 +28,47 @@ type MessageListProps = {
   channelId: number;
 };
 
+// Placeholder for MessageAudioButton component
+const MessageAudioButton = ({ content }: { content: string }) => {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const generateAudio = async () => {
+      setIsLoading(true);
+      try {
+        // Replace with actual ElevenLabs API call
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: content }),
+        });
+        const data = await response.json();
+        setAudioUrl(data.audioUrl);
+      } catch (error) {
+        console.error("Error generating audio:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (content) {
+      generateAudio();
+    }
+  }, [content]);
+
+  if (isLoading) return <Loader2 className="animate-spin h-4 w-4" />;
+  if (!audioUrl) return null;
+
+  return (
+    <audio controls>
+      <source src={audioUrl} type="audio/mpeg" />
+      Your browser does not support the audio element.
+    </audio>
+  );
+};
+
+
 export function MessageList({ channelId }: MessageListProps) {
   const { messages, isLoading, addReaction } = useMessages(channelId);
   const { user } = useUser();
@@ -225,6 +266,7 @@ export function MessageList({ channelId }: MessageListProps) {
           )}
 
           <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <MessageAudioButton content={message.content} />
             <Button
               variant="ghost"
               size="sm"

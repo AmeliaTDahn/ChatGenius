@@ -2187,5 +2187,21 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/tts", requireAuth, async (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+      
+      const audioBuffer = await generateSpeech(text);
+      res.set('Content-Type', 'audio/mpeg');
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      res.status(500).send("Error generating speech");
+    }
+  });
+
   return httpServer;
 }
