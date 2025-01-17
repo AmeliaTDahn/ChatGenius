@@ -276,7 +276,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(!message.trim() && files.length === 0) || isUploading || disabled}>
+        <Button type="submit" size="icon" disabled={(message.trim().length === 0 && files.length === 0) || isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
