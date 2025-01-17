@@ -73,6 +73,20 @@ class VoiceService {
       speaking_rate: 1.0     // Normal speaking rate
     };
 
+    // Check if the text ends with a question mark
+    const endsWithQuestion = text.trim().endsWith('?');
+
+    // If it's a question, apply questioning tone settings
+    if (endsWithQuestion) {
+      settings = {
+        stability: 0.7,            // Slightly reduced for more variation
+        similarity_boost: 0.75,    // Keep natural voice quality
+        speaking_rate: 0.95,       // Slightly slower for emphasis
+        pitch: 1.15               // Higher pitch for questioning tone
+      };
+      return settings;
+    }
+
     // Only adjust voice if we detect clear emotional content
     const hasEmotionalContent = positiveCount > 0 || negativeCount > 0 || angryCount > 0 || 
                                (exclamationCount > 1) || (uppercaseRatio > 0.4);
@@ -87,13 +101,6 @@ class VoiceService {
       settings.stability = 0.3;
       settings.similarity_boost = 0.85;
       settings.speaking_rate = 1.2;
-    }
-
-    // Adjust for questions
-    if (questionCount > 0) {
-      settings.stability = 0.4;
-      settings.similarity_boost = 0.8;
-      settings.pitch = 1.1;
     }
 
     // Adjust for positive emotion
@@ -127,6 +134,7 @@ class VoiceService {
       negativeCount,
       angryCount,
       hasEmotionalContent,
+      endsWithQuestion,
       settings
     });
 
