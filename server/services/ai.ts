@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages } from "@db/schema";
+import { messages, suggestionFeedback } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
@@ -26,6 +26,31 @@ async function getUserMessages(userId: number, limit: number = 50): Promise<stri
   }
 }
 
+async function getPastSuggestionFeedback(userId: number): Promise<{ 
+  acceptedSuggestions: string[], 
+  rejectedSuggestions: string[] 
+}> {
+  try {
+    const feedback = await db.query.suggestionFeedback.findMany({
+      where: eq(suggestionFeedback.userId, userId),
+      orderBy: [desc(suggestionFeedback.createdAt)],
+      limit: 20
+    });
+
+    return {
+      acceptedSuggestions: feedback
+        .filter(f => f.wasAccepted)
+        .map(f => f.suggestedContent),
+      rejectedSuggestions: feedback
+        .filter(f => !f.wasAccepted)
+        .map(f => f.suggestedContent)
+    };
+  } catch (error) {
+    console.error("Error fetching suggestion feedback:", error);
+    return { acceptedSuggestions: [], rejectedSuggestions: [] };
+  }
+}
+
 const PERSONAL_STYLE_ANALYSIS_PROMPT = `Analyze the following message history from a single user to understand their unique communication style. Focus on:
 
 1. Personal Expression:
@@ -47,6 +72,12 @@ const PERSONAL_STYLE_ANALYSIS_PROMPT = `Analyze the following message history fr
 User's message history:
 {userHistory}
 
+Previous well-received suggestions:
+{acceptedSuggestions}
+
+Previously rejected suggestions (avoid similar patterns):
+{rejectedSuggestions}
+
 Provide a detailed analysis of their personal communication style:`;
 
 const PERSONALIZED_SUGGESTION_PROMPT = `Generate a brief reply that matches this user's personal style:
@@ -57,6 +88,13 @@ const PERSONALIZED_SUGGESTION_PROMPT = `Generate a brief reply that matches this
 2. Message to reply to:
 {messageToReply}
 
+3. Learning from past feedback:
+Successful suggestions that the user liked:
+{acceptedSuggestions}
+
+Suggestions the user rejected (avoid similar patterns):
+{rejectedSuggestions}
+
 Guidelines:
 1. Keep it SHORT (1-2 sentences max)
 2. Match their personal style exactly:
@@ -66,12 +104,15 @@ Guidelines:
 3. Reflect their usual opinion patterns and stance
 4. Keep formatting clean (no special formatting tags)
 5. Sound natural and casual like them
-6. Never mention being AI or include usernames`;
+6. Never mention being AI or include usernames
+7. Follow patterns from accepted suggestions
+8. Avoid patterns from rejected suggestions`;
 
 class AIService {
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
+      const { acceptedSuggestions, rejectedSuggestions } = await getPastSuggestionFeedback(userId);
 
       if (!userHistory) {
         throw new Error("No message history found for user");
@@ -92,7 +133,10 @@ class AIService {
       }
 
       // First, analyze user's personal communication style
-      const personalStyleAnalysisPrompt = PERSONAL_STYLE_ANALYSIS_PROMPT.replace("{userHistory}", userHistory);
+      const personalStyleAnalysisPrompt = PERSONAL_STYLE_ANALYSIS_PROMPT
+        .replace("{userHistory}", userHistory)
+        .replace("{acceptedSuggestions}", acceptedSuggestions.join('\n'))
+        .replace("{rejectedSuggestions}", rejectedSuggestions.join('\n'));
 
       const personalityAnalysis = await openai.chat.completions.create({
         model: "gpt-4",
@@ -108,7 +152,9 @@ class AIService {
 
       const suggestionPrompt = PERSONALIZED_SUGGESTION_PROMPT
         .replace("{personalityAnalysis}", personalityAnalysis.choices[0].message.content || '')
-        .replace("{messageToReply}", messageToReply.content);
+        .replace("{messageToReply}", messageToReply.content)
+        .replace("{acceptedSuggestions}", acceptedSuggestions.join('\n'))
+        .replace("{rejectedSuggestions}", rejectedSuggestions.join('\n'));
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -124,9 +170,34 @@ class AIService {
         frequency_penalty: 0.5
       });
 
-      return response.choices[0].message.content || "Hey! How's it going?";
+      const suggestion = response.choices[0].message.content || "Hey! How's it going?";
+
+      // Store the generated suggestion in the feedback table (initially not accepted)
+      await db.insert(suggestionFeedback).values({
+        userId,
+        channelId,
+        suggestedContent: suggestion,
+        wasAccepted: false
+      });
+
+      return suggestion;
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
+      throw error;
+    }
+  }
+
+  async recordSuggestionFeedback(userId: number, channelId: number, content: string, wasAccepted: boolean): Promise<void> {
+    try {
+      await db.update(suggestionFeedback)
+        .set({ wasAccepted })
+        .where(and(
+          eq(suggestionFeedback.userId, userId),
+          eq(suggestionFeedback.channelId, channelId),
+          eq(suggestionFeedback.suggestedContent, content)
+        ));
+    } catch (error) {
+      console.error("Error recording suggestion feedback:", error);
       throw error;
     }
   }
@@ -134,11 +205,15 @@ class AIService {
   async processMessage(content: string, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
+      const { acceptedSuggestions } = await getPastSuggestionFeedback(userId);
 
       const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
 
 User's message history for context:
 ${userHistory}
+
+Previous successful responses they liked:
+${acceptedSuggestions.join('\n')}
 
 Current message to respond to:
 ${content}
@@ -147,7 +222,8 @@ Guidelines:
 1. Match their communication style (casual/formal, emoji usage, etc.)
 2. Keep responses concise and natural
 3. Don't mention being AI or analyzing their style
-4. Focus on being helpful while maintaining their preferred tone`;
+4. Focus on being helpful while maintaining their preferred tone
+5. Follow patterns from previously successful responses`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",

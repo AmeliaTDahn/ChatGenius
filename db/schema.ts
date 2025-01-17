@@ -46,7 +46,7 @@ export type Document = typeof documents.$inferSelect;
 export const documentEmbeddings = pgTable("document_embeddings", {
   id: serial("id").primaryKey(),
   documentId: integer("document_id").references(() => documents.id).notNull(),
-  embedding: text("embedding").notNull(), 
+  embedding: text("embedding").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -175,7 +175,7 @@ export const channelInvites = pgTable("channel_invites", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), 
+  status: text("status").notNull().default('pending'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -183,7 +183,7 @@ export const friendRequests = pgTable("friend_requests", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").references(() => users.id).notNull(),
   receiverId: integer("receiver_id").references(() => users.id).notNull(),
-  status: text("status").notNull().default('pending'), 
+  status: text("status").notNull().default('pending'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -301,3 +301,26 @@ export const selectDocumentSchema = createSelectSchema(documents);
 
 export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddings);
 export const selectDocumentEmbeddingSchema = createSelectSchema(documentEmbeddings);
+
+export const suggestionFeedback = pgTable("suggestion_feedback", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  suggestedContent: text("suggested_content").notNull(),
+  wasAccepted: boolean("was_accepted").notNull(),
+  channelId: integer("channel_id").references(() => channels.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SuggestionFeedback = typeof suggestionFeedback.$inferSelect;
+export type InsertSuggestionFeedback = typeof suggestionFeedback.$inferInsert;
+
+export const suggestionFeedbackRelations = relations(suggestionFeedback, ({ one }) => ({
+  user: one(users, {
+    fields: [suggestionFeedback.userId],
+    references: [users.id],
+  }),
+  channel: one(channels, {
+    fields: [suggestionFeedback.channelId],
+    references: [channels.id],
+  }),
+}));

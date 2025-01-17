@@ -16,6 +16,21 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const [currentSuggestion, setCurrentSuggestion] = useState("");
   const { toast } = useToast();
 
+  const recordFeedback = async (content: string, wasAccepted: boolean) => {
+    try {
+      await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content, wasAccepted }),
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Error recording suggestion feedback:', error);
+    }
+  };
+
   const handleGetSuggestion = async () => {
     try {
       setIsLoading(true);
@@ -45,9 +60,18 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
-  const handleUseSuggestion = () => {
+  const handleUseSuggestion = async () => {
     if (currentSuggestion) {
-      onSuggestion(currentSuggestion); // Call the callback with the suggestion
+      await recordFeedback(currentSuggestion, true);
+      onSuggestion(currentSuggestion);
+      setShowDialog(false);
+      setCurrentSuggestion("");
+    }
+  };
+
+  const handleRejectSuggestion = async () => {
+    if (currentSuggestion) {
+      await recordFeedback(currentSuggestion, false);
       setShowDialog(false);
       setCurrentSuggestion("");
     }
@@ -81,8 +105,8 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancel
+            <Button variant="outline" onClick={handleRejectSuggestion}>
+              Reject
             </Button>
             <Button onClick={handleUseSuggestion}>
               Use This Reply
