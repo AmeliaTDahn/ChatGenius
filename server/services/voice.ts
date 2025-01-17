@@ -56,10 +56,12 @@ class VoiceService {
     const questionCount = (text.match(/\?/g) || []).length;
     const uppercaseRatio = text.split('').filter(char => char === char.toUpperCase()).length / text.length;
 
-    // Basic sentiment analysis
-    const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased'];
-    const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed'];
-    const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated'];
+    // Enhanced sentiment analysis
+    const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased', 'excited', 'joy', 'amazing', 'perfect', 'fantastic'];
+    const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed', 'upset', 'regret', 'worried', 'concerned'];
+    const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated', 'frustrated', 'rage', 'hate'];
+    const excitedWords = ['wow', 'omg', 'amazing', 'incredible', 'awesome', 'fantastic', 'unbelievable'];
+    const calmWords = ['calm', 'peaceful', 'gentle', 'quiet', 'relaxed', 'steady', 'balanced'];
 
     const words = text.toLowerCase().split(/\W+/);
     const positiveCount = words.filter(word => positiveWords.includes(word)).length;
@@ -103,25 +105,40 @@ class VoiceService {
       settings.speaking_rate = 1.2;
     }
 
-    // Adjust for positive emotion
+    // Enhanced emotion adjustments
+    const excitedCount = words.filter(word => excitedWords.includes(word)).length;
+    const calmCount = words.filter(word => calmWords.includes(word)).length;
+
+    // Adjust for positive emotion with excitement levels
     if (positiveCount > 0) {
-      settings.stability = 0.35;
+      settings.stability = excitedCount > 0 ? 0.3 : 0.4;
       settings.similarity_boost = 0.8;
-      settings.speaking_rate = 1.1;
+      settings.speaking_rate = excitedCount > 0 ? 1.2 : 1.1;
+      settings.pitch = excitedCount > 0 ? 1.1 : 1.0;
     }
 
-    // Adjust for negative emotion
+    // Adjust for negative emotion with intensity
     if (negativeCount > 0) {
       settings.stability = 0.6;
-      settings.similarity_boost = 0.7;
+      settings.similarity_boost = 0.75;
       settings.speaking_rate = 0.9;
+      settings.pitch = 0.95;
     }
 
-    // Adjust for anger
+    // Adjust for anger with intensity scaling
     if (angryCount > 0) {
       settings.stability = 0.25;
       settings.similarity_boost = 0.9;
       settings.speaking_rate = 1.3;
+      settings.pitch = 1.15;
+    }
+
+    // Adjust for calm messages
+    if (calmCount > 0) {
+      settings.stability = 0.8;
+      settings.similarity_boost = 0.7;
+      settings.speaking_rate = 0.9;
+      settings.pitch = 0.95;
     }
 
     // Log the analysis for debugging
