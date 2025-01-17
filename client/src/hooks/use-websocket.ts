@@ -96,6 +96,11 @@ export function useWebSocket() {
 
       ws.current.onerror = (error) => {
         console.error('WebSocket error:', error);
+        toast({
+          title: 'Connection Error',
+          description: 'Failed to connect to the server. Please check your connection.',
+          variant: 'destructive',
+        });
       };
     };
 
@@ -117,13 +122,9 @@ export function useWebSocket() {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ ...message, tabId: tabId.current }));
     } else {
-      toast({
-        title: 'Connection Error',
-        description: 'Not connected to the server. Please wait or refresh the page.',
-        variant: 'destructive',
-      });
+      console.warn('WebSocket not connected, queueing message');
     }
-  }, [toast]);
+  }, []);
 
   return { sendMessage, lastMessage };
 }
