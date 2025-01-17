@@ -46,8 +46,11 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   };
 
   const handleUseSuggestion = () => {
+    // Call the onSuggestion callback with the current suggestion
     onSuggestion(currentSuggestion);
+    // Close the dialog
     setShowDialog(false);
+    // Clear the current suggestion
     setCurrentSuggestion("");
   };
 

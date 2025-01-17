@@ -38,12 +38,13 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   const { toast } = useToast();
 
   const handleSuggestion = (suggestion: string) => {
-    // Set the suggestion text
     setMessage(suggestion);
-
-    // Focus the textarea for immediate editing
+    // Focus the textarea after setting the suggestion
     if (textareaRef.current) {
       textareaRef.current.focus();
+      // Set cursor at the end of the text
+      const length = suggestion.length;
+      textareaRef.current.setSelectionRange(length, length);
     }
   };
 
