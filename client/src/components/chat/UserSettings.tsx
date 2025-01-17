@@ -138,25 +138,20 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
       });
 
       if (!res.ok) throw new Error(await res.text());
-      return res.json() as Promise<User>;
+      return res.json();
     },
     onMutate: async (newData) => {
       await queryClient.cancelQueries({ queryKey: ['user'] });
-      const previousData = queryClient.getQueryData<User>(['user']);
-
-      if (previousData) {
-        queryClient.setQueryData<User>(['user'], {
-          ...previousData,
-          ...newData,
-        });
-      }
-
+      const previousData = queryClient.getQueryData(['user']);
+      queryClient.setQueryData(['user'], old => ({
+        ...old,
+        ...newData
+      }));
       return { previousData };
     },
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['user'], updatedUser);
-      queryClient.invalidateQueries({ queryKey: ['user'] });
-
+      queryClient.invalidateQueries(['user']);
       form.reset({
         username: updatedUser.username,
         age: updatedUser.age,
@@ -165,7 +160,6 @@ export function UserSettings({ user, isOpen = false, onClose }: UserSettingsProp
         avatarUrl: updatedUser.avatarUrl || avatarOptions[0],
         timezone: updatedUser.timezone || "UTC",
       }, { keepValues: true });
-
       setIsAutoSaving(false);
       toast({
         title: "Settings Saved",

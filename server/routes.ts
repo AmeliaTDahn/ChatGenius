@@ -2118,7 +2118,7 @@ export function registerRoutes(app: Express): Server {
 
       // Check if user already exists with the same username or email
       const existingUser = await db.query.users.findFirst({
-                where: or(
+        where: or(
           eq(users.username, username),
           eq(users.email, email)
         ),
@@ -2213,74 +2213,55 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add these routes before the return httpServer line
-
-  // Get available voices endpoint
-  app.get("/api/voices", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const voices = await voiceService.getVoices();
-      res.json(voices);
-    } catch (error) {
-      console.error("Error fetching voices:", error);
-      res.status(500).send("Error fetching voices");
-    }
-  });
-
-  // Text-to-speech endpoint with voice selection
+  // Add this new endpoint before the return statement
   app.post("/api/messages/:messageId/text-to-speech", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).send("Not authenticated");
     }
 
-    const messageId = parseInt(req.params.messageId);
-    const { voiceId } = req.body;
-
-    if (isNaN(messageId)) {
-      return res.status(400).send("Invalid message ID");
-    }
-
     try {
-      // Fetch the message to convert
+      const messageId = parseInt(req.params.messageId);
+      if (isNaN(messageId)) {
+        return res.status(400).send("Invalid message ID");
+      }
+
       const message = await db.query.messages.findFirst({
-        where: eq(messages.id, messageId),
+        where: eq(messages.id, messageId)
       });
 
       if (!message) {
         return res.status(404).send("Message not found");
       }
 
-      // Generate audio from text
-      const audioBuffer = await voiceService.convertTextToSpeech(
-        message.content,
-        voiceId
-      );
+      const audioBuffer = await voiceService.convertTextToSpeech(message.content);
 
-      // Create a unique filename for the voice message
-      const filename = `voice_message_${messageId}_${Date.now()}.mp3`;
-      const filePath = path.join("uploads", filename);
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      res.status(500).send("Error generating speech");
+    }
+  });
+  // Text-to-speech endpoint
+  app.post("/api/tts", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
 
-      // Save the audio file
-      await fs.writeFile(filePath, audioBuffer);
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).send("Text is required");
+    }
 
-      // Create message attachment record
-      const [attachment] = await db
-        .insert(messageAttachments)
-        .values({
-          messageId,
-          filename,
-          fileUrl: `/uploads/${filename}`,
-          fileSize: audioBuffer.length,
-          mimeType: "audio/mpeg",
-          isVoiceMessage: true,
-          duration: 0, // TODO: Calculate actual duration if needed
-        })
-        .returning();
+    try {
+      const audioBuffer = await voiceService.convertTextToSpeech(text);
 
-      res.json(attachment);
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length
+      });
+
+      res.send(audioBuffer);
     } catch (error) {
       console.error("Error generating speech:", error);
       res.status(500).send("Error generating speech");

@@ -15,29 +15,11 @@ class VoiceService {
     this.apiKey = process.env.ELEVENLABS_API_KEY;
   }
 
-  async getVoices(): Promise<any[]> {
+  async convertTextToSpeech(text: string): Promise<Buffer> {
     try {
-      const response = await fetch(`${this.baseUrl}/voices`, {
-        headers: {
-          "xi-api-key": this.apiKey,
-        },
-      });
+      // Use Rachel voice ID by default - one of ElevenLabs' preset voices
+      const voiceId = "21m00Tcm4TlvDq8ikWAM";
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`ElevenLabs API error: ${error.detail || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-      return data.voices;
-    } catch (error) {
-      console.error("Error fetching voices:", error);
-      throw error;
-    }
-  }
-
-  async convertTextToSpeech(text: string, voiceId: string = "21m00Tcm4TlvDq8ikWAM"): Promise<Buffer> {
-    try {
       const response = await fetch(
         `${this.baseUrl}/text-to-speech/${voiceId}`,
         {

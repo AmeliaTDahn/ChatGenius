@@ -5,28 +5,10 @@ import session from 'express-session';
 import passport from 'passport';
 import MemoryStore from 'memorystore';
 import { setupAuth } from './auth';
-import path from 'path';
-import fs from 'fs';
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Configure static file serving for uploads
-app.use('/uploads', express.static(uploadsDir, {
-  setHeaders: (res, filePath) => {
-    // Set proper content type for audio files
-    if (filePath.endsWith('.mp3')) {
-      res.set('Content-Type', 'audio/mpeg');
-    }
-  }
-}));
 
 // Create MemoryStore instance
 const SessionStore = MemoryStore(session);
