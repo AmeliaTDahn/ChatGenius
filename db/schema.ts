@@ -306,6 +306,7 @@ export const suggestionFeedback = pgTable("suggestion_feedback", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
   suggestedContent: text("suggested_content").notNull(),
+  messageLength: integer("message_length").notNull(),
   wasAccepted: boolean("was_accepted").notNull(),
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
