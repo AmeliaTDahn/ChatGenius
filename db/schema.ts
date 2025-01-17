@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
+  preferredVoiceId: text("preferred_voice_id").default("21m00Tcm4TlvDq8ikWAM"), // Default to Rachel voice
 });
 
 // Base types

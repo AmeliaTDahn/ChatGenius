@@ -2118,16 +2118,16 @@ export function registerRoutes(app: Express): Server {
 
       const { username, email, password } = result.data;
 
-      // Check if user already exists with the same username or email
-      const existingUser = await db.query.users.findFirst({
+      // Check if user already exists withconst sameUsernameOrEmail = await db.query.users.findFirst({
+      const sameUsernameOrEmail = await db.query.users.findFirst({
         where: or(
           eq(users.username, username),
           eq(users.email, email)
         ),
       });
 
-      if (existingUser) {
-        if (existingUser.email=== email) {
+      if (sameUsernameOrEmail) {
+        if (sameUsernameOrEmail.email === email) {
           return res.status(400).send("A user with this email is already registered");
         }
         return res.status(400).send("Username already exists");
@@ -2237,7 +2237,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Message not found");
       }
 
-      const audioBuffer = await voiceService.convertTextToSpeech(message.content);
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, req.user.id))
+        .limit(1);
+
+      const audioBuffer = await voiceService.convertTextToSpeech(
+        message.content,
+        user.preferredVoiceId
+      );
 
       // Set headers for audio streaming
       res.set({
@@ -2277,6 +2286,44 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error generating speech:", error);
       res.status(500).send("Error generating speech");
+    }
+  });
+
+  app.get("/api/voices", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const voices = await voiceService.getAvailableVoices();
+      res.json(voices);
+    } catch (error) {
+      console.error("Error fetching voices:", error);
+      res.status(500).send("Error fetching voices");
+    }
+  });
+
+  app.put("/api/user/voice", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const { voiceId } = req.body;
+    if (!voiceId) {
+      return res.status(400).send("Voice ID is required");
+    }
+
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({ preferredVoiceId: voiceId })
+        .where(eq(users.id, req.user.id))
+        .returning();
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating preferred voice:", error);
+      res.status(500).send("Error updating preferred voice");
     }
   });
 
