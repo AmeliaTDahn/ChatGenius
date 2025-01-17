@@ -40,22 +40,24 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   const { toast } = useToast();
 
   const handleSuggestion = async (suggestion: string) => {
-    setMessage(suggestion);
-    setIsFromSuggestion(true);
-    if (textareaRef.current) {
-      textareaRef.current.value = suggestion;
-      textareaRef.current.focus();
-      const length = suggestion.length;
-      textareaRef.current.setSelectionRange(length, length);
-      textareaRef.current.style.height = "inherit";
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        200
-      )}px`;
-      textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+    if (suggestion && suggestion.length > 0) {
+      setMessage(suggestion);
+      setIsFromSuggestion(true);
+      if (textareaRef.current) {
+        textareaRef.current.value = suggestion;
+        textareaRef.current.focus();
+        const length = suggestion.length;
+        textareaRef.current.setSelectionRange(length, length);
+        textareaRef.current.style.height = "inherit";
+        textareaRef.current.style.height = `${Math.min(
+          textareaRef.current.scrollHeight,
+          200
+        )}px`;
+        textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      // Automatically submit the suggested message
+      await handleSubmit(new Event('submit') as unknown as React.FormEvent);
     }
-    // Automatically submit the suggested message
-    await handleSubmit(new Event('submit') as unknown as React.FormEvent);
   };
 
   useEffect(() => {
