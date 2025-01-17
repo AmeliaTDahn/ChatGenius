@@ -32,14 +32,17 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     color: null
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [isFromSuggestion, setIsFromSuggestion] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleSuggestion = (suggestion: string) => {
+  const handleSuggestion = async (suggestion: string) => {
     setMessage(suggestion);
+    setIsFromSuggestion(true);
     if (textareaRef.current) {
+      textareaRef.current.value = suggestion;
       textareaRef.current.focus();
       const length = suggestion.length;
       textareaRef.current.setSelectionRange(length, length);
@@ -50,6 +53,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
       )}px`;
       textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    // Automatically submit the suggested message
+    await handleSubmit(new Event('submit') as unknown as React.FormEvent);
   };
 
   useEffect(() => {
@@ -64,7 +69,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message || files.length > 0) { // Allow any non-empty message or files
+    if (message || files.length > 0) {
       try {
         setIsUploading(true);
         let finalMessage = message;
@@ -87,6 +92,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
           italic: false,
           color: null
         });
+        setIsFromSuggestion(false);
       } catch (error) {
         toast({
           title: "Error",
@@ -100,10 +106,15 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !isFromSuggestion) {
       e.preventDefault();
       handleSubmit(e);
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+    setIsFromSuggestion(false); // Reset the suggestion flag on manual input
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,7 +270,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
           <Textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
