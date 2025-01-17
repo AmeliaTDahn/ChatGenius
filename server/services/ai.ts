@@ -118,12 +118,9 @@ class AIService {
         throw new Error("No message history found for user");
       }
 
-      // Get message to reply to
+      // Get last message in channel to reply to
       const [messageToReply] = await db.query.messages.findMany({
-        where: and(
-          eq(messages.channelId, channelId),
-          eq(messages.userId, userId)
-        ),
+        where: eq(messages.channelId, channelId),
         orderBy: [desc(messages.createdAt)],
         limit: 1
       });
