@@ -711,7 +711,7 @@ export function registerRoutes(app: Express): Server {
               }
             }
           },
-          attachments: true
+          //attachments: true // Removed attachments fetching
         },
         orderBy: (messages, { asc }) => [asc(messages.createdAt)]
       });
@@ -1792,7 +1792,7 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       // If there are files, create attachments
-      if (files && files.length > 0) {
+      /*if (files && files.length > 0) {
         const attachmentValues = files.map(file => ({
           messageId: message.id,
           filename: file.originalname,
@@ -1804,7 +1804,7 @@ export function registerRoutes(app: Express): Server {
         await db
           .insert(messageAttachments)
           .values(attachmentValues);
-      }
+      }*/
 
       // Fetch the complete message with attachments
       const fullMessage = await db.query.messages.findFirst({
@@ -1817,7 +1817,7 @@ export function registerRoutes(app: Express): Server {
               avatarUrl: true,
             }
           },
-          attachments: true,
+          //attachments: true, // Removed attachments fetching
           reactions: {
             with: {
               user: {
@@ -2227,9 +2227,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).send("Invalid message ID");
       }
 
-      const message = await db.query.messages.findFirst({
-        where: eq(messages.id, messageId)
-      });
+      const [message] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, messageId))
+        .limit(1);
 
       if (!message) {
         return res.status(404).send("Message not found");
