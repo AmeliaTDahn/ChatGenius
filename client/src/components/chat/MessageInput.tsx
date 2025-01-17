@@ -43,13 +43,11 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
       textareaRef.current.focus();
       const length = suggestion.length;
       textareaRef.current.setSelectionRange(length, length);
-      // Ensure the textarea height updates
       textareaRef.current.style.height = "inherit";
       textareaRef.current.style.height = `${Math.min(
         textareaRef.current.scrollHeight,
         200
       )}px`;
-      // Don't auto-submit, let user click send button
       textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
     }
   };
@@ -66,12 +64,11 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() || files.length > 0) {
+    if (message || files.length > 0) { // Allow any non-empty message or files
       try {
         setIsUploading(true);
         let finalMessage = message;
 
-        // Apply formatting in reverse order to handle nested formats
         if (currentFormat.color) {
           finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
         }
@@ -125,7 +122,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
       });
 
       setFiles(prev => [...prev, ...newFiles]);
-      // Reset the input value so the same file can be selected again
       e.target.value = '';
     }
   };
@@ -138,7 +134,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     if (type === 'color') {
       setCurrentFormat(prev => ({
         ...prev,
-        color: value === prev.color ? null : value
+        color: value === prev.color ? null : value || null
       }));
     } else {
       setCurrentFormat(prev => ({
@@ -276,7 +272,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
             rows={1}
           />
         </div>
-        <Button type="submit" size="icon" disabled={(message.trim().length === 0 && files.length === 0) || isUploading || disabled}>
+        <Button type="submit" size="icon" disabled={isUploading || disabled}>
           <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
