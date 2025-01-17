@@ -43,13 +43,14 @@ class VoiceService {
     }
   }
 
-  async convertTextToSpeech(text: string, voiceId?: string): Promise<Buffer> {
+  async convertTextToSpeech(text: string, voiceId: string | undefined): Promise<Buffer> {
     try {
       // Use provided voice ID or Rachel voice as default
       const finalVoiceId = voiceId || "21m00Tcm4TlvDq8ikWAM";
+      console.log("Using voice ID:", finalVoiceId); // Debug log
 
       const response = await fetch(
-        `${this.baseUrl}/text-to-speech/${finalVoiceId}`,
+        `${this.baseUrl}/text-to-speech/${finalVoiceId}/stream`,
         {
           method: "POST",
           headers: {
