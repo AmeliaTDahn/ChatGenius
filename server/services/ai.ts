@@ -180,8 +180,7 @@ class AIService {
         wasAccepted: false
       });
 
-      // Remove any quotes from the suggestion
-      return suggestion.replace(/['"]/g, '');
+      return suggestion;
     } catch (error) {
       console.error("Error generating reply suggestion:", error);
       throw error;
