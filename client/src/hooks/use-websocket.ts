@@ -94,14 +94,14 @@ export function useWebSocket() {
         }
       };
 
-      ws.current.onerror = (error) => {
+     /* ws.current.onerror = (error) => {
         console.error('WebSocket error:', error);
         toast({
           title: 'Connection Error',
           description: 'Failed to connect to the server. Please check your connection.',
           variant: 'destructive',
         });
-      };
+      };*/
     };
 
     connect();
