@@ -2242,5 +2242,31 @@ export function registerRoutes(app: Express): Server {
       res.status(500).send("Error generating speech");
     }
   });
+  // Text-to-speech endpoint
+  app.post("/api/tts", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).send("Text is required");
+    }
+
+    try {
+      const audioBuffer = await voiceService.convertTextToSpeech(text);
+
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length
+      });
+
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      res.status(500).send("Error generating speech");
+    }
+  });
+
   return httpServer;
 }
