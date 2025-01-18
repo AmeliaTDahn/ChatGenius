@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Lightbulb, Loader2 } from "lucide-react";
+import { Lightbulb, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface SuggestionButtonProps {
@@ -109,11 +109,20 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={handleRejectSuggestion}>
-              Reject
+            <Button 
+              variant="outline" 
+              onClick={handleRejectSuggestion}
+              className="gap-2"
+            >
+              <ThumbsDown className="h-4 w-4" />
+              Not Good
             </Button>
-            <Button onClick={handleUseSuggestion}>
-              Use This Reply
+            <Button 
+              onClick={handleUseSuggestion}
+              className="gap-2"
+            >
+              <ThumbsUp className="h-4 w-4" />
+              Use This
             </Button>
           </DialogFooter>
         </DialogContent>
