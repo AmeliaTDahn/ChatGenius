@@ -249,8 +249,8 @@ Guidelines:
 2. Keep responses concise and natural
 3. Don't mention being AI or analyzing their style
 4. Focus on being helpful while maintaining their preferred tone
-5. Follow patterns from previously successful responses
-${rejectedSuggestions.length > 0 ? `6. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
+5. Follow patterns from responses they liked
+${rejectedSuggestions.length > 0 ? `6. Avoid patterns similar to these disliked responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -335,10 +335,10 @@ async function getPastSuggestionFeedback(userId: number): Promise<{
 
     return {
       acceptedSuggestions: feedback
-        .filter(f => f.wasAccepted)
+        .filter(f => f.wasLiked === true)
         .map(f => f.suggestedContent),
       rejectedSuggestions: feedback
-        .filter(f => !f.wasAccepted)
+        .filter(f => f.wasLiked === false)
         .map(f => f.suggestedContent)
     };
   } catch (error) {
