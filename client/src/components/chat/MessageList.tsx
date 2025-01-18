@@ -295,13 +295,14 @@ export function MessageList({ channelId }: MessageListProps) {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
+      {messages.length > 0 && channelId !== -1 && 
+       messages[messages.length - 1].userId !== user?.id &&
+       isMessageDirectedAtUser(messages[messages.length - 1], user) && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <SuggestionButton
             channelId={channelId}
             onSuggestion={handleSuggestion}
             disabled={isGeneratingSuggestion}
-            isMessageDirectedAtUser={isMessageDirectedAtUser(messages[messages.length -1], user)}
           />
         </div>
       )}
