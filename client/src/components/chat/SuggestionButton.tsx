@@ -32,6 +32,12 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         }),
         credentials: 'include',
       });
+
+      // Show minimal feedback toast
+      toast({
+        description: "Feedback received",
+        duration: 3000,
+      });
     } catch (error) {
       console.error('Error recording style feedback:', error);
     }
