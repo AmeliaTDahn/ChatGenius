@@ -2389,25 +2389,11 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Check if user is a member of the channel
-      const [membership] = await db
-        .select()
-        .from(channelMembers)
-        .where(and(
-          eq(channelMembers.channelId, channelId),
-          eq(channelMembers.userId, req.user.id)
-        ))
-        .limit(1);
-
-      if (!membership && channelId !== -1) {
-        return res.status(403).send("You are not a member of this channel");
-      }
-
       const summary = await aiService.generateConversationSummary(channelId);
       res.json({ summary });
     } catch (error) {
-      console.error("Error generating channel summary:", error);
-      res.status(500).send("Error generating channel summary");
+      console.error("Error generating conversation summary:", error);
+      res.status(500).send("Error generating conversation summary");
     }
   });
 

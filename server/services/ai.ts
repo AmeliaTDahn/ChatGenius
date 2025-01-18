@@ -81,7 +81,7 @@ async function getUserMessages(userId: number, searchQuery?: string, limit: numb
       content: msg.content,
       username: msg.user?.username || 'AI Assistant',
       timestamp: msg.createdAt,
-      source: msg.channelId === -1 
+      source: msg.channelId === -1
         ? "AI Assistant Chat"
         : channelNames.get(msg.channelId) || dmUsernames.get(msg.channelId) || "Unknown"
     }));
@@ -110,7 +110,7 @@ class AIService {
                      content.toLowerCase().includes('?');
 
       // If it's a query, try to find relevant messages first
-      const relevantMessages = isQuery 
+      const relevantMessages = isQuery
         ? await getUserMessages(userId, content.replace(/[?.,!]/g, '').split(' ').filter(word => word.length > 3).join(' '))
         : await getUserMessages(userId);
 
@@ -168,27 +168,26 @@ Guidelines:
 
   async generateConversationSummary(channelId: number): Promise<string> {
     try {
-      // Get messages from both the specific channel and active conversations
+      // Get channel messages and global context from active conversations
       const channelMessages = await getChannelMessages(channelId);
-      const allMessages = await getUserMessages(-1); // -1 to get all messages from active channels
-      const channelHistory = this.formatMessageHistory(channelMessages);
-      const globalHistory = this.formatMessageHistory(allMessages);
+      const messageHistory = formatMessageHistory(channelMessages);
 
-      const systemPrompt = `You are a conversation summarizer with access to both channel-specific and global conversations. Analyze the conversation and provide a concise summary of the key points and outcomes.
+      const systemPrompt = `You are an expert conversation summarizer. Analyze this conversation and provide a concise, informative summary.
 
-Channel Conversation:
-${channelHistory}
-
-Global Context:
-${globalHistory}
+Conversation to summarize:
+${messageHistory}
 
 Guidelines:
-1. Focus on the main topics and decisions made
-2. Keep the summary brief (2-3 sentences)
-3. Highlight any action items or conclusions
-4. Use neutral language
-5. Reference relevant information from other conversations when appropriate
-6. Don't include timestamps unless crucial to understanding`;
+1. Focus on key topics, decisions, and outcomes
+2. Keep the summary concise (2-3 paragraphs max)
+3. Highlight important decisions or action items
+4. Mention significant participant contributions
+5. Note any unresolved discussions or next steps
+6. Use natural, engaging language
+7. Include timestamps only if they're crucial to understanding the context
+8. Group related topics together
+9. If there are emotional elements or tone changes in the conversation, briefly note them
+10. If technical discussions occur, summarize them in accessible terms`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -198,8 +197,8 @@ Guidelines:
             content: systemPrompt
           }
         ],
-        temperature: 0.5,
-        max_tokens: 150
+        temperature: 0.7,
+        max_tokens: 500
       });
 
       return response.choices[0].message.content || "No significant discussion points to summarize.";
@@ -296,15 +295,16 @@ Guidelines:
 
 export const aiService = new AIService();
 
-async function getChannelMessages(channelId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
+async function getChannelMessages(channelId: number, limit: number = 100): Promise<Array<MessageWithContext>> {
   try {
     const channelMessages = await db.query.messages.findMany({
       where: eq(messages.channelId, channelId),
-      orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+      orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
       with: {
         user: {
           columns: {
+            id: true,
             username: true
           }
         }
@@ -313,7 +313,9 @@ async function getChannelMessages(channelId: number, limit: number = 100): Promi
 
     return channelMessages.map(msg => ({
       content: msg.content,
-      username: msg.user?.username || 'AI Assistant'
+      username: msg.user?.username || 'AI Assistant',
+      timestamp: msg.createdAt,
+      source: `Channel Message`
     }));
   } catch (error) {
     console.error("Error fetching channel messages:", error);
