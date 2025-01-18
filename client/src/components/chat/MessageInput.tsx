@@ -55,9 +55,10 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      setIsUploading(true);
-      let finalMessage = message;
+    if (message || files.length > 0) {
+      try {
+        setIsUploading(true);
+        let finalMessage = message;
 
         if (currentFormat.color) {
           finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
@@ -169,8 +170,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     "#ec4899", // Pink
   ];
 
-  const MessageInputComponent = () => {
-    return (
+  return (
     <form onSubmit={handleSubmit} className="p-4 border-t">
       {files.length > 0 && (
         <ScrollArea className="max-h-32 mb-2">
@@ -293,8 +293,5 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
         </Button>
       </div>
     </form>
-    );
-  };
-  
-  return MessageInputComponent();
+  );
 }
