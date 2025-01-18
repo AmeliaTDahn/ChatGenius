@@ -142,7 +142,7 @@ class VoiceService {
   }
 
   private analyzeTextEmotion(text: string): VoiceEmotionSettings {
-    // Enhanced positive emotion detection
+    // Enhanced positive emotion detection with stronger weights for happy/excited keywords
     const positiveWords = [
       'happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best',
       'thanks', 'thank', 'pleased', 'excited', 'joy', 'amazing', 'perfect', 'fantastic',
@@ -166,14 +166,28 @@ class VoiceService {
     // Get emotional intensity
     const intensity = this.detectEmotionalIntensity(text);
 
-    // Enhanced emotional patterns with positive emphasis
+    // Check explicit happiness/excitement indicators first
+    const hasHappyKeyword = /(happy|excited|joy|delighted|glad)\b/i.test(text);
+    if (hasHappyKeyword) {
+      const profile = VOICE_TONE_PROFILES.happy;
+      const multiplier = profile.intensityMultipliers[intensity];
+
+      return {
+        stability: 0.3, // Lower stability for more dynamic expression
+        similarity_boost: 0.85,
+        speaking_rate: 1.3 * multiplier, // Faster for happiness
+        pitch: 1.25 * multiplier // Higher pitch for positive emotions
+      };
+    }
+
+    // Enhanced emotional patterns with emphasis on positive emotions
     const emotionPatterns = [
       { 
-        regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(happy|excited|joyful|thrilled|ecstatic|delighted|glad)/i,
+        regex: /(?:i (?:am|feel)|i'm|feeling|this is|that's|thats) (?:so |really |very |extremely )?(happy|excited|joyful|thrilled|ecstatic|delighted|glad)/i,
         emotion: 'happy'
       },
       { 
-        regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(excited|thrilled|pumped|stoked|psyched)/i,
+        regex: /(?:i (?:am|feel)|i'm|feeling|this is|that's|thats) (?:so |really |very |extremely )?(excited|thrilled|pumped|stoked|psyched)/i,
         emotion: 'excited'
       },
       { 
@@ -186,15 +200,18 @@ class VoiceService {
       }
     ];
 
-    // Check for direct emotional expressions first
+    // Check for direct emotional expressions
     for (const pattern of emotionPatterns) {
       if (pattern.regex.test(text)) {
         const profile = VOICE_TONE_PROFILES[pattern.emotion];
         const multiplier = profile.intensityMultipliers[intensity];
 
-        // Apply emotional momentum
+        // Apply emotional momentum with stronger effect for positive emotions
         if (this.lastEmotionalContext === pattern.emotion) {
-          this.emotionalMomentum = Math.min(this.emotionalMomentum + 0.15, 0.4);
+          this.emotionalMomentum = Math.min(
+            this.emotionalMomentum + (pattern.emotion === 'happy' || pattern.emotion === 'excited' ? 0.2 : 0.15),
+            0.4
+          );
         } else {
           this.emotionalMomentum = 0;
         }
@@ -210,18 +227,18 @@ class VoiceService {
       }
     }
 
-    // Word-based analysis with positive bias
+    // Word-based analysis with increased positive bias
     const words = text.toLowerCase().split(/\W+/);
     const emotionCounts = {
-      positive: words.filter(word => positiveWords.includes(word)).length * 1.2, // Increased weight for positive words
-      excited: words.filter(word => excitedWords.includes(word)).length * 1.2,  // Increased weight for excited words
-      negative: words.filter(word => negativeWords.includes(word)).length,
-      angry: words.filter(word => angryWords.includes(word)).length
+      positive: words.filter(word => positiveWords.includes(word)).length * 1.5, // Increased weight for positive words
+      excited: words.filter(word => excitedWords.includes(word)).length * 1.5,  // Increased weight for excited words
+      negative: words.filter(word => negativeWords.includes(word)).length * 0.8, // Reduced weight for negative words
+      angry: words.filter(word => angryWords.includes(word)).length * 0.8 // Reduced weight for angry words
     };
 
-    // Check for emojis
+    // Check for happy emojis with increased weight
     const happyEmojiCount = (text.match(/[😀😃😄😊🙂😉😌😍🥰😘🤗]/g) || []).length;
-    emotionCounts.positive += happyEmojiCount * 1.5; // Add extra weight for happy emojis
+    emotionCounts.positive += happyEmojiCount * 2.0; // Increased weight for happy emojis
 
     const dominantEmotion = Object.entries(emotionCounts).reduce((max, [emotion, count]) => 
       count > max.count ? { emotion, count } : max,
@@ -231,10 +248,11 @@ class VoiceService {
     let profile: VoiceToneProfile;
     switch (dominantEmotion.emotion) {
       case 'positive':
-        profile = VOICE_TONE_PROFILES.happy;
-        break;
       case 'excited':
-        profile = VOICE_TONE_PROFILES.excited;
+        // Use excited profile for stronger positive emotions
+        profile = emotionCounts.excited > emotionCounts.positive 
+          ? VOICE_TONE_PROFILES.excited 
+          : VOICE_TONE_PROFILES.happy;
         break;
       case 'negative':
         profile = VOICE_TONE_PROFILES.sad;
@@ -243,7 +261,7 @@ class VoiceService {
         profile = VOICE_TONE_PROFILES.angry;
         break;
       default:
-        // Return slightly positive neutral settings
+        // Default to slightly positive neutral settings
         return {
           stability: 0.65,
           similarity_boost: 0.75,
@@ -254,9 +272,10 @@ class VoiceService {
 
     const multiplier = profile.intensityMultipliers[intensity];
 
-    // Update emotional context
+    // Update emotional context with stronger momentum for positive emotions
     if (this.lastEmotionalContext === profile.emotion) {
-      this.emotionalMomentum = Math.min(this.emotionalMomentum + 0.15, 0.4);
+      const momentumIncrease = (profile.emotion === 'happy' || profile.emotion === 'excited') ? 0.2 : 0.15;
+      this.emotionalMomentum = Math.min(this.emotionalMomentum + momentumIncrease, 0.4);
     } else {
       this.emotionalMomentum = 0;
     }
