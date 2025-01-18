@@ -13,17 +13,8 @@ const openai = new OpenAI({
 
 async function getUserMessages(userId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
   try {
-    // Get all channels the user is a member of
-    const userChannels = await db
-      .select({ channelId: channelMembers.channelId })
-      .from(channelMembers)
-      .where(eq(channelMembers.userId, userId));
-
-    const channelIds = userChannels.map(uc => uc.channelId);
-
-    // Get messages from all these channels
-    const channelMessages = await db.query.messages.findMany({
-      where: inArray(messages.channelId, channelIds),
+    // Get all messages from all channels
+    const allMessages = await db.query.messages.findMany({
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
       with: {
@@ -35,12 +26,12 @@ async function getUserMessages(userId: number, limit: number = 100): Promise<Arr
       }
     });
 
-    return channelMessages.map(msg => ({
+    return allMessages.map(msg => ({
       content: msg.content,
       username: msg.user?.username || 'AI Assistant'
     }));
   } catch (error) {
-    console.error("Error fetching channel messages:", error);
+    console.error("Error fetching messages:", error);
     return [];
   }
 }
@@ -118,7 +109,7 @@ class AIService {
                                content.toLowerCase().includes('?');
 
       let systemPrompt = isQueryAboutHistory
-        ? `You are a helpful AI assistant with access to the conversation history. Be concise and direct.
+        ? `You are a helpful AI assistant with access to all conversations in the system. Be concise and direct.
 
 Your context:
 ${messageHistory}
@@ -130,7 +121,8 @@ Guidelines:
 - Only mention timestamps if specifically asked about timing
 - Be direct and to the point
 - Focus on answering the specific question asked
-- Include usernames when referring to specific messages`
+- Include usernames when referring to specific messages
+- Consider the full context of all conversations when answering questions`
         : `You are a helpful AI assistant. Be concise and match the user's communication style.
 
 Conversation history for context:
@@ -170,20 +162,27 @@ Guidelines:
 
   async generateConversationSummary(channelId: number): Promise<string> {
     try {
+      // Get messages from both the specific channel and global context
       const channelMessages = await getChannelMessages(channelId);
-      const messageHistory = this.formatMessageHistory(channelMessages);
+      const allMessages = await getUserMessages(-1); // -1 to get all messages
+      const channelHistory = this.formatMessageHistory(channelMessages);
+      const globalHistory = this.formatMessageHistory(allMessages);
 
-      const systemPrompt = `You are a conversation summarizer. Analyze the following conversation and provide a concise summary of the key points and outcomes.
+      const systemPrompt = `You are a conversation summarizer with access to both channel-specific and global conversations. Analyze the conversation and provide a concise summary of the key points and outcomes.
 
-Conversation:
-${messageHistory}
+Channel Conversation:
+${channelHistory}
+
+Global Context:
+${globalHistory}
 
 Guidelines:
 1. Focus on the main topics and decisions made
 2. Keep the summary brief (2-3 sentences)
 3. Highlight any action items or conclusions
 4. Use neutral language
-5. Don't include timestamps unless crucial to understanding`;
+5. Reference relevant information from other conversations when appropriate
+6. Don't include timestamps unless crucial to understanding`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -203,7 +202,6 @@ Guidelines:
       throw error;
     }
   }
-
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
