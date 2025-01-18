@@ -16,7 +16,28 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const [currentSuggestion, setCurrentSuggestion] = useState("");
   const { toast } = useToast();
 
-  const recordFeedback = async (content: string, wasAccepted: boolean, wasLiked?: boolean) => {
+  // Separate feedback functions for different purposes
+  const recordStyleFeedback = async (content: string, wasLiked: boolean) => {
+    try {
+      await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          content, 
+          wasAccepted: false, // Style feedback doesn't affect acceptance
+          wasLiked,
+          messageLength: content.length 
+        }),
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Error recording style feedback:', error);
+    }
+  };
+
+  const recordUsageFeedback = async (content: string, wasAccepted: boolean) => {
     try {
       await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
         method: 'POST',
@@ -26,21 +47,12 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         body: JSON.stringify({ 
           content, 
           wasAccepted,
-          wasLiked,
           messageLength: content.length 
         }),
         credentials: 'include',
       });
-
-      if (wasLiked !== undefined) {
-        toast({
-          description: wasLiked 
-            ? "Thanks! I'll consider this style for future suggestions." 
-            : "Got it! I'll avoid this style in the future.",
-        });
-      }
     } catch (error) {
-      console.error('Error recording suggestion feedback:', error);
+      console.error('Error recording usage feedback:', error);
     }
   };
 
@@ -75,7 +87,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
 
   const handleUseSuggestion = async () => {
     if (currentSuggestion) {
-      await recordFeedback(currentSuggestion, true);
+      await recordUsageFeedback(currentSuggestion, true);
       onSuggestion(currentSuggestion);
       setShowDialog(false);
       setCurrentSuggestion("");
@@ -84,7 +96,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
 
   const handleRejectSuggestion = async () => {
     if (currentSuggestion) {
-      await recordFeedback(currentSuggestion, false);
+      await recordUsageFeedback(currentSuggestion, false);
       setShowDialog(false);
       setCurrentSuggestion("");
     }
@@ -92,7 +104,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
 
   const handleQualityFeedback = async (wasLiked: boolean) => {
     if (currentSuggestion) {
-      await recordFeedback(currentSuggestion, false, wasLiked);
+      await recordStyleFeedback(currentSuggestion, wasLiked);
     }
   };
 
@@ -131,6 +143,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
                   size="sm"
                   onClick={() => handleQualityFeedback(false)}
                   className="hover:bg-destructive/10"
+                  title="This style doesn't match my communication"
                 >
                   <ThumbsDown className="h-4 w-4 text-destructive" />
                 </Button>
@@ -139,6 +152,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
                   size="sm"
                   onClick={() => handleQualityFeedback(true)}
                   className="hover:bg-primary/10"
+                  title="This style matches my communication"
                 >
                   <ThumbsUp className="h-4 w-4 text-primary" />
                 </Button>
