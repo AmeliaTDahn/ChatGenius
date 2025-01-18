@@ -244,7 +244,6 @@ export function MessageList({ channelId }: MessageListProps) {
             channelId={channelId}
             onSuggestion={handleSuggestion}
             disabled={isGeneratingSuggestion}
-            isMessageDirectedAtUser={true}
           />
         </div>
       )}

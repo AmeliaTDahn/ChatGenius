@@ -44,7 +44,16 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get suggestion');
+        const errorText = await response.text();
+        if (errorText.includes("directed at another user")) {
+          toast({
+            title: "Cannot Generate Suggestion",
+            description: "This message appears to be directed at another user in the conversation.",
+            variant: "default",
+          });
+          return;
+        }
+        throw new Error(errorText || 'Failed to get suggestion');
       }
 
       const data = await response.json();
