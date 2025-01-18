@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels } from "@db/schema";
+import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels, users } from "@db/schema";
 import { eq, desc, and, or, inArray, not, ilike } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
@@ -114,6 +114,48 @@ async function getUserEmoticonStyle(userMessages: MessageWithContext[]): Promise
     usesEmojis: emojiFrequency > 0.1, // Consider user an emoji user if >10% of messages have emojis
     emojiFrequency
   };
+}
+
+async function isMessageDirectedAtUser(message: string, username: string, otherUsernames: string[]): Promise<boolean> {
+  // Convert usernames to lowercase for case-insensitive matching
+  const lowerMessage = message.toLowerCase();
+  const lowerUsername = username.toLowerCase();
+
+  // Check for direct @mentions
+  if (lowerMessage.includes(`@${lowerUsername}`)) {
+    return true;
+  }
+
+  // Check if message starts with the username
+  if (lowerMessage.startsWith(lowerUsername)) {
+    return true;
+  }
+
+  // Check if message is directed at another user
+  for (const otherUser of otherUsernames) {
+    if (lowerMessage.includes(`@${otherUser.toLowerCase()}`)) {
+      return false;
+    }
+    if (lowerMessage.startsWith(otherUser.toLowerCase())) {
+      return false;
+    }
+  }
+
+  // Check for question directed at specific user
+  const questionPattern = /^(?:hey|hi|hello|excuse me|um|uh)?\s*,?\s*([a-zA-Z0-9_]+)\s*[,.]?\s*(?:can|could|would|will|do|does|what|when|where|why|how|is|are)/i;
+  const match = message.match(questionPattern);
+  if (match && match[1]) {
+    const mentionedUser = match[1].toLowerCase();
+    if (mentionedUser === lowerUsername) {
+      return true;
+    }
+    if (otherUsernames.some(name => mentionedUser === name.toLowerCase())) {
+      return false;
+    }
+  }
+
+  // If no specific direction is found, consider it a general message
+  return true;
 }
 
 class AIService {
@@ -233,11 +275,11 @@ Guidelines:
         throw new Error("No message history found for user");
       }
 
-      // Get recent messages in the channel for context
+      // Get recent messages and channel participants
       const recentMessages = await db.query.messages.findMany({
         where: eq(messages.channelId, channelId),
         orderBy: [desc(messages.createdAt)],
-        limit: 5,
+        limit: 10, // Increased limit for better context
         with: {
           user: {
             columns: {
@@ -257,10 +299,40 @@ Guidelines:
         throw new Error("Cannot suggest a reply to your own message");
       }
 
+      // Get current user's username
+      const [currentUser] = await db
+        .select({
+          username: users.username
+        })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!currentUser) {
+        throw new Error("Current user not found");
+      }
+
+      // Get unique usernames of other participants in the conversation
+      const otherUsernames = [...new Set(
+        recentMessages
+          .map(msg => msg.user?.username)
+          .filter(username => username && username !== currentUser.username)
+      )];
+
+      // Check if the last message is directed at the current user
+      const isDirectedAtUser = await isMessageDirectedAtUser(
+        lastMessage.content,
+        currentUser.username,
+        otherUsernames
+      );
+
+      if (!isDirectedAtUser) {
+        throw new Error("Message appears to be directed at another user");
+      }
+
       // Analyze user's emoji usage
       const { usesEmojis, emojiFrequency } = await getUserEmoticonStyle(userHistory);
 
-      // Format recent conversation context
+      // Format recent conversation context with clear speaker identification
       const conversationContext = recentMessages
         .reverse()
         .map(msg => `${msg.user?.username || 'Unknown'}: ${msg.content}`)
@@ -273,7 +345,7 @@ Guidelines:
         ? `Use emojis sparingly (about ${Math.round(emojiFrequency * 100)}% of the time) to match their style`
         : "Do not use any emojis in the response as the user doesn't use them";
 
-      const prompt = `You are helping craft a reply to a conversation. Generate a natural response directed at ${lastMessage.user?.username || 'the last speaker'} based on the recent conversation and the user's communication style.
+      const prompt = `You are helping craft a reply in a group conversation with multiple participants. Generate a natural response directed at ${lastMessage.user?.username || 'the last speaker'} based on the recent conversation and the user's communication style.
 
 Recent conversation context (most recent last):
 ${conversationContext}
@@ -287,6 +359,8 @@ ${acceptedSuggestions.join('\n')}
 You are generating a reply to this specific message:
 ${lastMessage.user?.username || 'User'}: ${lastMessage.content}
 
+Channel participants: ${[currentUser.username, ...otherUsernames].join(', ')}
+
 Guidelines:
 1. Make sure the reply is directed at ${lastMessage.user?.username || 'the speaker'} and relevant to their last message
 2. Match their communication style (casual/formal, length, etc.)
@@ -296,7 +370,8 @@ Guidelines:
 6. Focus on being helpful while maintaining their preferred tone
 7. Ensure the response continues the current conversation thread
 8. Don't start with their username - write as if in an ongoing conversation
-${rejectedSuggestions.length > 0 ? `9. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
+9. Consider the group conversation context - make sure the response is appropriate for the ongoing discussion
+${rejectedSuggestions.length > 0 ? `10. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
