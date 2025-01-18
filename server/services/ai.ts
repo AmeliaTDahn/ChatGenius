@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback, channelMembers } from "@db/schema";
-import { eq, desc, and, or, inArray } from "drizzle-orm";
+import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels } from "@db/schema";
+import { eq, desc, and, or, inArray, not } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -13,8 +13,27 @@ const openai = new OpenAI({
 
 async function getUserMessages(userId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
   try {
-    // Get all messages from all channels
+    // Get channels where user is still a member
+    const userChannels = await db
+      .select({ channelId: channelMembers.channelId })
+      .from(channelMembers)
+      .where(eq(channelMembers.userId, userId));
+
+    const channelIds = userChannels.map(uc => uc.channelId);
+
+    // Get active DM channels for the user
+    const userDMs = await db.query.directMessageChannels.findMany({
+      where: or(
+        eq(directMessageChannels.user1Id, userId),
+        eq(directMessageChannels.user2Id, userId)
+      )
+    });
+
+    const dmChannelIds = userDMs.map(dm => dm.channelId);
+
+    // Get messages from all active channels and DMs
     const allMessages = await db.query.messages.findMany({
+      where: inArray(messages.channelId, [...channelIds, ...dmChannelIds]),
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
       with: {
@@ -109,7 +128,7 @@ class AIService {
                                content.toLowerCase().includes('?');
 
       let systemPrompt = isQueryAboutHistory
-        ? `You are a helpful AI assistant with access to all conversations in the system. Be concise and direct.
+        ? `You are a helpful AI assistant with access to all active conversations in the system. Be concise and direct.
 
 Your context:
 ${messageHistory}
@@ -121,8 +140,7 @@ Guidelines:
 - Only mention timestamps if specifically asked about timing
 - Be direct and to the point
 - Focus on answering the specific question asked
-- Include usernames when referring to specific messages
-- Consider the full context of all conversations when answering questions`
+- Include usernames when referring to specific messages`
         : `You are a helpful AI assistant. Be concise and match the user's communication style.
 
 Conversation history for context:
@@ -162,9 +180,9 @@ Guidelines:
 
   async generateConversationSummary(channelId: number): Promise<string> {
     try {
-      // Get messages from both the specific channel and global context
+      // Get messages from both the specific channel and active conversations
       const channelMessages = await getChannelMessages(channelId);
-      const allMessages = await getUserMessages(-1); // -1 to get all messages
+      const allMessages = await getUserMessages(-1); // -1 to get all messages from active channels
       const channelHistory = this.formatMessageHistory(channelMessages);
       const globalHistory = this.formatMessageHistory(allMessages);
 
