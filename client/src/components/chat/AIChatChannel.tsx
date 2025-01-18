@@ -6,9 +6,16 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { marked } from 'marked';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useUser } from "@/hooks/use-user";
 import type { Message } from "@db/schema";
 
-interface AIMessage extends Message {
+interface AIMessage extends Partial<Message> {
+  id: number;
+  content: string;
+  channelId: number;
+  userId: number;
+  createdAt: Date;
+  isAIMessage?: boolean;
   user: {
     id: number;
     username: string;
@@ -23,6 +30,7 @@ export function AIChatChannel() {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { user } = useUser();
 
   const { data: messages = [] } = useQuery<AIMessage[]>({
     queryKey: ['/api/channels/-1/messages'],
@@ -50,12 +58,21 @@ export function AIChatChannel() {
   }, [messages]);
 
   const handleSendMessage = async (content: string) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to send messages.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
 
       // Send message via WebSocket
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws?userId=${user.id}&tabId=${Date.now()}`);
 
       ws.onopen = () => {
         ws.send(JSON.stringify({
@@ -70,6 +87,11 @@ export function AIChatChannel() {
         if (data.type === 'message' || data.type === 'ai_status') {
           queryClient.invalidateQueries({ queryKey: ['/api/channels/-1/messages'] });
         }
+        if (data.type === 'ai_status' && data.status === 'thinking') {
+          setIsLoading(true);
+        } else {
+          setIsLoading(false);
+        }
       };
 
       ws.onerror = (error) => {
@@ -79,6 +101,11 @@ export function AIChatChannel() {
           description: "Failed to send message. Please try again.",
           variant: "destructive",
         });
+        setIsLoading(false);
+      };
+
+      ws.onclose = () => {
+        setIsLoading(false);
       };
 
     } catch (error) {
@@ -88,7 +115,6 @@ export function AIChatChannel() {
         description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };
