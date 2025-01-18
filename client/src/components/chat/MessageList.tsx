@@ -282,16 +282,16 @@ export function MessageList({ channelId }: MessageListProps) {
         </div>
       )}
       <ScrollArea className="flex-1 p-4">
-        {messages.length > 0 && channelId !== -1 && (
-          <div className="flex justify-end mb-4">
-            <SummaryButton channelId={channelId} />
-          </div>
-        )}
         <div className="space-y-4 pt-14">
           {messages.map((message) => (
             <MessageComponent key={message.id} message={message} />
           ))}
           <div ref={bottomRef} />
+          {messages.length > 0 && channelId !== -1 && (
+            <div className="flex justify-end mt-4">
+              <SummaryButton channelId={channelId} />
+            </div>
+          )}
         </div>
       </ScrollArea>
       {showThread && selectedMessage && (
