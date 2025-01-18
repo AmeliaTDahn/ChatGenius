@@ -2126,7 +2126,7 @@ export function registerRoutes(app: Express): Server {
       if (sameUsernameOrEmail) {
         return res.status(400).send(
           sameUsernameOrEmail.username === username
-            ? "Username already exists"            : "Email already exists"
+            ? "Username already exists"            :"Email already exists"
         );
       }
 
@@ -2378,6 +2378,38 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error testing voice:", error);
       res.status(500).send("Error testing voice");
+    }
+  });
+  app.get("/api/channels/:channelId/summary", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const channelId = parseInt(req.params.channelId);
+    if (isNaN(channelId)) {
+      return res.status(400).send("Invalid channel ID");
+    }
+
+    try {
+      // Check if user is a member of the channel
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(and(
+          eq(channelMembers.channelId, channelId),
+          eq(channelMembers.userId, req.user.id)
+        ))
+        .limit(1);
+
+      if (!membership && channelId !== -1) {
+        return res.status(403).send("You are not a member of this channel");
+      }
+
+      const summary = await aiService.generateConversationSummary(channelId);
+      res.json({ summary });
+    } catch (error) {
+      console.error("Error generating channel summary:", error);
+      res.status(500).send("Error generating channel summary");
     }
   });
 

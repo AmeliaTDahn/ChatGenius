@@ -45,6 +45,31 @@ async function getUserMessages(userId: number, limit: number = 100): Promise<Arr
   }
 }
 
+async function getChannelMessages(channelId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
+  try {
+    const channelMessages = await db.query.messages.findMany({
+      where: eq(messages.channelId, channelId),
+      orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+      limit,
+      with: {
+        user: {
+          columns: {
+            username: true
+          }
+        }
+      }
+    });
+
+    return channelMessages.map(msg => ({
+      content: msg.content,
+      username: msg.user?.username || 'AI Assistant'
+    }));
+  } catch (error) {
+    console.error("Error fetching channel messages:", error);
+    return [];
+  }
+}
+
 async function getPastSuggestionFeedback(userId: number): Promise<{
   acceptedSuggestions: string[];
   rejectedSuggestions: string[];
@@ -139,6 +164,42 @@ Guidelines:
       return response.choices[0].message.content || "I understand. Could you tell me more?";
     } catch (error) {
       console.error("Error processing message:", error);
+      throw error;
+    }
+  }
+
+  async generateConversationSummary(channelId: number): Promise<string> {
+    try {
+      const channelMessages = await getChannelMessages(channelId);
+      const messageHistory = this.formatMessageHistory(channelMessages);
+
+      const systemPrompt = `You are a conversation summarizer. Analyze the following conversation and provide a concise summary of the key points and outcomes.
+
+Conversation:
+${messageHistory}
+
+Guidelines:
+1. Focus on the main topics and decisions made
+2. Keep the summary brief (2-3 sentences)
+3. Highlight any action items or conclusions
+4. Use neutral language
+5. Don't include timestamps unless crucial to understanding`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: 150
+      });
+
+      return response.choices[0].message.content || "No significant discussion points to summarize.";
+    } catch (error) {
+      console.error("Error generating conversation summary:", error);
       throw error;
     }
   }
