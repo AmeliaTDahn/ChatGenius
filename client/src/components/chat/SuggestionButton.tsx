@@ -16,7 +16,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const [currentSuggestion, setCurrentSuggestion] = useState("");
   const { toast } = useToast();
 
-  // Separate feedback functions for different purposes
   const recordStyleFeedback = async (content: string, wasLiked: boolean) => {
     try {
       await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
@@ -26,14 +25,13 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         },
         body: JSON.stringify({ 
           content, 
-          wasAccepted: false, // Style feedback doesn't affect acceptance
+          wasAccepted: false,
           wasLiked,
           messageLength: content.length 
         }),
         credentials: 'include',
       });
 
-      // Show minimal feedback toast
       toast({
         description: "Feedback received",
         duration: 3000,
@@ -114,6 +112,12 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     }
   };
 
+  const handleDialogChange = (open: boolean) => {
+    setShowDialog(open);
+    // Only clear suggestion when the dialog is explicitly closed via buttons
+    // Not when it's dismissed by clicking outside or pressing ESC
+  };
+
   return (
     <>
       <Button
@@ -130,7 +134,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         )}
       </Button>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <Dialog open={showDialog} onOpenChange={handleDialogChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Suggested Reply</DialogTitle>
