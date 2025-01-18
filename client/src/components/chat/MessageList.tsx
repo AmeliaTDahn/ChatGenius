@@ -55,7 +55,6 @@ export function MessageList({ channelId }: MessageListProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const { toast } = useToast();
-  const textInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,7 +63,6 @@ export function MessageList({ channelId }: MessageListProps) {
   const handleSuggestion = (suggestion: string) => {
     const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
     if (textarea) {
-      // Find the MessageInput component's handleSuggestionPaste function in the prototype chain
       const inputComponent = textarea.closest('form');
       if (inputComponent) {
         const event = new CustomEvent('suggestionPaste', { 
@@ -233,19 +231,20 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   };
 
-  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-  const isLastMessageFromOthers = lastMessage && lastMessage.userId !== user?.id;
-  const isLastMessageDirectedAtUser = lastMessage && isMessageDirectedAtUser(lastMessage, user);
+  const lastMessage = messages[messages.length - 1];
+  const showSuggestionButton = lastMessage && 
+    lastMessage.userId !== user?.id && 
+    channelId !== -1;
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {isLastMessageFromOthers && isLastMessageDirectedAtUser && channelId !== -1 && (
+      {showSuggestionButton && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <SuggestionButton
             channelId={channelId}
             onSuggestion={handleSuggestion}
             disabled={isGeneratingSuggestion}
-            isMessageDirectedAtUser={isLastMessageDirectedAtUser}
+            isMessageDirectedAtUser={true}
           />
         </div>
       )}

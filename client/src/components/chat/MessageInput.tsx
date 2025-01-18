@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect, forwardRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { SendHorizontal, Paperclip, X, Bold, Italic, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { SuggestionButton } from "./SuggestionButton";
 import {
   Popover,
   PopoverContent,
@@ -48,6 +47,28 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     }
   }, [message]);
 
+  useEffect(() => {
+    // Listen for suggestion paste events
+    const form = textareaRef.current?.closest('form');
+    if (form) {
+      const handleSuggestionPaste = (e: CustomEvent) => {
+        const text = e.detail.text;
+        setMessage(text);
+        setIsFromSuggestion(true);
+        if (textareaRef.current) {
+          textareaRef.current.value = text;
+          textareaRef.current.focus();
+          handleSubmit(new Event('submit') as unknown as React.FormEvent);
+        }
+      };
+
+      form.addEventListener('suggestionPaste', handleSuggestionPaste as EventListener);
+      return () => {
+        form.removeEventListener('suggestionPaste', handleSuggestionPaste as EventListener);
+      };
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() || files.length > 0) {
@@ -87,7 +108,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Allow Enter key if it's a suggested reply being sent
+    // Allow Enter key if it's a suggested reply being sent or there's text
     if (e.key === "Enter" && !e.shiftKey && (isFromSuggestion || message.trim() !== "")) {
       e.preventDefault();
       handleSubmit(e);
@@ -96,17 +117,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-  };
-
-  // This will be called by the parent component when a suggestion is used
-  const handleSuggestionPaste = (text: string) => {
-    setMessage(text);
-    setIsFromSuggestion(true);
-    if (textareaRef.current) {
-      textareaRef.current.value = text;
-      textareaRef.current.focus();
-      handleSubmit(new Event('submit') as unknown as React.FormEvent);
-    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -250,14 +260,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
               </div>
             </PopoverContent>
           </Popover>
-          {channelId && channelId !== -1 && (
-            <SuggestionButton
-              channelId={channelId}
-              onSuggestion={handleSuggestionPaste}
-              disabled={disabled}
-              isMessageDirectedAtUser={true} // Added to address potential issue.  This might need adjustment depending on SuggestionButton's implementation.
-            />
-          )}
         </div>
         <div className="flex-1 relative">
           <Textarea
