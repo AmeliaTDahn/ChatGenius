@@ -231,7 +231,7 @@ Guidelines:
       }
 
       // Format history for context
-      const messageHistory = this.formatMessageHistory(userHistory);
+      const messageHistory = formatMessageHistory(userHistory);
 
       const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
 
@@ -249,7 +249,8 @@ Guidelines:
 2. Keep responses concise and natural
 3. Don't mention being AI or analyzing their style
 4. Focus on being helpful while maintaining their preferred tone
-5. Follow patterns from previously successful responses`;
+5. Follow patterns from previously successful responses
+${rejectedSuggestions.length > 0 ? `6. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
