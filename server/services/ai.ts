@@ -231,7 +231,7 @@ Guidelines:
       }
 
       // Format history for context
-      const messageHistory = this.formatMessageHistory(userHistory);
+      const messageHistory = formatMessageHistory(userHistory);
 
       const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
 
