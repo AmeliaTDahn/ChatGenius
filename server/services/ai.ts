@@ -215,42 +215,62 @@ Guidelines:
         throw new Error("No message history found for user");
       }
 
-      // Get last message in channel to reply to
-      const [messageToReply] = await db.query.messages.findMany({
+      // Get recent messages in the channel for context
+      const recentMessages = await db.query.messages.findMany({
         where: eq(messages.channelId, channelId),
         orderBy: [desc(messages.createdAt)],
-        limit: 1
+        limit: 5,
+        with: {
+          user: {
+            columns: {
+              id: true,
+              username: true
+            }
+          }
+        }
       });
 
-      if (!messageToReply) {
-        throw new Error("No message found to reply to");
+      if (recentMessages.length === 0) {
+        throw new Error("No messages found in channel");
       }
 
-      if (messageToReply.userId === userId) {
+      const lastMessage = recentMessages[0];
+      if (lastMessage.userId === userId) {
         throw new Error("Cannot suggest a reply to your own message");
       }
+
+      // Format recent conversation context
+      const conversationContext = recentMessages
+        .reverse()
+        .map(msg => `${msg.user?.username || 'Unknown'}: ${msg.content}`)
+        .join('\n');
 
       // Format history for context
       const messageHistory = formatMessageHistory(userHistory);
 
-      const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
+      const prompt = `You are helping craft a reply to a conversation. Generate a natural response directed at ${lastMessage.user?.username || 'the last speaker'} based on the recent conversation and the user's communication style.
 
-User's message history for context:
+Recent conversation context (most recent last):
+${conversationContext}
+
+Previous communication style context:
 ${messageHistory}
 
 Previous successful responses they liked:
 ${acceptedSuggestions.join('\n')}
 
-Current message to respond to:
-${messageToReply.content}
+You are generating a reply to this specific message:
+${lastMessage.user?.username || 'User'}: ${lastMessage.content}
 
 Guidelines:
-1. Match their communication style (casual/formal, emoji usage, etc.)
-2. Keep responses concise and natural
-3. Don't mention being AI or analyzing their style
-4. Focus on being helpful while maintaining their preferred tone
-5. Follow patterns from previously successful responses
-${rejectedSuggestions.length > 0 ? `6. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
+1. Make sure the reply is directed at ${lastMessage.user?.username || 'the speaker'} and relevant to their last message
+2. Match their communication style (casual/formal, emoji usage, etc.)
+3. Keep responses concise and natural
+4. Don't mention being AI or analyzing their style
+5. Focus on being helpful while maintaining their preferred tone
+6. Ensure the response continues the current conversation thread
+7. Don't start with their username - write as if in an ongoing conversation
+${rejectedSuggestions.length > 0 ? `8. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
