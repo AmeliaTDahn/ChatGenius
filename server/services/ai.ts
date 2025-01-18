@@ -98,6 +98,24 @@ function formatMessageHistory(messages: MessageWithContext[]): string {
     .join('\n');
 }
 
+async function getUserEmoticonStyle(userMessages: MessageWithContext[]): Promise<{
+  usesEmojis: boolean;
+  emojiFrequency: number;
+}> {
+  const totalMessages = userMessages.length;
+  if (totalMessages === 0) return { usesEmojis: false, emojiFrequency: 0 };
+
+  const messagesWithEmojis = userMessages.filter(msg =>
+    /[\p{Emoji_Presentation}\u{FE0F}\u{FE0E}]/gu.test(msg.content)
+  ).length;
+
+  const emojiFrequency = messagesWithEmojis / totalMessages;
+  return {
+    usesEmojis: emojiFrequency > 0.1, // Consider user an emoji user if >10% of messages have emojis
+    emojiFrequency
+  };
+}
+
 class AIService {
   async processMessage(content: string, userId: number): Promise<string> {
     try {
@@ -239,6 +257,9 @@ Guidelines:
         throw new Error("Cannot suggest a reply to your own message");
       }
 
+      // Analyze user's emoji usage
+      const { usesEmojis, emojiFrequency } = await getUserEmoticonStyle(userHistory);
+
       // Format recent conversation context
       const conversationContext = recentMessages
         .reverse()
@@ -247,6 +268,10 @@ Guidelines:
 
       // Format history for context
       const messageHistory = formatMessageHistory(userHistory);
+
+      const emojiGuideline = usesEmojis
+        ? `Use emojis sparingly (about ${Math.round(emojiFrequency * 100)}% of the time) to match their style`
+        : "Do not use any emojis in the response as the user doesn't use them";
 
       const prompt = `You are helping craft a reply to a conversation. Generate a natural response directed at ${lastMessage.user?.username || 'the last speaker'} based on the recent conversation and the user's communication style.
 
@@ -264,13 +289,14 @@ ${lastMessage.user?.username || 'User'}: ${lastMessage.content}
 
 Guidelines:
 1. Make sure the reply is directed at ${lastMessage.user?.username || 'the speaker'} and relevant to their last message
-2. Match their communication style (casual/formal, emoji usage, etc.)
-3. Keep responses concise and natural
-4. Don't mention being AI or analyzing their style
-5. Focus on being helpful while maintaining their preferred tone
-6. Ensure the response continues the current conversation thread
-7. Don't start with their username - write as if in an ongoing conversation
-${rejectedSuggestions.length > 0 ? `8. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
+2. Match their communication style (casual/formal, length, etc.)
+3. ${emojiGuideline}
+4. Keep responses concise and natural
+5. Don't mention being AI or analyzing their style
+6. Focus on being helpful while maintaining their preferred tone
+7. Ensure the response continues the current conversation thread
+8. Don't start with their username - write as if in an ongoing conversation
+${rejectedSuggestions.length > 0 ? `9. Avoid patterns similar to these rejected responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
