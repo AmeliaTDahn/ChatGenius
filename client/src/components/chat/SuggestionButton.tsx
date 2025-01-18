@@ -14,9 +14,10 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const [isLoading, setIsLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
   const { toast } = useToast();
 
-  const recordFeedback = async (content: string, wasAccepted: boolean) => {
+  const recordFeedback = async (content: string, wasAccepted: boolean, wasLiked?: boolean) => {
     try {
       await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
         method: 'POST',
@@ -26,6 +27,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         body: JSON.stringify({ 
           content, 
           wasAccepted,
+          wasLiked,
           messageLength: content.length 
         }),
         credentials: 'include',
@@ -51,6 +53,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       if (data.suggestion) {
         setCurrentSuggestion(data.suggestion);
         setShowDialog(true);
+        setShowFeedback(false);
       }
     } catch (error) {
       console.error('Error getting suggestion:', error);
@@ -68,16 +71,27 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     if (currentSuggestion) {
       await recordFeedback(currentSuggestion, true);
       onSuggestion(currentSuggestion);
-      setShowDialog(false);
-      setCurrentSuggestion("");
+      setShowFeedback(true);
     }
   };
 
   const handleRejectSuggestion = async () => {
     if (currentSuggestion) {
       await recordFeedback(currentSuggestion, false);
+      setShowFeedback(true);
+    }
+  };
+
+  const handleQualityFeedback = async (wasLiked: boolean) => {
+    if (currentSuggestion) {
+      await recordFeedback(currentSuggestion, showFeedback, wasLiked);
       setShowDialog(false);
       setCurrentSuggestion("");
+      setShowFeedback(false);
+
+      toast({
+        description: "Thanks for your feedback! This helps improve future suggestions.",
+      });
     }
   };
 
@@ -108,22 +122,43 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
           <div className="mt-4 p-4 bg-muted rounded-md">
             <p className="text-sm whitespace-pre-wrap">{currentSuggestion}</p>
           </div>
-          <DialogFooter className="mt-4">
-            <Button 
-              variant="outline" 
-              onClick={handleRejectSuggestion}
-              className="gap-2"
-            >
-              <ThumbsDown className="h-4 w-4" />
-              Not Good
-            </Button>
-            <Button 
-              onClick={handleUseSuggestion}
-              className="gap-2"
-            >
-              <ThumbsUp className="h-4 w-4" />
-              Use This
-            </Button>
+          <DialogFooter className="flex flex-col gap-4">
+            {!showFeedback ? (
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleRejectSuggestion}
+                >
+                  Don't Use
+                </Button>
+                <Button 
+                  onClick={handleUseSuggestion}
+                >
+                  Use This Reply
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-sm text-muted-foreground">How was this suggestion?</p>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleQualityFeedback(false)}
+                    className="gap-2"
+                  >
+                    <ThumbsDown className="h-4 w-4" />
+                    Not Helpful
+                  </Button>
+                  <Button 
+                    onClick={() => handleQualityFeedback(true)}
+                    className="gap-2"
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                    Helpful
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

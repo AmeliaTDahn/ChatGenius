@@ -335,10 +335,10 @@ async function getPastSuggestionFeedback(userId: number): Promise<{
 
     return {
       acceptedSuggestions: feedback
-        .filter(f => f.wasAccepted)
+        .filter(f => f.wasAccepted && f.wasLiked)
         .map(f => f.suggestedContent),
       rejectedSuggestions: feedback
-        .filter(f => !f.wasAccepted)
+        .filter(f => !f.wasLiked)
         .map(f => f.suggestedContent)
     };
   } catch (error) {
