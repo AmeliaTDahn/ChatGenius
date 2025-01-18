@@ -20,9 +20,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     try {
       await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           content, 
           wasAccepted: false,
@@ -36,6 +34,8 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         description: "Feedback received",
         duration: 3000,
       });
+
+      // Don't clear suggestion state here
     } catch (error) {
       console.error('Error recording style feedback:', error);
     }
@@ -101,7 +101,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     if (currentSuggestion) {
       await recordUsageFeedback(currentSuggestion, false);
       setShowDialog(false);
-      setCurrentSuggestion("");
+      //setCurrentSuggestion(""); // Removed this line
     }
   };
 
