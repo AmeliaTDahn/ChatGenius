@@ -14,9 +14,11 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const [isLoading, setIsLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState("");
+  const [feedbackGiven, setFeedbackGiven] = useState<boolean | null>(null);
   const { toast } = useToast();
 
   const recordStyleFeedback = async (content: string, wasLiked: boolean) => {
+    setFeedbackGiven(wasLiked);
     try {
       await fetch(`/api/channels/${channelId}/suggestion-feedback`, {
         method: 'POST',
@@ -141,19 +143,19 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
                   variant="ghost"
                   size="sm"
                   onClick={() => handleQualityFeedback(false)}
-                  className="hover:bg-destructive/10"
+                  className={`hover:bg-destructive/10 ${feedbackGiven === false ? 'bg-destructive/10' : ''}`}
                   title="This style doesn't match my communication"
                 >
-                  <ThumbsDown className="h-4 w-4 text-destructive" />
+                  <ThumbsDown className={`h-4 w-4 ${feedbackGiven === false ? 'text-destructive' : 'text-muted-foreground'}`} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleQualityFeedback(true)}
-                  className="hover:bg-primary/10"
+                  className={`hover:bg-primary/10 ${feedbackGiven === true ? 'bg-primary/10' : ''}`}
                   title="This style matches my communication"
                 >
-                  <ThumbsUp className="h-4 w-4 text-primary" />
+                  <ThumbsUp className={`h-4 w-4 ${feedbackGiven === true ? 'text-primary' : 'text-muted-foreground'}`} />
                 </Button>
               </div>
               <div className="flex gap-2">
