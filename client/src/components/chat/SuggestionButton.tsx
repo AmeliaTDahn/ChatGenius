@@ -94,7 +94,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
   const handleUseSuggestion = async () => {
     if (currentSuggestion) {
       await recordUsageFeedback(currentSuggestion, true);
-      onSuggestion(currentSuggestion);
       setShowDialog(false);
       setCurrentSuggestion("");
     }
