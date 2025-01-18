@@ -169,7 +169,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
     "#ec4899", // Pink
   ];
 
-  return (
+  const MessageInputComponent = () => {
+    return (
     <form onSubmit={handleSubmit} className="p-4 border-t">
       {files.length > 0 && (
         <ScrollArea className="max-h-32 mb-2">
@@ -292,5 +293,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
         </Button>
       </div>
     </form>
-  );
+    );
+  };
+  
+  return MessageInputComponent();
 }
