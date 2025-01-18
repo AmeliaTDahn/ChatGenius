@@ -310,7 +310,6 @@ export const suggestionFeedback = pgTable("suggestion_feedback", {
   userId: integer("user_id").references(() => users.id).notNull(),
   suggestedContent: text("suggested_content").notNull(),
   wasAccepted: boolean("was_accepted").notNull(),
-  wasLiked: boolean("was_liked"),  // New field for tracking if user liked the suggestion
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
