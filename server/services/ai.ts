@@ -209,7 +209,12 @@ Guidelines:
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
-      const { acceptedSuggestions, rejectedSuggestions } = await getPastSuggestionFeedback(userId);
+      const [lastMessage] = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.channelId, channelId))
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
 
       if (!userHistory) {
         throw new Error("No message history found for user");
@@ -238,11 +243,8 @@ Guidelines:
 User's message history for context:
 ${messageHistory}
 
-Previous successful responses they liked:
-${acceptedSuggestions.join('\n')}
-
 Current message to respond to:
-${messageToReply.content}
+${lastMessage.content}
 
 Guidelines:
 1. Match their communication style (casual/formal, emoji usage, etc.)
