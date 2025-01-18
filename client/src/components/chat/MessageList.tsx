@@ -14,22 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
 import { SuggestionButton } from "./SuggestionButton";
 
-// Helper function to check if a message is directed at a user
-function isMessageDirectedAtUser(message: Message, currentUser: any) {
-  if (!currentUser) return false;
-
-  // Check for @mentions
-  const mentionPattern = new RegExp(`@${currentUser.username}\\b`, 'i');
-  if (mentionPattern.test(message.content)) return true;
-
-  // Check for direct address (starting with the username)
-  if (message.content.toLowerCase().startsWith(currentUser.username.toLowerCase())) return true;
-
-  // If it's a reply to user's message
-  if (message.parentId && message.parentMessage?.userId === currentUser.id) return true;
-
-  return false;
-}
 
 function parseFormattedText(text: string) {
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
@@ -66,13 +50,6 @@ export function MessageList({ channelId }: MessageListProps) {
       setIsGeneratingSuggestion(true);
       const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messageContext: messages.slice(-5), // Send last 5 messages for context
-          currentUserId: user?.id
-        }),
         credentials: 'include',
       });
 
@@ -295,9 +272,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {messages.length > 0 && channelId !== -1 && 
-       messages[messages.length - 1].userId !== user?.id &&
-       isMessageDirectedAtUser(messages[messages.length - 1], user) && (
+      {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <SuggestionButton
             channelId={channelId}

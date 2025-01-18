@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels, users } from "@db/schema";
+import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels } from "@db/schema";
 import { eq, desc, and, or, inArray, not, ilike } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
@@ -96,44 +96,6 @@ function formatMessageHistory(messages: MessageWithContext[]): string {
   return messages
     .map(msg => `[${msg.source}] ${msg.username}: ${msg.content}`)
     .join('\n');
-}
-
-interface MessageWithUser {
-  content: string;
-  userId: number;
-  user: {
-    username: string;
-  };
-  parentId?: number;
-  parentMessage?: {
-    userId: number;
-  };
-}
-
-async function isMessageDirectedAtUser(message: MessageWithUser, userId: number): Promise<boolean> {
-  if (message.userId === userId) return false;
-
-  // Get user info
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    columns: {
-      username: true
-    }
-  });
-
-  if (!user) return false;
-
-  // Check for @mentions
-  const mentionPattern = new RegExp(`@${user.username}\\b`, 'i');
-  if (mentionPattern.test(message.content)) return true;
-
-  // Check for direct address
-  if (message.content.toLowerCase().startsWith(user.username.toLowerCase())) return true;
-
-  // Check if it's a reply to user's message
-  if (message.parentId && message.parentMessage?.userId === userId) return true;
-
-  return false;
 }
 
 class AIService {
@@ -253,58 +215,33 @@ Guidelines:
         throw new Error("No message history found for user");
       }
 
-      // Get last 5 messages in channel for context
-      const channelMessages = await db.query.messages.findMany({
+      // Get last message in channel to reply to
+      const [messageToReply] = await db.query.messages.findMany({
         where: eq(messages.channelId, channelId),
         orderBy: [desc(messages.createdAt)],
-        limit: 5,
-        with: {
-          user: {
-            columns: {
-              id: true,
-              username: true
-            }
-          },
-          parentMessage: {
-            columns: {
-              userId: true
-            }
-          }
-        }
+        limit: 1
       });
-
-      // Get the last message
-      const [messageToReply] = channelMessages;
 
       if (!messageToReply) {
         throw new Error("No message found to reply to");
       }
 
-      // Check if the message is directed at the current user
-      const isDirected = await isMessageDirectedAtUser(messageToReply, userId);
-      if (!isDirected) {
-        throw new Error("Message is not directed at you");
+      if (messageToReply.userId === userId) {
+        throw new Error("Cannot suggest a reply to your own message");
       }
 
       // Format history for context
       const messageHistory = formatMessageHistory(userHistory);
-      const recentContext = channelMessages.reverse().map(msg =>
-        `${msg.user.username}: ${msg.content}`
-      ).join('\n');
 
-      const prompt = `You are having a conversation in a group chat. The last message was directed at you.
-Analyze the user's communication style and respond in a similar tone and style.
+      const prompt = `You are having a conversation with a user. Analyze their communication style from their message history and respond in a similar tone and style.
 
-Recent conversation context:
-${recentContext}
-
-User's past message history for style reference:
+User's message history for context:
 ${messageHistory}
 
 Previous successful responses they liked:
 ${acceptedSuggestions.join('\n')}
 
-Message to respond to:
+Current message to respond to:
 ${messageToReply.content}
 
 Guidelines:
@@ -313,8 +250,7 @@ Guidelines:
 3. Don't mention being AI or analyzing their style
 4. Focus on being helpful while maintaining their preferred tone
 5. Follow patterns from responses they liked
-6. Consider the group chat context - your response should be appropriate for a group conversation
-${rejectedSuggestions.length > 0 ? `7. Avoid patterns similar to these disliked responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
+${rejectedSuggestions.length > 0 ? `6. Avoid patterns similar to these disliked responses:\n${rejectedSuggestions.join('\n')}` : ''}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
