@@ -12,7 +12,7 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider defaultTheme="dark" storageKey="chat-theme">
       <QueryClientProvider client={queryClient}>
         <App />
-        <Toaster />
+        <Toaster position="top" />
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,
