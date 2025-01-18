@@ -18,9 +18,80 @@ interface VoiceEmotionSettings {
   pitch?: number;
 }
 
+interface VoiceToneProfile {
+  emotion: string;
+  baseline: VoiceEmotionSettings;
+  intensityMultipliers: {
+    low: number;
+    medium: number;
+    high: number;
+  };
+}
+
+const VOICE_TONE_PROFILES: Record<string, VoiceToneProfile> = {
+  happy: {
+    emotion: 'happy',
+    baseline: {
+      stability: 0.45,
+      similarity_boost: 0.8,
+      speaking_rate: 1.2,
+      pitch: 1.15
+    },
+    intensityMultipliers: {
+      low: 0.8,
+      medium: 1.0,
+      high: 1.2
+    }
+  },
+  excited: {
+    emotion: 'excited',
+    baseline: {
+      stability: 0.3,
+      similarity_boost: 0.9,
+      speaking_rate: 1.35,
+      pitch: 1.25
+    },
+    intensityMultipliers: {
+      low: 0.85,
+      medium: 1.0,
+      high: 1.15
+    }
+  },
+  sad: {
+    emotion: 'sad',
+    baseline: {
+      stability: 0.85,
+      similarity_boost: 0.7,
+      speaking_rate: 0.9,
+      pitch: 0.9
+    },
+    intensityMultipliers: {
+      low: 0.9,
+      medium: 1.0,
+      high: 1.1
+    }
+  },
+  angry: {
+    emotion: 'angry',
+    baseline: {
+      stability: 0.2,
+      similarity_boost: 0.95,
+      speaking_rate: 1.3,
+      pitch: 1.15
+    },
+    intensityMultipliers: {
+      low: 0.9,
+      medium: 1.0,
+      high: 1.2
+    }
+  }
+};
+
 class VoiceService {
   private apiKey: string;
   private baseUrl = "https://api.elevenlabs.io/v1";
+  private lastEmotionalContext: string | null = null;
+  private emotionalMomentum: number = 0;
 
   constructor() {
     if (!process.env.ELEVENLABS_API_KEY) {
@@ -50,152 +121,119 @@ class VoiceService {
     }
   }
 
+  private detectEmotionalIntensity(text: string): 'low' | 'medium' | 'high' {
+    // Count intensity indicators
+    const intensifiers = ['very', 'really', 'so', 'extremely', 'incredibly', 'absolutely'];
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const intensifierCount = intensifiers.reduce((count, word) => 
+      count + (text.toLowerCase().match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0
+    );
+    const capsWordCount = (text.match(/\b[A-Z]{2,}\b/g) || []).length;
+
+    const totalIntensity = intensifierCount + exclamationCount + capsWordCount;
+
+    if (totalIntensity >= 3) return 'high';
+    if (totalIntensity >= 1) return 'medium';
+    return 'low';
+  }
+
   private analyzeTextEmotion(text: string): VoiceEmotionSettings {
     // Enhanced sentiment analysis with comprehensive emotion patterns
     const positiveWords = ['happy', 'great', 'awesome', 'wonderful', 'love', 'excellent', 'good', 'best', 'thanks', 'thank', 'pleased', 'excited', 'joy', 'amazing', 'perfect', 'fantastic'];
     const negativeWords = ['sad', 'bad', 'terrible', 'awful', 'hate', 'worst', 'sorry', 'unfortunately', 'disappointed', 'upset', 'regret', 'worried', 'concerned'];
     const angryWords = ['angry', 'mad', 'furious', 'outraged', 'annoyed', 'irritated', 'frustrated', 'rage', 'hate'];
     const excitedWords = ['wow', 'omg', 'amazing', 'incredible', 'awesome', 'fantastic', 'unbelievable'];
-    const calmWords = ['calm', 'peaceful', 'gentle', 'quiet', 'relaxed', 'steady', 'balanced'];
 
-    let settings: VoiceEmotionSettings = {
-      stability: 0.75,
-      similarity_boost: 0.75,
-      speaking_rate: 1.0,
-      pitch: 1.0
-    };
-
-    const endsWithQuestion = text.trim().endsWith('?');
-    if (endsWithQuestion) {
-      settings = {
-        stability: 0.7,
-        similarity_boost: 0.75,
-        speaking_rate: 0.95,
-        pitch: 1.15
-      };
-      return settings;
-    }
+    // Get emotional intensity
+    const intensity = this.detectEmotionalIntensity(text);
 
     // Direct emotional expressions with intensity patterns
-    const directEmotionPatterns = [
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(happy|excited|joyful|thrilled|ecstatic)/i, emotion: 'happy', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(happy|cheerful|good)/i, emotion: 'happy', intensity: 'low' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(sad|down|upset)/i, emotion: 'sad', intensity: 'low' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(angry|furious|mad|outraged|livid)/i, emotion: 'angry', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(angry|annoyed|irritated)/i, emotion: 'angry', intensity: 'low' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(excited|thrilled|pumped|stoked)/i, emotion: 'excited', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(excited|eager)/i, emotion: 'excited', intensity: 'low' }
+    const emotionPatterns = [
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(happy|excited|joyful|thrilled|ecstatic)/i, emotion: 'happy' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(angry|furious|mad|outraged|livid)/i, emotion: 'angry' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(excited|thrilled|pumped|stoked)/i, emotion: 'excited' }
     ];
 
-    for (const pattern of directEmotionPatterns) {
+    // Check for direct emotional expressions first
+    for (const pattern of emotionPatterns) {
       if (pattern.regex.test(text)) {
-        switch (pattern.emotion) {
-          case 'happy':
-            return {
-              stability: pattern.intensity === 'high' ? 0.35 : 0.45, // Lower stability for more expressiveness
-              similarity_boost: pattern.intensity === 'high' ? 0.85 : 0.8,
-              speaking_rate: pattern.intensity === 'high' ? 1.3 : 1.2, // Faster for happiness
-              pitch: pattern.intensity === 'high' ? 1.2 : 1.15 // Higher pitch for happiness
-            };
-          case 'excited':
-            return {
-              stability: pattern.intensity === 'high' ? 0.3 : 0.4, // Even lower stability for excitement
-              similarity_boost: pattern.intensity === 'high' ? 0.9 : 0.85,
-              speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3, // Fastest for excitement
-              pitch: pattern.intensity === 'high' ? 1.25 : 1.2 // Highest pitch for excitement
-            };
-          case 'sad':
-            return {
-              stability: pattern.intensity === 'high' ? 0.9 : 0.8,
-              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,
-              speaking_rate: pattern.intensity === 'high' ? 0.8 : 0.9,
-              pitch: pattern.intensity === 'high' ? 0.85 : 0.9
-            };
-          case 'angry':
-            return {
-              stability: pattern.intensity === 'high' ? 0.15 : 0.25,
-              similarity_boost: pattern.intensity === 'high' ? 0.95 : 0.9,
-              speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3,
-              pitch: pattern.intensity === 'high' ? 1.2 : 1.15
-            };
+        const profile = VOICE_TONE_PROFILES[pattern.emotion];
+        const multiplier = profile.intensityMultipliers[intensity];
+
+        // Apply emotional momentum
+        if (this.lastEmotionalContext === pattern.emotion) {
+          this.emotionalMomentum = Math.min(this.emotionalMomentum + 0.1, 0.3);
+        } else {
+          this.emotionalMomentum = 0;
         }
+
+        this.lastEmotionalContext = pattern.emotion;
+
+        return {
+          stability: profile.baseline.stability * (1 - this.emotionalMomentum),
+          similarity_boost: profile.baseline.similarity_boost,
+          speaking_rate: profile.baseline.speaking_rate! * (multiplier + this.emotionalMomentum),
+          pitch: profile.baseline.pitch! * (multiplier + this.emotionalMomentum * 0.5)
+        };
       }
     }
 
-    // If no direct emotion matches, analyze word patterns
+    // Word-based analysis
     const words = text.toLowerCase().split(/\W+/);
     const emotionCounts = {
       positive: words.filter(word => positiveWords.includes(word)).length,
       negative: words.filter(word => negativeWords.includes(word)).length,
       angry: words.filter(word => angryWords.includes(word)).length,
-      excited: words.filter(word => excitedWords.includes(word)).length,
-      calm: words.filter(word => calmWords.includes(word)).length
+      excited: words.filter(word => excitedWords.includes(word)).length
     };
 
-    // Find dominant emotion
-    const emotions = Object.entries(emotionCounts);
-    const maxEmotion = emotions.reduce((max, current) => 
-      current[1] > max[1] ? current : max, ['none', 0]
+    const dominantEmotion = Object.entries(emotionCounts).reduce((max, [emotion, count]) => 
+      count > max.count ? { emotion, count } : max,
+      { emotion: 'neutral', count: 0 }
     );
 
-    // Apply settings based on dominant emotion with enhanced positive emotion handling
-    if (maxEmotion[1] > 0) {
-      switch (maxEmotion[0]) {
-        case 'positive':
-          settings = {
-            stability: 0.4, // Lower stability for more expressiveness
-            similarity_boost: 0.85,
-            speaking_rate: 1.25, // Increased rate for positive tone
-            pitch: 1.15 // Higher pitch for positive tone
-          };
-          break;
-        case 'excited':
-          settings = {
-            stability: 0.3, // Even lower stability for excitement
-            similarity_boost: 0.9,
-            speaking_rate: 1.35, // Fastest rate for excitement
-            pitch: 1.2 // Highest pitch for excitement
-          };
-          break;
-        case 'negative':
-          settings = {
-            stability: 0.75,
-            similarity_boost: 0.7,
-            speaking_rate: 0.9,
-            pitch: 0.95
-          };
-          break;
-        case 'angry':
-          settings = {
-            stability: 0.2,
-            similarity_boost: 0.9,
-            speaking_rate: 1.3,
-            pitch: 1.15
-          };
-          break;
-        case 'calm':
-          settings = {
-            stability: 0.85,
-            similarity_boost: 0.7,
-            speaking_rate: 0.9,
-            pitch: 0.95
-          };
-          break;
-      }
+    let profile: VoiceToneProfile;
+    switch (dominantEmotion.emotion) {
+      case 'positive':
+        profile = VOICE_TONE_PROFILES.happy;
+        break;
+      case 'negative':
+        profile = VOICE_TONE_PROFILES.sad;
+        break;
+      case 'angry':
+        profile = VOICE_TONE_PROFILES.angry;
+        break;
+      case 'excited':
+        profile = VOICE_TONE_PROFILES.excited;
+        break;
+      default:
+        // Return neutral settings
+        return {
+          stability: 0.75,
+          similarity_boost: 0.75,
+          speaking_rate: 1.0,
+          pitch: 1.0
+        };
     }
 
-    // Additional analysis for exclamation marks and uppercase words
-    const exclamationCount = (text.match(/!/g) || []).length;
-    const hasUppercaseWords = /[A-Z]{2,}/.test(text);
+    const multiplier = profile.intensityMultipliers[intensity];
 
-    if (exclamationCount > 0 || hasUppercaseWords) {
-      settings.stability = Math.max(0.3, settings.stability - 0.1 * exclamationCount);
-      settings.speaking_rate = Math.min(1.4, settings.speaking_rate! + 0.1 * exclamationCount);
-      settings.pitch = Math.min(1.25, settings.pitch! + 0.05 * exclamationCount);
+    // Update emotional context
+    if (this.lastEmotionalContext === profile.emotion) {
+      this.emotionalMomentum = Math.min(this.emotionalMomentum + 0.1, 0.3);
+    } else {
+      this.emotionalMomentum = 0;
     }
 
-    return settings;
+    this.lastEmotionalContext = profile.emotion;
+
+    return {
+      stability: profile.baseline.stability * (1 - this.emotionalMomentum),
+      similarity_boost: profile.baseline.similarity_boost,
+      speaking_rate: profile.baseline.speaking_rate! * (multiplier + this.emotionalMomentum),
+      pitch: profile.baseline.pitch! * (multiplier + this.emotionalMomentum * 0.5)
+    };
   }
 
   async convertTextToSpeech(text: string, voiceId?: string): Promise<Buffer> {
