@@ -131,7 +131,7 @@ class AIService {
                                 content.toLowerCase().includes('?');
 
       let systemPrompt = isQueryAboutHistory
-        ? `You are a helpful AI assistant with access to all active conversations in the system. Be concise and direct.
+        ? `You are a helpful AI assistant with access to all conversations in the system. Be concise and direct.
 
 Your context:
 ${messageHistory}
@@ -143,7 +143,9 @@ Guidelines:
 - Only mention timestamps if specifically asked about timing
 - Be direct and to the point
 - Focus on answering the specific question asked
-- Include usernames when referring to specific messages`
+- Include usernames when referring to specific messages
+- Use your understanding of all conversations to provide accurate context-aware responses
+- If referencing a conversation, specify which chat/channel it's from`
         : `You are a helpful AI assistant. Be concise and match the user's communication style.
 
 Conversation history for context:
@@ -223,6 +225,7 @@ Guidelines:
       throw error;
     }
   }
+
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
