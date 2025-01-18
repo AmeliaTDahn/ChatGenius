@@ -31,9 +31,12 @@ async function getUserMessages(userId: number, limit: number = 100): Promise<Arr
 
     const dmChannelIds = userDMs.map(dm => dm.channelId);
 
-    // Get messages from all active channels and DMs
+    // Get messages from all active channels, DMs, and AI conversations
     const allMessages = await db.query.messages.findMany({
-      where: inArray(messages.channelId, [...channelIds, ...dmChannelIds]),
+      where: or(
+        inArray(messages.channelId, [...channelIds, ...dmChannelIds]),
+        eq(messages.channelId, -1) // Include AI channel messages
+      ),
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
       with: {
@@ -121,11 +124,11 @@ class AIService {
 
       // Different system prompts based on whether the message appears to be a question about past messages
       const isQueryAboutHistory = content.toLowerCase().includes('what') ||
-                               content.toLowerCase().includes('when') ||
-                               content.toLowerCase().includes('who') ||
-                               content.toLowerCase().includes('how') ||
-                               content.toLowerCase().includes('why') ||
-                               content.toLowerCase().includes('?');
+                                content.toLowerCase().includes('when') ||
+                                content.toLowerCase().includes('who') ||
+                                content.toLowerCase().includes('how') ||
+                                content.toLowerCase().includes('why') ||
+                                content.toLowerCase().includes('?');
 
       let systemPrompt = isQueryAboutHistory
         ? `You are a helpful AI assistant with access to all active conversations in the system. Be concise and direct.

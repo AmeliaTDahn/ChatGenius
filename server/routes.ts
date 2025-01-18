@@ -172,6 +172,16 @@ export function registerRoutes(app: Express): Server {
             // Handle AI channel messages
             if (message.channelId === -1) {
               try {
+                // Save user's message first
+                const [userMessage] = await db.insert(messages)
+                  .values({
+                    content: message.content!,
+                    channelId: message.channelId,
+                    userId: userId,
+                    isAIMessage: false
+                  })
+                  .returning();
+
                 // Send initial AI thinking status
                 ws.send(JSON.stringify({
                   type: 'ai_status',
@@ -182,7 +192,7 @@ export function registerRoutes(app: Express): Server {
                 const aiResponse = await aiService.processMessage(message.content!, userId);
 
                 // Create AI message in database
-                const [newMessage] = await db.insert(messages)
+                const [aiMessage] = await db.insert(messages)
                   .values({
                     content: aiResponse,
                     channelId: message.channelId,
@@ -196,7 +206,7 @@ export function registerRoutes(app: Express): Server {
                   type: 'message',
                   channelId: message.channelId,
                   message: {
-                    ...newMessage,
+                    ...aiMessage,
                     user: {
                       id: -1,
                       username: 'AI Assistant',
@@ -1793,17 +1803,6 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       // If there are files, create attachments
-      /*if (files && files.length > 0) {
-        const attachmentValues = files.map((file) => ({
-          messageId: message.id,
-          filename: file.originalname,
-          fileUrl: `/uploads/${file.filename}`,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-        }));
-
-        await db.insert(messageAttachments).values(attachmentValues);
-      }*/
 
       // Fetch the complete message with attachments
       const fullMessage = await db.query.messages.findFirst({
@@ -1816,7 +1815,6 @@ export function registerRoutes(app: Express): Server {
               avatarUrl: true,
             },
           },
-          //attachments: true, // Removed attachments fetching
           reactions: {
             with: {
               user: {
@@ -2130,7 +2128,7 @@ export function registerRoutes(app: Express): Server {
         );
       }
 
-      // Create new user
+      //// Create new user
       const [user] = await db
         .insert(users)
         .values({
