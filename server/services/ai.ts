@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels } from "@db/schema";
-import { eq, desc, and, or, inArray, not } from "drizzle-orm";
+import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels } from "@db/schema";
+import { eq, desc, and, or, inArray, not, ilike } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY must be set");
@@ -11,37 +11,66 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function getUserMessages(userId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
+interface MessageWithContext {
+  content: string;
+  username: string;
+  source: string; // Channel name or "DM with [username]" or "AI Assistant"
+  timestamp: Date;
+}
+
+async function getUserMessages(userId: number, searchQuery?: string, limit: number = 100): Promise<Array<MessageWithContext>> {
   try {
     // Get channels where user is still a member
     const userChannels = await db
-      .select({ channelId: channelMembers.channelId })
+      .select({
+        channelId: channelMembers.channelId,
+        name: channels.name,
+      })
       .from(channelMembers)
+      .innerJoin(channels, eq(channels.id, channelMembers.channelId))
       .where(eq(channelMembers.userId, userId));
 
     const channelIds = userChannels.map(uc => uc.channelId);
+    const channelNames = new Map(userChannels.map(uc => [uc.channelId, uc.name]));
 
     // Get active DM channels for the user
     const userDMs = await db.query.directMessageChannels.findMany({
       where: or(
         eq(directMessageChannels.user1Id, userId),
         eq(directMessageChannels.user2Id, userId)
-      )
+      ),
+      with: {
+        user1: true,
+        user2: true
+      }
     });
 
     const dmChannelIds = userDMs.map(dm => dm.channelId);
+    const dmUsernames = new Map(userDMs.map(dm => [
+      dm.channelId,
+      `DM with ${dm.user1.id === userId ? dm.user2.username : dm.user1.username}`
+    ]));
 
-    // Get messages from all active channels, DMs, and AI conversations
+    // Build where clause for message search
+    let whereClause = or(
+      inArray(messages.channelId, [...channelIds, ...dmChannelIds]),
+      eq(messages.channelId, -1) // Include AI channel messages
+    );
+
+    // Add content search if query provided
+    if (searchQuery) {
+      whereClause = and(whereClause, ilike(messages.content, `%${searchQuery}%`));
+    }
+
+    // Get messages with full context
     const allMessages = await db.query.messages.findMany({
-      where: or(
-        inArray(messages.channelId, [...channelIds, ...dmChannelIds]),
-        eq(messages.channelId, -1) // Include AI channel messages
-      ),
+      where: whereClause,
       orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       limit,
       with: {
         user: {
           columns: {
+            id: true,
             username: true
           }
         }
@@ -50,7 +79,11 @@ async function getUserMessages(userId: number, limit: number = 100): Promise<Arr
 
     return allMessages.map(msg => ({
       content: msg.content,
-      username: msg.user?.username || 'AI Assistant'
+      username: msg.user?.username || 'AI Assistant',
+      timestamp: msg.createdAt,
+      source: msg.channelId === -1 
+        ? "AI Assistant Chat"
+        : channelNames.get(msg.channelId) || dmUsernames.get(msg.channelId) || "Unknown"
     }));
   } catch (error) {
     console.error("Error fetching messages:", error);
@@ -58,82 +91,35 @@ async function getUserMessages(userId: number, limit: number = 100): Promise<Arr
   }
 }
 
-async function getChannelMessages(channelId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
-  try {
-    const channelMessages = await db.query.messages.findMany({
-      where: eq(messages.channelId, channelId),
-      orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-      limit,
-      with: {
-        user: {
-          columns: {
-            username: true
-          }
-        }
-      }
-    });
-
-    return channelMessages.map(msg => ({
-      content: msg.content,
-      username: msg.user?.username || 'AI Assistant'
-    }));
-  } catch (error) {
-    console.error("Error fetching channel messages:", error);
-    return [];
-  }
-}
-
-async function getPastSuggestionFeedback(userId: number): Promise<{
-  acceptedSuggestions: string[];
-  rejectedSuggestions: string[];
-}> {
-  try {
-    const feedback = await db.query.suggestionFeedback.findMany({
-      where: eq(suggestionFeedback.userId, userId),
-      orderBy: [desc(suggestionFeedback.createdAt)],
-      limit: 20
-    });
-
-    return {
-      acceptedSuggestions: feedback
-        .filter(f => f.wasAccepted)
-        .map(f => f.suggestedContent),
-      rejectedSuggestions: feedback
-        .filter(f => !f.wasAccepted)
-        .map(f => f.suggestedContent)
-    };
-  } catch (error) {
-    console.error("Error fetching suggestion feedback:", error);
-    return { acceptedSuggestions: [], rejectedSuggestions: [] };
-  }
+// Helper method to format message history with context
+function formatMessageHistory(messages: MessageWithContext[]): string {
+  return messages
+    .map(msg => `[${msg.source}] ${msg.username}: ${msg.content}`)
+    .join('\n');
 }
 
 class AIService {
-  // Helper method to format message history for context
-  private formatMessageHistory(messages: Array<{ content: string; username: string; }>): string {
-    return messages
-      .map(msg => `${msg.username}: ${msg.content}`)
-      .join('\n');
-  }
-
   async processMessage(content: string, userId: number): Promise<string> {
     try {
-      const channelMessages = await getUserMessages(userId);
-      const messageHistory = this.formatMessageHistory(channelMessages);
-      const { acceptedSuggestions } = await getPastSuggestionFeedback(userId);
+      // For questions about message history, try to find relevant messages first
+      const isQuery = content.toLowerCase().includes('what') ||
+                     content.toLowerCase().includes('when') ||
+                     content.toLowerCase().includes('who') ||
+                     content.toLowerCase().includes('how') ||
+                     content.toLowerCase().includes('why') ||
+                     content.toLowerCase().includes('?');
 
-      // Different system prompts based on whether the message appears to be a question about past messages
-      const isQueryAboutHistory = content.toLowerCase().includes('what') ||
-                                content.toLowerCase().includes('when') ||
-                                content.toLowerCase().includes('who') ||
-                                content.toLowerCase().includes('how') ||
-                                content.toLowerCase().includes('why') ||
-                                content.toLowerCase().includes('?');
+      // If it's a query, try to find relevant messages first
+      const relevantMessages = isQuery 
+        ? await getUserMessages(userId, content.replace(/[?.,!]/g, '').split(' ').filter(word => word.length > 3).join(' '))
+        : await getUserMessages(userId);
 
-      let systemPrompt = isQueryAboutHistory
-        ? `You are a helpful AI assistant with access to all conversations in the system. Be concise and direct.
+      const messageHistory = formatMessageHistory(relevantMessages);
 
-Your context:
+      const systemPrompt = isQuery
+        ? `You are a helpful AI assistant with access to the user's entire conversation history across all channels and direct messages. Be concise and direct.
+
+Your context (including message sources and authors):
 ${messageHistory}
 
 Current query: ${content}
@@ -143,16 +129,13 @@ Guidelines:
 - Only mention timestamps if specifically asked about timing
 - Be direct and to the point
 - Focus on answering the specific question asked
-- Include usernames when referring to specific messages
-- Use your understanding of all conversations to provide accurate context-aware responses
-- If referencing a conversation, specify which chat/channel it's from`
+- When referencing messages, always specify their source (channel or DM) and author
+- Use the full context from all conversations to provide accurate, well-informed responses
+- If multiple relevant conversations exist, mention them briefly`
         : `You are a helpful AI assistant. Be concise and match the user's communication style.
 
 Conversation history for context:
 ${messageHistory}
-
-Previous successful responses they liked:
-${acceptedSuggestions.join('\n')}
 
 Guidelines:
 1. Keep responses short and direct (2-3 sentences max)
@@ -173,7 +156,7 @@ Guidelines:
           }
         ],
         temperature: 0.7,
-        max_tokens: 100 
+        max_tokens: 150
       });
 
       return response.choices[0].message.content || "I understand. Could you tell me more?";
@@ -312,3 +295,53 @@ Guidelines:
 }
 
 export const aiService = new AIService();
+
+async function getChannelMessages(channelId: number, limit: number = 100): Promise<Array<{ content: string; username: string; }>> {
+  try {
+    const channelMessages = await db.query.messages.findMany({
+      where: eq(messages.channelId, channelId),
+      orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+      limit,
+      with: {
+        user: {
+          columns: {
+            username: true
+          }
+        }
+      }
+    });
+
+    return channelMessages.map(msg => ({
+      content: msg.content,
+      username: msg.user?.username || 'AI Assistant'
+    }));
+  } catch (error) {
+    console.error("Error fetching channel messages:", error);
+    return [];
+  }
+}
+
+async function getPastSuggestionFeedback(userId: number): Promise<{
+  acceptedSuggestions: string[];
+  rejectedSuggestions: string[];
+}> {
+  try {
+    const feedback = await db.query.suggestionFeedback.findMany({
+      where: eq(suggestionFeedback.userId, userId),
+      orderBy: [desc(suggestionFeedback.createdAt)],
+      limit: 20
+    });
+
+    return {
+      acceptedSuggestions: feedback
+        .filter(f => f.wasAccepted)
+        .map(f => f.suggestedContent),
+      rejectedSuggestions: feedback
+        .filter(f => !f.wasAccepted)
+        .map(f => f.suggestedContent)
+    };
+  } catch (error) {
+    console.error("Error fetching suggestion feedback:", error);
+    return { acceptedSuggestions: [], rejectedSuggestions: [] };
+  }
+}
