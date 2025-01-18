@@ -55,10 +55,9 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message || files.length > 0) {
-      try {
-        setIsUploading(true);
-        let finalMessage = message;
+    try {
+      setIsUploading(true);
+      let finalMessage = message;
 
         if (currentFormat.color) {
           finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
