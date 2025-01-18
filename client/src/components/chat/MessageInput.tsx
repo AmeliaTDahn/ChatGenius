@@ -40,10 +40,7 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   const { toast } = useToast();
 
   const handleSuggestion = async (suggestion: string) => {
-    await new Promise<void>(resolve => {
-      setMessage(suggestion);
-      resolve();
-    });
+    setMessage(suggestion);
     setIsFromSuggestion(true);
     if (textareaRef.current) {
       textareaRef.current.value = suggestion;

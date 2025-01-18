@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,22 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
 import { SuggestionButton } from "./SuggestionButton";
 
-// Helper function to check if a message is directed at a user
-function isMessageDirectedAtUser(message: Message, currentUser: any) {
-  if (!currentUser || !message) return false;
-
-  // Check for @mentions
-  const mentionPattern = new RegExp(`@${currentUser.username}\\b`, 'i');
-  if (mentionPattern.test(message.content)) return true;
-
-  // Check for direct address (starting with the username)
-  if (message.content.toLowerCase().startsWith(currentUser.username.toLowerCase())) return true;
-
-  // If it's a reply to user's message
-  if (message.parentId && message.parentMessage?.userId === currentUser.id) return true;
-
-  return false;
-}
 
 function parseFormattedText(text: string) {
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
@@ -60,6 +44,54 @@ export function MessageList({ channelId }: MessageListProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleGetSuggestion = async () => {
+    try {
+      setIsGeneratingSuggestion(true);
+      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get suggestion');
+      }
+
+      const data = await response.json();
+      toast({
+        title: "Suggested Reply",
+        description: data.suggestion,
+        action: (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+              if (textarea) {
+                textarea.value = data.suggestion;
+                textarea.focus();
+                toast({
+                    duration: 0,
+                    onOpenChange: () => {}
+                  });
+              }
+            }}
+          >
+            Use This
+          </Button>
+        ),
+      });
+    } catch (error) {
+      console.error('Error getting suggestion:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get reply suggestion",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingSuggestion(false);
+    }
+  };
 
   const handleSuggestion = (suggestion: string) => {
     const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
@@ -100,6 +132,12 @@ export function MessageList({ channelId }: MessageListProps) {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const isImageFile = (filename: string, mimeType?: string) => {
+      if (mimeType?.startsWith('image/')) return true;
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+    };
+
     return (
       <div id={`message-${message.id}`} className="flex items-start gap-3 transition-colors duration-200">
         <Avatar className="h-8 w-8 flex-shrink-0">
@@ -130,7 +168,7 @@ export function MessageList({ channelId }: MessageListProps) {
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 space-y-2">
               {message.attachments.map((attachment: MessageAttachment) => {
-                const isImage = attachment.mimeType?.startsWith('image/');
+                const isImage = isImageFile(attachment.filename, attachment.mimeType);
                 const showFallback = failedImages.has(attachment.fileUrl);
 
                 return (
@@ -230,19 +268,16 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   };
 
-  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-  const isLastMessageFromOthers = lastMessage && lastMessage.userId !== user?.id;
-  const isLastMessageDirectedAtUser = lastMessage && isMessageDirectedAtUser(lastMessage, user);
+  const lastMessageFromOthers = messages.length > 0 && messages[messages.length - 1].userId !== user?.id;
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {isLastMessageFromOthers && isLastMessageDirectedAtUser && channelId !== -1 && (
+      {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <SuggestionButton
             channelId={channelId}
             onSuggestion={handleSuggestion}
             disabled={isGeneratingSuggestion}
-            isMessageDirectedAtUser={isLastMessageDirectedAtUser}
           />
         </div>
       )}

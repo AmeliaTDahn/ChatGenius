@@ -8,10 +8,9 @@ interface SuggestionButtonProps {
   channelId: number;
   onSuggestion: (suggestion: string) => void;
   disabled?: boolean;
-  isMessageDirectedAtUser: boolean;
 }
 
-export function SuggestionButton({ channelId, onSuggestion, disabled, isMessageDirectedAtUser }: SuggestionButtonProps) {
+export function SuggestionButton({ channelId, onSuggestion, disabled }: SuggestionButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState("");
@@ -37,15 +36,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled, isMessageD
   };
 
   const handleGetSuggestion = async () => {
-    if (!isMessageDirectedAtUser) {
-      toast({
-        title: "Cannot generate suggestion",
-        description: "This message is not directed at you",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       setIsLoading(true);
       const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
@@ -77,8 +67,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled, isMessageD
   const handleUseSuggestion = async () => {
     if (currentSuggestion) {
       await recordFeedback(currentSuggestion, true);
-      // Add a space character at the end of the suggestion
-      onSuggestion(currentSuggestion + ' ');
+      onSuggestion(currentSuggestion);
       setShowDialog(false);
       setCurrentSuggestion("");
     }
@@ -92,19 +81,13 @@ export function SuggestionButton({ channelId, onSuggestion, disabled, isMessageD
     }
   };
 
-  const handleDialogChange = (open: boolean) => {
-    setShowDialog(open);
-    // Only clear suggestion when the dialog is explicitly closed via buttons
-    // Not when it's dismissed by clicking outside or pressing ESC
-  };
-
   return (
     <>
       <Button
         variant="ghost"
         size="icon"
         onClick={handleGetSuggestion}
-        disabled={disabled || isLoading || !isMessageDirectedAtUser}
+        disabled={disabled || isLoading}
         title="Get AI reply suggestion"
       >
         {isLoading ? (
@@ -114,7 +97,7 @@ export function SuggestionButton({ channelId, onSuggestion, disabled, isMessageD
         )}
       </Button>
 
-      <Dialog open={showDialog} onOpenChange={handleDialogChange}>
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-lg">
           <DialogHeader>
             <DialogTitle>Suggested Reply</DialogTitle>
