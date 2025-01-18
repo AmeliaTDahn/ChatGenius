@@ -172,22 +172,20 @@ Guidelines:
       const channelMessages = await getChannelMessages(channelId);
       const messageHistory = formatMessageHistory(channelMessages);
 
-      const systemPrompt = `You are an expert conversation summarizer. Analyze this conversation and provide a concise, informative summary.
+      const systemPrompt = `You are a concise conversation summarizer. Analyze this conversation and provide a brief, focused summary.
 
 Conversation to summarize:
 ${messageHistory}
 
 Guidelines:
-1. Focus on key topics, decisions, and outcomes
-2. Keep the summary concise (2-3 paragraphs max)
-3. Highlight important decisions or action items
-4. Mention significant participant contributions
-5. Note any unresolved discussions or next steps
-6. Use natural, engaging language
-7. Include timestamps only if they're crucial to understanding the context
-8. Group related topics together
-9. If there are emotional elements or tone changes in the conversation, briefly note them
-10. If technical discussions occur, summarize them in accessible terms`;
+1. Provide ONLY 2-4 sentences total
+2. Focus on the most important topics and decisions
+3. Include key conclusions or action items if any exist
+4. Use clear, direct language
+5. Omit timestamps unless absolutely crucial
+6. Avoid detailed explanations or background information
+7. Skip participant names unless critical to understanding
+8. Focus on outcomes rather than process`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4",
@@ -198,10 +196,10 @@ Guidelines:
           }
         ],
         temperature: 0.7,
-        max_tokens: 500
+        max_tokens: 150 // Reduced from 500 to encourage brevity
       });
 
-      return response.choices[0].message.content || "No significant discussion points to summarize.";
+      return response.choices[0].message.content || "No significant points to summarize.";
     } catch (error) {
       console.error("Error generating conversation summary:", error);
       throw error;
