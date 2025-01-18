@@ -14,6 +14,22 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
 import { SuggestionButton } from "./SuggestionButton";
 
+// Helper function to check if a message is directed at a user
+function isMessageDirectedAtUser(message: Message, currentUser: any) {
+  if (!currentUser || !message) return false;
+
+  // Check for @mentions
+  const mentionPattern = new RegExp(`@${currentUser.username}\\b`, 'i');
+  if (mentionPattern.test(message.content)) return true;
+
+  // Check for direct address (starting with the username)
+  if (message.content.toLowerCase().startsWith(currentUser.username.toLowerCase())) return true;
+
+  // If it's a reply to user's message
+  if (message.parentId && message.parentMessage?.userId === currentUser.id) return true;
+
+  return false;
+}
 
 function parseFormattedText(text: string) {
   text = text.replace(/\[color=(#[0-9a-f]{6})\](.*?)\[\/color\]/gi, 
@@ -44,54 +60,6 @@ export function MessageList({ channelId }: MessageListProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const handleGetSuggestion = async () => {
-    try {
-      setIsGeneratingSuggestion(true);
-      const response = await fetch(`/api/channels/${channelId}/suggest-reply`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get suggestion');
-      }
-
-      const data = await response.json();
-      toast({
-        title: "Suggested Reply",
-        description: data.suggestion,
-        action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-              if (textarea) {
-                textarea.value = data.suggestion;
-                textarea.focus();
-                toast({
-                    duration: 0,
-                    onOpenChange: () => {}
-                  });
-              }
-            }}
-          >
-            Use This
-          </Button>
-        ),
-      });
-    } catch (error) {
-      console.error('Error getting suggestion:', error);
-      toast({
-        title: "Error",
-        description: "Failed to get reply suggestion",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingSuggestion(false);
-    }
-  };
 
   const handleSuggestion = (suggestion: string) => {
     const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
@@ -268,16 +236,17 @@ export function MessageList({ channelId }: MessageListProps) {
     );
   };
 
-  const lastMessageFromOthers = messages.length > 0 && messages[messages.length - 1].userId !== user?.id;
-
   return (
     <div className="flex h-full overflow-hidden relative">
-      {messages.length > 0 && channelId !== -1 && messages[messages.length - 1].userId !== user?.id && (
+      {messages.length > 0 && channelId !== -1 && 
+       messages[messages.length - 1].userId !== user?.id &&
+       isMessageDirectedAtUser(messages[messages.length - 1], user) && (
         <div className="absolute top-0 right-4 z-10 p-4 bg-background/80 backdrop-blur-sm rounded-b-lg shadow-lg">
           <SuggestionButton
             channelId={channelId}
             onSuggestion={handleSuggestion}
             disabled={isGeneratingSuggestion}
+            isMessageDirectedAtUser={true}
           />
         </div>
       )}

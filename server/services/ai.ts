@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "@db";
-import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels } from "@db/schema";
+import { messages, suggestionFeedback, channelMembers, friends, directMessageChannels, channels, users } from "@db/schema";
 import { eq, desc, and, or, inArray, not, ilike } from "drizzle-orm";
 
 if (!process.env.OPENAI_API_KEY) {
@@ -98,6 +98,49 @@ function formatMessageHistory(messages: MessageWithContext[]): string {
     .join('\n');
 }
 
+interface MessageWithUser {
+  content: string;
+  userId: number;
+  user: {
+    username: string;
+  };
+  parentId?: number | null;
+  parentMessage?: {
+    userId: number;
+  } | null;
+}
+
+async function isMessageDirectedAtUser(message: MessageWithUser, userId: number): Promise<boolean> {
+  if (!message || message.userId === userId) return false;
+
+  try {
+    // Get user info
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: {
+        username: true
+      }
+    });
+
+    if (!user) return false;
+
+    // Check for @mentions
+    const mentionPattern = new RegExp(`@${user.username}\\b`, 'i');
+    if (mentionPattern.test(message.content)) return true;
+
+    // Check for direct address
+    if (message.content.toLowerCase().startsWith(user.username.toLowerCase())) return true;
+
+    // Check if it's a reply to user's message
+    if (message.parentId && message.parentMessage?.userId === userId) return true;
+
+    return false;
+  } catch (error) {
+    console.error("Error checking if message is directed at user:", error);
+    return false;
+  }
+}
+
 class AIService {
   async processMessage(content: string, userId: number): Promise<string> {
     try {
@@ -166,56 +209,9 @@ Guidelines:
     }
   }
 
-  async generateConversationSummary(channelId: number): Promise<string> {
-    try {
-      // Get channel messages and global context from active conversations
-      const channelMessages = await getChannelMessages(channelId);
-      const messageHistory = formatMessageHistory(channelMessages);
-
-      const systemPrompt = `You are a concise conversation summarizer. Analyze this conversation and provide a brief, focused summary.
-
-Conversation to summarize:
-${messageHistory}
-
-Guidelines:
-1. Provide ONLY 2-4 sentences total
-2. Focus on the most important topics and decisions
-3. Include key conclusions or action items if any exist
-4. Use clear, direct language
-5. Omit timestamps unless absolutely crucial
-6. Avoid detailed explanations or background information
-7. Skip participant names unless critical to understanding
-8. Focus on outcomes rather than process`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 150 // Reduced from 500 to encourage brevity
-      });
-
-      return response.choices[0].message.content || "No significant points to summarize.";
-    } catch (error) {
-      console.error("Error generating conversation summary:", error);
-      throw error;
-    }
-  }
-
   async generateReplySuggestion(channelId: number, userId: number): Promise<string> {
     try {
       const userHistory = await getUserMessages(userId);
-      const [lastMessage] = await db
-        .select()
-        .from(messages)
-        .where(eq(messages.channelId, channelId))
-        .orderBy(desc(messages.createdAt))
-        .limit(1);
-
       if (!userHistory) {
         throw new Error("No message history found for user");
       }
@@ -309,16 +305,17 @@ ${rejectedSuggestions.length > 0 ? `7. Avoid patterns similar to these disliked 
     userId: number,
     channelId: number,
     content: string,
-    wasAccepted: boolean
+    wasAccepted: boolean,
+    wasLiked?: boolean
   ): Promise<void> {
     try {
-      await db.update(suggestionFeedback)
-        .set({ wasAccepted })
-        .where(and(
-          eq(suggestionFeedback.userId, userId),
-          eq(suggestionFeedback.channelId, channelId),
-          eq(suggestionFeedback.suggestedContent, content)
-        ));
+      await db.insert(suggestionFeedback).values({
+        userId,
+        channelId,
+        suggestedContent: content,
+        wasAccepted,
+        wasLiked
+      });
     } catch (error) {
       console.error("Error recording suggestion feedback:", error);
       throw error;
@@ -327,6 +324,31 @@ ${rejectedSuggestions.length > 0 ? `7. Avoid patterns similar to these disliked 
 }
 
 export const aiService = new AIService();
+
+async function getPastSuggestionFeedback(userId: number): Promise<{
+  acceptedSuggestions: string[];
+  rejectedSuggestions: string[];
+}> {
+  try {
+    const feedback = await db.query.suggestionFeedback.findMany({
+      where: eq(suggestionFeedback.userId, userId),
+      orderBy: [desc(suggestionFeedback.createdAt)],
+      limit: 20
+    });
+
+    return {
+      acceptedSuggestions: feedback
+        .filter(f => f.wasLiked === true)
+        .map(f => f.suggestedContent),
+      rejectedSuggestions: feedback
+        .filter(f => f.wasLiked === false)
+        .map(f => f.suggestedContent)
+    };
+  } catch (error) {
+    console.error("Error fetching suggestion feedback:", error);
+    return { acceptedSuggestions: [], rejectedSuggestions: [] };
+  }
+}
 
 async function getChannelMessages(channelId: number, limit: number = 100): Promise<Array<MessageWithContext>> {
   try {
@@ -354,38 +376,4 @@ async function getChannelMessages(channelId: number, limit: number = 100): Promi
     console.error("Error fetching channel messages:", error);
     return [];
   }
-}
-
-async function getPastSuggestionFeedback(userId: number): Promise<{
-  acceptedSuggestions: string[];
-  rejectedSuggestions: string[];
-}> {
-  try {
-    const feedback = await db.query.suggestionFeedback.findMany({
-      where: eq(suggestionFeedback.userId, userId),
-      orderBy: [desc(suggestionFeedback.createdAt)],
-      limit: 20
-    });
-
-    return {
-      acceptedSuggestions: feedback
-        .filter(f => f.wasLiked === true)
-        .map(f => f.suggestedContent),
-      rejectedSuggestions: feedback
-        .filter(f => f.wasLiked === false)
-        .map(f => f.suggestedContent)
-    };
-  } catch (error) {
-    console.error("Error fetching suggestion feedback:", error);
-    return { acceptedSuggestions: [], rejectedSuggestions: [] };
-  }
-}
-
-// Added helper function
-async function isMessageDirectedAtUser(message: any, userId: number): Promise<boolean> {
-  // Implement your logic to determine if a message is directed at a user.
-  // This might involve checking mentions, direct addressing, or other criteria.
-  // For simplicity, this example checks if the message content contains the user's ID.  Replace with your actual logic.
-
-  return message.content.includes(String(userId));
 }
