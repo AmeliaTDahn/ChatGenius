@@ -61,7 +61,8 @@ class VoiceService {
     let settings: VoiceEmotionSettings = {
       stability: 0.75,
       similarity_boost: 0.75,
-      speaking_rate: 1.0
+      speaking_rate: 1.0,
+      pitch: 1.0
     };
 
     const endsWithQuestion = text.trim().endsWith('?');
@@ -77,21 +78,33 @@ class VoiceService {
 
     // Direct emotional expressions with intensity patterns
     const directEmotionPatterns = [
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(sad|down|upset)/i, emotion: 'sad', intensity: 'low' },
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(happy|excited|joyful|thrilled|ecstatic)/i, emotion: 'happy', intensity: 'high' },
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(happy|cheerful|good)/i, emotion: 'happy', intensity: 'low' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(sad|depressed|down|upset|heartbroken)/i, emotion: 'sad', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(sad|down|upset)/i, emotion: 'sad', intensity: 'low' },
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(angry|furious|mad|outraged|livid)/i, emotion: 'angry', intensity: 'high' },
       { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(angry|annoyed|irritated)/i, emotion: 'angry', intensity: 'low' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(calm|peaceful|relaxed|serene)/i, emotion: 'calm', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(calm|relaxed)/i, emotion: 'calm', intensity: 'low' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(worried|anxious|nervous|scared|terrified)/i, emotion: 'worried', intensity: 'high' },
-      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(worried|concerned|uneasy)/i, emotion: 'worried', intensity: 'low' }
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:so |really |very |extremely )?(excited|thrilled|pumped|stoked)/i, emotion: 'excited', intensity: 'high' },
+      { regex: /(?:i (?:am|feel)|i'm|feeling) (?:a (?:bit|little) )?(excited|eager)/i, emotion: 'excited', intensity: 'low' }
     ];
 
     for (const pattern of directEmotionPatterns) {
       if (pattern.regex.test(text)) {
         switch (pattern.emotion) {
+          case 'happy':
+            return {
+              stability: pattern.intensity === 'high' ? 0.35 : 0.45, // Lower stability for more expressiveness
+              similarity_boost: pattern.intensity === 'high' ? 0.85 : 0.8,
+              speaking_rate: pattern.intensity === 'high' ? 1.3 : 1.2, // Faster for happiness
+              pitch: pattern.intensity === 'high' ? 1.2 : 1.15 // Higher pitch for happiness
+            };
+          case 'excited':
+            return {
+              stability: pattern.intensity === 'high' ? 0.3 : 0.4, // Even lower stability for excitement
+              similarity_boost: pattern.intensity === 'high' ? 0.9 : 0.85,
+              speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3, // Fastest for excitement
+              pitch: pattern.intensity === 'high' ? 1.25 : 1.2 // Highest pitch for excitement
+            };
           case 'sad':
             return {
               stability: pattern.intensity === 'high' ? 0.9 : 0.8,
@@ -99,33 +112,12 @@ class VoiceService {
               speaking_rate: pattern.intensity === 'high' ? 0.8 : 0.9,
               pitch: pattern.intensity === 'high' ? 0.85 : 0.9
             };
-          case 'happy':
-            return {
-              stability: pattern.intensity === 'high' ? 0.2 : 0.3,
-              similarity_boost: pattern.intensity === 'high' ? 0.85 : 0.8,
-              speaking_rate: pattern.intensity === 'high' ? 1.2 : 1.1,
-              pitch: pattern.intensity === 'high' ? 1.1 : 1.05
-            };
           case 'angry':
             return {
               stability: pattern.intensity === 'high' ? 0.15 : 0.25,
               similarity_boost: pattern.intensity === 'high' ? 0.95 : 0.9,
               speaking_rate: pattern.intensity === 'high' ? 1.4 : 1.3,
               pitch: pattern.intensity === 'high' ? 1.2 : 1.15
-            };
-          case 'calm':
-            return {
-              stability: pattern.intensity === 'high' ? 0.95 : 0.9,
-              similarity_boost: pattern.intensity === 'high' ? 0.65 : 0.7,
-              speaking_rate: pattern.intensity === 'high' ? 0.85 : 0.9,
-              pitch: pattern.intensity === 'high' ? 0.9 : 0.95
-            };
-          case 'worried':
-            return {
-              stability: pattern.intensity === 'high' ? 0.5 : 0.6,
-              similarity_boost: pattern.intensity === 'high' ? 0.8 : 0.75,
-              speaking_rate: pattern.intensity === 'high' ? 1.15 : 1.1,
-              pitch: pattern.intensity === 'high' ? 1.1 : 1.05
             };
         }
       }
@@ -147,15 +139,23 @@ class VoiceService {
       current[1] > max[1] ? current : max, ['none', 0]
     );
 
-    // Apply settings based on dominant emotion
+    // Apply settings based on dominant emotion with enhanced positive emotion handling
     if (maxEmotion[1] > 0) {
       switch (maxEmotion[0]) {
         case 'positive':
           settings = {
-            stability: 0.3,
-            similarity_boost: 0.8,
-            speaking_rate: 1.15,
-            pitch: 1.1
+            stability: 0.4, // Lower stability for more expressiveness
+            similarity_boost: 0.85,
+            speaking_rate: 1.25, // Increased rate for positive tone
+            pitch: 1.15 // Higher pitch for positive tone
+          };
+          break;
+        case 'excited':
+          settings = {
+            stability: 0.3, // Even lower stability for excitement
+            similarity_boost: 0.9,
+            speaking_rate: 1.35, // Fastest rate for excitement
+            pitch: 1.2 // Highest pitch for excitement
           };
           break;
         case 'negative':
@@ -174,14 +174,6 @@ class VoiceService {
             pitch: 1.15
           };
           break;
-        case 'excited':
-          settings = {
-            stability: 0.25,
-            similarity_boost: 0.85,
-            speaking_rate: 1.25,
-            pitch: 1.1
-          };
-          break;
         case 'calm':
           settings = {
             stability: 0.85,
@@ -191,6 +183,16 @@ class VoiceService {
           };
           break;
       }
+    }
+
+    // Additional analysis for exclamation marks and uppercase words
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const hasUppercaseWords = /[A-Z]{2,}/.test(text);
+
+    if (exclamationCount > 0 || hasUppercaseWords) {
+      settings.stability = Math.max(0.3, settings.stability - 0.1 * exclamationCount);
+      settings.speaking_rate = Math.min(1.4, settings.speaking_rate! + 0.1 * exclamationCount);
+      settings.pitch = Math.min(1.25, settings.pitch! + 0.05 * exclamationCount);
     }
 
     return settings;
@@ -203,6 +205,7 @@ class VoiceService {
 
       // Analyze text for emotion-based settings
       const emotionSettings = this.analyzeTextEmotion(text);
+      console.log("Emotion settings:", emotionSettings);
 
       const response = await fetch(
         `${this.baseUrl}/text-to-speech/${finalVoiceId}/stream`,
