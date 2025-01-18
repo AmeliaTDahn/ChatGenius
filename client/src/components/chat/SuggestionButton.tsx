@@ -94,7 +94,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
       await recordUsageFeedback(currentSuggestion, true);
       onSuggestion(currentSuggestion);
       setShowDialog(false);
-      setCurrentSuggestion("");
     }
   };
 
