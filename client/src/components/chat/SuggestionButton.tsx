@@ -29,13 +29,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
         }),
         credentials: 'include',
       });
-
-      toast({
-        description: "Feedback received",
-        duration: 3000,
-      });
-
-      // Don't clear suggestion state here
     } catch (error) {
       console.error('Error recording style feedback:', error);
     }
@@ -101,7 +94,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
     if (currentSuggestion) {
       await recordUsageFeedback(currentSuggestion, false);
       setShowDialog(false);
-      //setCurrentSuggestion(""); // Removed this line
     }
   };
 
@@ -113,8 +105,6 @@ export function SuggestionButton({ channelId, onSuggestion, disabled }: Suggesti
 
   const handleDialogChange = (open: boolean) => {
     setShowDialog(open);
-    // Only clear suggestion when the dialog is explicitly closed via buttons
-    // Not when it's dismissed by clicking outside or pressing ESC
   };
 
   return (
