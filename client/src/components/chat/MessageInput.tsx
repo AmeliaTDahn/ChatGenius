@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef } from "react";
 import { SendHorizontal, Paperclip, X, Bold, Italic, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,29 +33,10 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   });
   const [isUploading, setIsUploading] = useState(false);
   const [isFromSuggestion, setIsFromSuggestion] = useState(false);
-  const [isFromPaste, setIsFromPaste] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  const handleSuggestion = async (suggestion: string) => {
-    setMessage(suggestion);
-    setIsFromSuggestion(true);
-    if (textareaRef.current) {
-      textareaRef.current.value = suggestion;
-      textareaRef.current.focus();
-      const length = suggestion.length;
-      textareaRef.current.setSelectionRange(length, length);
-      textareaRef.current.style.height = "inherit";
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        200
-      )}px`;
-      textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    await handleSubmit(new Event('submit') as unknown as React.FormEvent);
-  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -69,10 +50,10 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message || files.length > 0) {
+    if (message.trim() || files.length > 0) {
       try {
         setIsUploading(true);
-        let finalMessage = message;
+        let finalMessage = message.trim();
 
         if (currentFormat.color) {
           finalMessage = `[color=${currentFormat.color}]${finalMessage}[/color]`;
@@ -93,7 +74,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
           color: null
         });
         setIsFromSuggestion(false);
-        setIsFromPaste(false);
       } catch (error) {
         toast({
           title: "Error",
@@ -107,7 +87,8 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !isFromSuggestion) {
+    // Allow Enter key if it's a suggested reply being sent
+    if (e.key === "Enter" && !e.shiftKey && (isFromSuggestion || message.trim() !== "")) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -115,23 +96,16 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-    if (!isFromPaste) {
-      setIsFromSuggestion(false);
-    }
-    setIsFromPaste(false);
   };
 
-  const handlePaste = async (e: React.ClipboardEvent) => {
-    const pastedText = e.clipboardData.getData('text');
-    if (pastedText) {
-      setMessage(pastedText);
-      if (isFromSuggestion) {
-        e.preventDefault();
-        setTimeout(() => {
-          handleSubmit(new Event('submit') as unknown as React.FormEvent);
-        }, 0);
-      }
-      setIsFromPaste(true);
+  // This will be called by the parent component when a suggestion is used
+  const handleSuggestionPaste = (text: string) => {
+    setMessage(text);
+    setIsFromSuggestion(true);
+    if (textareaRef.current) {
+      textareaRef.current.value = text;
+      textareaRef.current.focus();
+      handleSubmit(new Event('submit') as unknown as React.FormEvent);
     }
   };
 
@@ -279,8 +253,9 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
           {channelId && channelId !== -1 && (
             <SuggestionButton
               channelId={channelId}
-              onSuggestion={handleSuggestion}
+              onSuggestion={handleSuggestionPaste}
               disabled={disabled}
+              isMessageDirectedAtUser={true} // Added to address potential issue.  This might need adjustment depending on SuggestionButton's implementation.
             />
           )}
         </div>
@@ -290,7 +265,6 @@ export function MessageInput({ onSendMessage, channelId, disabled, placeholder }
             value={message}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
             placeholder={placeholder || "Type a message..."}
             className="min-h-[44px] max-h-[200px] resize-none pr-14"
             style={{
